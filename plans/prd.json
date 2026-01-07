@@ -1,0 +1,104 @@
+{
+  "id": "initial-sprint",
+  "name": "Initial Sprint",
+  "goal": "Set up project infrastructure and core features",
+  "deadline": "2026-02-01T00:00:00.000Z",
+  "status": "active",
+  "columns": [
+    {
+      "id": "backlog",
+      "name": "Backlog",
+      "order": 0
+    },
+    {
+      "id": "todo",
+      "name": "To Do",
+      "order": 1
+    },
+    {
+      "id": "in_progress",
+      "name": "In Progress",
+      "order": 2
+    },
+    {
+      "id": "review",
+      "name": "Review",
+      "order": 3
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "order": 4
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task-001",
+      "category": "functional",
+      "description": "User can create a new task in the Kanban board",
+      "steps": [
+        "Navigate to active board view",
+        "Click 'New Task' button",
+        "Fill in task details (description, priority, estimate)",
+        "Save task",
+        "Verify task appears in the backlog column"
+      ],
+      "passes": false,
+      "status": "todo",
+      "priority": "high",
+      "estimate": 3,
+      "createdAt": "2026-01-07T00:00:00.000Z",
+      "updatedAt": "2026-01-07T00:00:00.000Z",
+      "tags": ["ui", "crud"],
+      "filesTouched": []
+    },
+    {
+      "id": "task-002",
+      "category": "functional",
+      "description": "User can drag and drop tasks between columns",
+      "steps": [
+        "Navigate to board with tasks",
+        "Drag a task from one column to another",
+        "Verify task moves to new column",
+        "Verify task status is updated",
+        "Refresh page and verify persistence"
+      ],
+      "passes": false,
+      "status": "todo",
+      "priority": "high",
+      "estimate": 5,
+      "createdAt": "2026-01-07T00:00:00.000Z",
+      "updatedAt": "2026-01-07T00:00:00.000Z",
+      "tags": ["ui", "drag-drop"],
+      "filesTouched": []
+    },
+    {
+      "id": "task-003",
+      "category": "functional",
+      "description": "AI can generate new tasks from a description",
+      "steps": [
+        "Navigate to board",
+        "Click 'AI Generate Tasks' button",
+        "Enter project description or feature request",
+        "Submit to AI",
+        "Verify multiple relevant tasks are created",
+        "Verify tasks have proper acceptance criteria"
+      ],
+      "passes": false,
+      "status": "backlog",
+      "priority": "medium",
+      "estimate": 8,
+      "createdAt": "2026-01-07T00:00:00.000Z",
+      "updatedAt": "2026-01-07T00:00:00.000Z",
+      "tags": ["ai", "generation"],
+      "filesTouched": []
+    }
+  ],
+  "createdAt": "2026-01-07T00:00:00.000Z",
+  "updatedAt": "2026-01-07T00:00:00.000Z",
+  "metrics": {
+    "velocity": 0,
+    "completed": 0,
+    "total": 3
+  }
+}
