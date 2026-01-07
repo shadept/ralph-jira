@@ -49,6 +49,12 @@
     "setup": [
       "npm ci"
     ],
-    "maxIterations": 5
+    "maxIterations": 5,
+    "agent": {
+      "name": "claude",
+      "model": "opus-4.5",
+      "permissionMode": "acceptEdits",
+      "extraArgs": []
+    }
   }
 }

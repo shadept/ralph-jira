@@ -29,6 +29,23 @@ function resolveBoardId(board: Board, requestedId?: string) {
 interface RunRequestPayload {
   boardId?: string;
   maxIterations?: number;
+  branchName?: string;
+}
+
+function normalizeBranchName(value?: string) {
+  if (typeof value !== 'string') return '';
+  return value.trim();
+}
+
+function isValidBranchName(name: string) {
+  if (!name) return false;
+  if (/\s/.test(name)) return false;
+  if (name.includes('..')) return false;
+  if (name.startsWith('/') || name.endsWith('/') || name.endsWith('.lock')) return false;
+  if (name.includes('~') || name.includes('^') || name.includes(':') || name.includes('?') || name.includes('*') || name.includes('[')) {
+    return false;
+  }
+  return /^[A-Za-z0-9._\/-]+$/.test(name);
 }
 
 function resolveRunnerCommand(params: {
@@ -58,6 +75,13 @@ export async function POST(request: Request) {
   try {
     const payload: RunRequestPayload = await request.json().catch(() => ({}));
     const requestedBoardId = payload.boardId || DEFAULT_BOARD_ID;
+    const branchName = normalizeBranchName(payload.branchName);
+    if (!isValidBranchName(branchName)) {
+      return NextResponse.json(
+        { error: 'branchName is required and may only include letters, numbers, ., -, _, and / (no spaces).' },
+        { status: 400 },
+      );
+    }
     const { project, storage } = await getProjectStorage(request);
 
     const board = await storage.readBoard(requestedBoardId);
@@ -74,6 +98,7 @@ export async function POST(request: Request) {
       selectedTaskIds: selectTaskIds(board),
       maxIterations,
       executorMode,
+      sandboxBranch: branchName,
     });
 
     await writeRun(project.path, runRecord);

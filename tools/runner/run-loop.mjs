@@ -16,7 +16,14 @@ If, while implementing the feature, you notice the PRD is complete, output <prom
 
 const PENDING_STATUSES = new Set(['todo', 'in_progress']);
 const MAX_LOG_SNIPPET = 1200;
-const DEFAULT_SETUP = ['npm ci'];
+const DEFAULT_SETUP = Object.freeze([]);
+const DEFAULT_AGENT_NAME = 'claude';
+const DEFAULT_CLAUDE_MODEL = 'opus-4.5';
+
+function normalizeStringArray(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map(item => `${item}`.trim()).filter(Boolean);
+}
 
 class CancellationSignal extends Error {}
 
@@ -87,6 +94,7 @@ class RunLoop {
     this.runFile = path.join(projectPath, 'plans', 'runs', `${runId}.json`);
     this.rootProgressFile = path.join(projectPath, 'progress.txt');
     this.settingsPath = path.join(projectPath, 'plans', 'settings.json');
+    this.sandboxSettingsPath = null;
     this.run = null;
     this.sandboxDir = null;
     this.sandboxBoardPath = null;
@@ -95,12 +103,21 @@ class RunLoop {
     this.persistedLogPath = null;
     this.cancelFlagPath = null;
     this.settings = null;
+    this.setupCommands = DEFAULT_SETUP;
+    this.worktreeAdded = false;
+    this.worktreeBranch = null;
     this.passed = 0;
     this.failed = 0;
     this.reason = 'completed';
     this.status = 'completed';
-    this.agentName = (process.env.RUN_LOOP_AGENT || 'claude').toLowerCase();
+    const envAgentName = process.env.RUN_LOOP_AGENT || DEFAULT_AGENT_NAME;
+    this.agentName = envAgentName.toLowerCase();
     this.agentBin = process.env.RUN_LOOP_AGENT_BIN || this.agentName;
+    this.agentModel = process.env.RUN_LOOP_AGENT_MODEL || null;
+    this.agentExtraArgsFromEnv = Object.prototype.hasOwnProperty.call(
+      process.env,
+      'RUN_LOOP_AGENT_EXTRA_ARGS',
+    );
     this.agentExtraArgs = parseAgentExtraArgs();
     this.claudePermissionMode = process.env.RUN_LOOP_CLAUDE_PERMISSION_MODE || 'acceptEdits';
   }
@@ -119,7 +136,15 @@ class RunLoop {
       this.run.logPath || path.join('plans', 'runs', `${this.runId}.progress.txt`),
     );
     this.cancelFlagPath = path.join(this.projectPath, this.run.cancelFlagPath);
-    this.settings = await readJson(this.settingsPath);
+    const configuredBranch =
+      typeof this.run.sandboxBranch === 'string' && this.run.sandboxBranch.trim().length
+        ? this.run.sandboxBranch.trim()
+        : `run-${this.runId}`;
+    this.worktreeBranch = configuredBranch;
+    if (this.run.sandboxBranch !== configuredBranch) {
+      await this.updateRun({ sandboxBranch: configuredBranch });
+    }
+    await this.loadSettingsFrom(this.settingsPath);
   }
 
   async updateRun(patch) {
@@ -144,34 +169,137 @@ class RunLoop {
     await fs.appendFile(this.rootProgressFile, block, 'utf-8');
   }
 
-  async ensureSandboxBase() {
+  async ensureSandboxParent() {
     await fs.mkdir(path.dirname(this.sandboxDir), { recursive: true });
-    if (await fileExists(this.sandboxDir)) {
-      await fs.rm(this.sandboxDir, { recursive: true, force: true });
+  }
+
+  getEffectiveBranchName() {
+    if (this.worktreeBranch?.trim().length) {
+      return this.worktreeBranch.trim();
     }
+    if (this.run?.sandboxBranch?.trim().length) {
+      return this.run.sandboxBranch.trim();
+    }
+    return `run-${this.runId}`;
+  }
+
+  async branchExists(branchName) {
+    const result = await this.runCommand('git', ['rev-parse', '--verify', branchName], this.projectPath);
+    return result.code === 0;
   }
 
   async checkoutWorkspace() {
-    await this.ensureSandboxBase();
-    const cloneArgs = ['clone', '--local', this.projectPath, this.sandboxDir];
-    try {
-      await this.runCommand('git', cloneArgs, this.projectPath);
-    } catch (error) {
-      console.warn('git clone --local failed, falling back to fs copy', error.message || error);
-      await fs.cp(this.projectPath, this.sandboxDir, {
-        recursive: true,
-        filter: source => {
-          const rel = path.relative(this.projectPath, source);
-          if (!rel) return true;
-          if (rel.startsWith('.git')) return false;
-          if (rel.startsWith('.pm')) return false;
-          if (rel.startsWith(`plans${path.sep}runs`)) return false;
-          if (rel.startsWith('node_modules')) return false;
-          if (rel.startsWith('.next')) return false;
-          return true;
-        },
-      });
+    await this.ensureSandboxParent();
+    await this.removeWorktree({ silent: true });
+    const branchName = this.getEffectiveBranchName();
+    this.worktreeBranch = branchName;
+    const branchExists = await this.branchExists(branchName);
+    const args = branchExists
+      ? ['worktree', 'add', '--force', this.sandboxDir, branchName]
+      : ['worktree', 'add', '--force', '-b', branchName, this.sandboxDir];
+    const result = await this.runCommand('git', args, this.projectPath);
+    if (result.code !== 0) {
+      const snippet = limitOutput(result.stderr || result.stdout || '');
+      throw new Error(`git worktree add failed (code ${result.code}). ${snippet}`.trim());
     }
+    if (!this.run?.sandboxBranch || this.run.sandboxBranch !== branchName) {
+      await this.updateRun({ sandboxBranch: branchName });
+    }
+    this.worktreeAdded = true;
+  }
+
+  async removeWorktree(options = {}) {
+    const { silent = false } = options;
+    try {
+      const result = await this.runCommand(
+        'git',
+        ['worktree', 'remove', '--force', this.sandboxDir],
+        this.projectPath,
+      );
+      if (result.code !== 0 && !silent) {
+        const snippet = limitOutput(result.stderr || result.stdout || '');
+        console.warn(`git worktree remove failed (code ${result.code}). ${snippet}`.trim());
+      }
+    } catch (error) {
+      if (!silent) {
+        console.warn('Unable to execute git worktree remove', error);
+      }
+    }
+
+    this.worktreeAdded = false;
+    try {
+      await fs.rm(this.sandboxDir, { recursive: true, force: true });
+    } catch (error) {
+      if (!silent && error.code !== 'ENOENT') {
+        console.warn('Unable to delete sandbox directory', error);
+      }
+    }
+
+    // Keep the branch around for review/merge; just clear local reference
+    this.worktreeBranch = null;
+  }
+
+  async cleanupSandbox() {
+    if (!this.worktreeAdded && !(await fileExists(this.sandboxDir))) {
+      return;
+    }
+    const safeToDelete = await this.ensureWorktreeSafeToDelete();
+    if (!safeToDelete) {
+      const branchName = this.getEffectiveBranchName();
+      await this.appendSandboxLog(
+        `Skipping sandbox cleanup for branch ${branchName} due to uncommitted or unpushed work. Push commits to origin before rerunning cleanup.`,
+      );
+      return;
+    }
+    await this.removeWorktree({ silent: false });
+  }
+
+  async ensureWorktreeSafeToDelete() {
+    if (!this.worktreeAdded) {
+      return true;
+    }
+
+    const branchName = this.getEffectiveBranchName();
+    if (!branchName) {
+      return true;
+    }
+
+    const statusResult = await this.runCommand('git', ['status', '--porcelain'], this.sandboxDir);
+    if (statusResult.code !== 0) {
+      console.warn('Unable to inspect sandbox status before cleanup');
+      return false;
+    }
+    if (statusResult.stdout.trim().length > 0) {
+      console.warn('Sandbox has uncommitted changes; leaving worktree in place.');
+      return false;
+    }
+
+    const fetchResult = await this.runCommand('git', ['fetch', 'origin', branchName], this.projectPath);
+    if (fetchResult.code !== 0) {
+      console.warn(`Unable to fetch origin/${branchName}. Push your commits before cleanup.`);
+      return false;
+    }
+
+    const aheadResult = await this.runCommand(
+      'git',
+      ['rev-list', '--count', `origin/${branchName}..${branchName}`],
+      this.projectPath,
+    );
+    if (aheadResult.code !== 0) {
+      console.warn('Unable to determine push status for sandbox branch.');
+      return false;
+    }
+    const ahead = parseInt(aheadResult.stdout.trim(), 10);
+    if (Number.isNaN(ahead)) {
+      console.warn('Unexpected response while checking push status.');
+      return false;
+    }
+    if (ahead > 0) {
+      console.warn(`Branch ${branchName} has ${ahead} unpushed commits.`);
+      return false;
+    }
+
+    return true;
   }
 
   async prepareSandboxPlan() {
@@ -180,15 +308,59 @@ class RunLoop {
     const sandboxBoard = { ...board, tasks: filteredTasks };
     await fs.mkdir(path.dirname(this.sandboxBoardPath), { recursive: true });
     await writeJson(this.sandboxBoardPath, sandboxBoard);
-    const sandboxSettingsPath = path.join(this.sandboxDir, 'plans', 'settings.json');
-    await fs.copyFile(this.settingsPath, sandboxSettingsPath);
+    this.sandboxSettingsPath = path.join(this.sandboxDir, 'plans', 'settings.json');
+    await fs.copyFile(this.settingsPath, this.sandboxSettingsPath);
     await fs.writeFile(this.sandboxLogPath, `# Run ${this.runId} progress\n`, 'utf-8');
+    await this.loadSettingsFrom(this.sandboxSettingsPath);
+  }
+
+  async loadSettingsFrom(filePath) {
+    this.settings = await readJson(filePath);
+    this.applyAutomationSettings();
+  }
+
+  applyAutomationSettings() {
+    const automation = this.settings?.automation || {};
+    const setupCommands = normalizeStringArray(automation.setup);
+    this.setupCommands = setupCommands.length ? setupCommands : DEFAULT_SETUP;
+
+    const agentSettings = automation.agent || {};
+    const envAgentName = process.env.RUN_LOOP_AGENT;
+    const envAgentBin = process.env.RUN_LOOP_AGENT_BIN;
+    const envAgentModel = process.env.RUN_LOOP_AGENT_MODEL;
+    const envPermission = process.env.RUN_LOOP_CLAUDE_PERMISSION_MODE;
+
+    const normalizedAgentName =
+      typeof agentSettings.name === 'string' ? agentSettings.name.trim().toLowerCase() : undefined;
+    const resolvedAgentName = (envAgentName || normalizedAgentName || DEFAULT_AGENT_NAME).toLowerCase();
+
+    this.agentName = resolvedAgentName;
+    const normalizedBin = typeof agentSettings.bin === 'string' ? agentSettings.bin.trim() : undefined;
+    this.agentBin = envAgentBin || normalizedBin || this.agentName;
+
+    const defaultModel = resolvedAgentName === 'claude' ? DEFAULT_CLAUDE_MODEL : null;
+    const normalizedModel =
+      typeof agentSettings.model === 'string' && agentSettings.model.trim().length
+        ? agentSettings.model.trim()
+        : undefined;
+    this.agentModel = envAgentModel || normalizedModel || defaultModel;
+
+    const settingsExtraArgs = normalizeStringArray(agentSettings.extraArgs);
+    if (!this.agentExtraArgsFromEnv) {
+      this.agentExtraArgs = [...settingsExtraArgs];
+    }
+
+    const normalizedPermission =
+      typeof agentSettings.permissionMode === 'string' && agentSettings.permissionMode.trim().length
+        ? agentSettings.permissionMode.trim()
+        : undefined;
+
+    this.claudePermissionMode =
+      envPermission || normalizedPermission || this.claudePermissionMode || 'acceptEdits';
   }
 
   getSetupCommands() {
-    const commands = this.settings.automation?.setup;
-    if (Array.isArray(commands) && commands.length) return commands;
-    return DEFAULT_SETUP;
+    return Array.isArray(this.setupCommands) ? [...this.setupCommands] : [];
   }
 
   async runCommand(command, argsOrString, cwd, options = {}) {
@@ -237,11 +409,16 @@ class RunLoop {
   }
 
   getAgentInvocation(prompt) {
-    const extraArgs = this.agentExtraArgs;
+    if (!this.agentModel) {
+      throw new Error(
+        `Agent "${this.agentName}" requires a model. Configure automation.agent.model or RUN_LOOP_AGENT_MODEL.`,
+      );
+    }
+    const baseArgs = [...this.agentExtraArgs, '--model', this.agentModel];
     if (this.agentName === 'opencode') {
       return {
         command: this.agentBin,
-        args: [...extraArgs, '-p', prompt],
+        args: [...baseArgs, '-p', prompt],
         prompt,
       };
     }
@@ -249,7 +426,7 @@ class RunLoop {
     if (this.agentName === 'claude') {
       return {
         command: this.agentBin,
-        args: [...extraArgs, '--permission-mode', this.claudePermissionMode, '-p', prompt],
+        args: [...baseArgs, '--permission-mode', this.claudePermissionMode, '-p', prompt],
         prompt,
       };
     }
@@ -282,6 +459,10 @@ class RunLoop {
 
   async runSetup() {
     const commands = this.getSetupCommands();
+    if (!commands.length) {
+      await this.appendSandboxLog('No setup commands configured. Skipping setup step.');
+      return;
+    }
     for (const command of commands) {
       await this.appendSandboxLog(`Running setup command: ${command}`);
       const result = await this.runCommand(command, command, this.sandboxDir, { shell: true });
@@ -391,7 +572,7 @@ class RunLoop {
 
       await this.updateRun({
         currentIteration: iteration,
-        lastTaskId: null,
+        lastTaskId: undefined,
         lastMessage: `Iteration ${iteration}: running ${this.agentName}`,
       });
 
@@ -455,6 +636,12 @@ class RunLoop {
       `Details: plans/runs/${this.runId}.json`,
     ].join('\n');
     await this.appendRootProgress(summary);
+
+    try {
+      await this.cleanupSandbox();
+    } catch (error) {
+      console.warn('Unable to clean up sandbox workspace', error);
+    }
   }
 }
 

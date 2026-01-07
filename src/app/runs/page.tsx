@@ -115,7 +115,11 @@ export default function RunsPage() {
             <CardHeader className="flex flex-row items-start justify-between gap-4">
               <div>
                 <CardTitle className="text-base">{run.boardName || run.boardId}</CardTitle>
-                <CardDescription>Run ID: {run.runId}</CardDescription>
+                <CardDescription>
+                  Run ID: {run.runId}
+                  <br />
+                  Branch: {run.sandboxBranch || '—'}
+                </CardDescription>
               </div>
               <Badge className={RUN_STATUS_STYLES[run.status]}>{run.status}</Badge>
             </CardHeader>

@@ -158,6 +158,18 @@ Preserves original required fields and extends with Kanban features:
     naming: string
     commitStyle?: string
   }
+  automation?: {
+    setup?: string[]
+    maxIterations?: number
+    sandboxRoot?: string
+    agent?: {
+      name: 'claude' | 'opencode'
+      model?: string
+      bin?: string
+      permissionMode?: string
+      extraArgs?: string[]
+    }
+  }
 }
 ```
 
@@ -293,12 +305,13 @@ The background loop now lives in `tools/runner/run-loop.mjs`. Instead of a monol
 
 At startup the loop performs the following:
 
-1. Clone or copy the current repo into `.pm/sandboxes/<runId>` (git clone `--local` first, fs copy as a fallback).
+1. Create a git worktree on the operator-specified branch (the UI now prompts for it when starting a run, defaulting to `run-<runId>`) in `.pm/sandboxes/<runId>` so each run has an isolated copy without duplicating the repo.
 2. Copy `plans/settings.json` and generate a sandbox `plans/prd.json` that only includes `todo` or `in_progress` tasks from the active board.
 3. Run sandbox setup commands defined in `plans/settings.json.automation.setup` (defaults to `npm ci`).
 4. Iterate up to `maxIterations`, launching the configured CLI agent (`claude` or `opencode`) with the shared loop prompt so it can decide what to build, run whatever commands/tests it needs, update files, and append its own notes to `progress.txt`. The runner captures stdout/stderr for observability and watches for `<promise>COMPLETE</promise>` to know when to stop.
 5. Respect cancellation by checking for `plans/runs/<runId>.cancel` between every major step.
 6. On completion/cancel/error copy the sandbox log to `plans/runs/<runId>.progress.txt`, sync task fields back into the root `plans/prd.json`, append a summary to the root `progress.txt`, and update the run record with final status + reason (`completed`, `max_iterations`, `canceled`, or `error`).
+7. Remove the git worktree once the branch is clean and pushed so `.pm/sandboxes` stays clean and future runs start with a fresh workspace, while keeping the `run-<runId>` branch available for manual review.
 
 Two execution modes are supported:
 - **Local** (default): the API spawns `node tools/runner/run-loop.mjs --runId <id> --projectPath <root>` as a detached child process.

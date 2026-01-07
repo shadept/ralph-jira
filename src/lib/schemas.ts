@@ -54,10 +54,21 @@ export const BoardSchema = z.object({
 export type Board = z.infer<typeof BoardSchema>;
 
 // Project Settings schema
+const AgentAutomationSchema = z.object({
+  name: z.enum(['claude', 'opencode']).default('claude'),
+  model: z.string().optional(),
+  bin: z.string().optional(),
+  permissionMode: z.string().optional(),
+  extraArgs: z.array(z.string()).default([]),
+});
+
+export type AgentAutomationSettings = z.infer<typeof AgentAutomationSchema>;
+
 const AutomationSettingsSchema = z.object({
-  setup: z.array(z.string()).default(['npm ci']),
+  setup: z.array(z.string()).default([]),
   maxIterations: z.number().int().positive().default(5),
   sandboxRoot: z.string().optional(),
+  agent: AgentAutomationSchema.optional(),
 });
 
 export type AutomationSettings = z.infer<typeof AutomationSettingsSchema>;
@@ -107,6 +118,7 @@ export const RunRecordSchema = z.object({
   reason: RunReasonSchema.optional(),
   boardSourcePath: z.string(),
   sandboxPath: z.string(),
+  sandboxBranch: z.string().optional(),
   cancelFlagPath: z.string(),
   logPath: z.string().optional(),
   sandboxLogPath: z.string().optional(),

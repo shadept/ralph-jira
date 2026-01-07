@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useCallback, useEffect, useState } from 'react';
+import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Sparkle, PlayCircle, ArrowLeft, Plus, ClockCounterClockwise } from '@phosphor-icons/react';
@@ -11,6 +11,8 @@ import { TaskEditorDialog } from '@/components/task-editor-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Sheet,
   SheetContent,
@@ -24,8 +26,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useProjectContext } from '@/components/projects/project-provider';
 import { AppLayout } from '@/components/layout/app-layout';
+import { cn } from '@/lib/utils';
 
 const RUN_TERMINAL_STATUSES = new Set<RunRecord['status']>(['completed', 'failed', 'canceled', 'stopped']);
 const RUN_STATUS_BADGES: Record<RunRecord['status'], string> = {
@@ -60,6 +71,38 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
   const [runDrawerOpen, setRunDrawerOpen] = useState(false);
   const [pollingRunId, setPollingRunId] = useState<string | null>(null);
   const [runLoading, setRunLoading] = useState(false);
+  const [startRunDialogOpen, setStartRunDialogOpen] = useState(false);
+  const [runBranchInput, setRunBranchInput] = useState('');
+  const [runBranchError, setRunBranchError] = useState('');
+  const [boardRunCount, setBoardRunCount] = useState(0);
+
+  const toKebabCase = useCallback((value: string) => {
+    const normalized = value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9./_-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    return normalized;
+  }, []);
+
+  const fallbackBranchBase = useMemo(
+    () => toKebabCase(board?.name || ''),
+    [board?.name, toKebabCase],
+  );
+
+  const generateDefaultBranchName = useCallback(() => {
+    const nextCount = Math.max(boardRunCount, 0) + 1;
+    const suggestion = `${fallbackBranchBase}/run-${nextCount}`;
+    return toKebabCase(suggestion);
+  }, [boardRunCount, fallbackBranchBase, toKebabCase]);
+
+  const normalizedBranchPreview = useMemo(() => {
+    const fallback = generateDefaultBranchName();
+    return toKebabCase(runBranchInput || fallback);
+  }, [runBranchInput, toKebabCase, generateDefaultBranchName]);
+  const branchPreviewDiffers =
+    runBranchInput.trim().length > 0 && normalizedBranchPreview !== runBranchInput.trim();
 
   const closeTaskEditor = () => {
     setIsEditorOpen(false);
@@ -67,6 +110,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
   };
 
   const openTaskEditor = (task: Task) => {
+    if (activeRun?.status === 'running') return;
     setSelectedTask(task);
     setIsEditorOpen(true);
   };
@@ -96,6 +140,13 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
   }, [loadBoard]);
 
   useEffect(() => {
+    if (activeRun?.status === 'running') {
+      setIsEditorOpen(false);
+      setSelectedTask(null);
+    }
+  }, [activeRun?.status]);
+
+  useEffect(() => {
     if (!currentProject) {
       setActiveRun(null);
       setRunLog([]);
@@ -111,6 +162,8 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
         const res = await apiFetch('/api/runs');
         const data = await res.json();
         const runs: RunRecord[] = data.runs || [];
+        const boardRuns = runs.filter(run => run.boardId === id);
+        setBoardRunCount(boardRuns.length);
         const running = runs.find(run => run.status === 'running');
         if (running) {
           setActiveRun(running);
@@ -118,15 +171,13 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
           setPollingRunId(running.runId);
         } else if (runs.length) {
           setActiveRun(runs[0]);
-        } else {
-          setActiveRun(null);
-          setRunLog([]);
         }
       } catch (error) {
-        console.error('Failed to load runs snapshot', error);
+        console.error('Failed to fetch runs', error);
       }
     })();
-  }, [apiFetch, currentProject]);
+  }, [apiFetch, currentProject, id]);
+
 
   const fetchRunStatus = useCallback(async (runId: string) => {
     try {
@@ -264,12 +315,24 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
     }
   };
 
-  const handleStartRun = async () => {
+  const handleRunButtonClick = () => {
     if (!currentProject) return;
     if (activeRun?.status === 'running') {
       toast.info('AI loop already running');
       setRunDrawerOpen(true);
       return;
+    }
+    setRunBranchInput(generateDefaultBranchName());
+    setRunBranchError('');
+    setStartRunDialogOpen(true);
+  };
+
+  const startRun = async (branchName: string) => {
+    if (!currentProject) return false;
+    if (activeRun?.status === 'running') {
+      toast.info('AI loop already running');
+      setRunDrawerOpen(true);
+      return false;
     }
 
     setRunLoading(true);
@@ -277,21 +340,49 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
       const res = await apiFetch('/api/runs/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ boardId: id }),
+        body: JSON.stringify({ boardId: id, branchName }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to start AI loop');
+      }
       setActiveRun(data.run);
       setRunLog([]);
       setRunDrawerOpen(true);
       setPollingRunId(data.run.runId);
+      setBoardRunCount(prev => prev + 1);
       toast.success('AI loop started');
       await fetchRunStatus(data.run.runId);
+      return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to start AI loop';
       toast.error(message);
       console.error('Run start error:', error);
+      return false;
     } finally {
       setRunLoading(false);
+    }
+  };
+
+  const handleRunDialogChange = (open: boolean) => {
+    setStartRunDialogOpen(open);
+    if (!open) {
+      setRunBranchError('');
+    }
+  };
+
+  const handleConfirmRunStart = async () => {
+    const fallback = generateDefaultBranchName();
+    const normalizedBranch = toKebabCase(runBranchInput || fallback);
+    if (!normalizedBranch) {
+      setRunBranchError('Branch name is required');
+      return;
+    }
+    setRunBranchError('');
+    const started = await startRun(normalizedBranch);
+    if (started) {
+      setStartRunDialogOpen(false);
+      setRunBranchInput('');
     }
   };
 
@@ -309,22 +400,27 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
   };
 
   const isRunActive = activeRun?.status === 'running';
+  const boardLocked = isRunActive;
 
   const actions = (
     <div className="flex flex-wrap items-center gap-2">
-      <Button variant="ghost" className="gap-2" onClick={() => router.push('/')}
-        >
+      <Button
+        variant="ghost"
+        className="gap-2"
+        onClick={() => router.push('/')}
+        disabled={boardLocked}
+      >
         <ArrowLeft className="w-4 h-4" />
         Back to Boards
       </Button>
-      <Button variant="outline" onClick={handleNewTask}
+      <Button variant="outline" onClick={handleNewTask} disabled={boardLocked}
         >
         <Plus className="w-4 h-4 mr-2" />
         New Task
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline">
+          <Button variant="outline" disabled={boardLocked}>
             <Sparkle className="w-4 h-4 mr-2" />
             AI Actions
           </Button>
@@ -345,7 +441,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
         <ClockCounterClockwise className="w-4 h-4 mr-2" />
         Run History
       </Button>
-      <Button variant="default" onClick={handleStartRun} disabled={runLoading || isRunActive}>
+      <Button variant="default" onClick={handleRunButtonClick} disabled={runLoading || isRunActive}>
         <PlayCircle className="w-4 h-4 mr-2" />
         {isRunActive ? 'Loop Running…' : 'Run AI Loop'}
       </Button>
@@ -391,11 +487,23 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
 
     return (
       <div className="flex flex-1 flex-col gap-6">
-        <KanbanBoard
-          board={board}
-          onUpdateBoard={handleUpdateBoard}
-          onTaskClick={handleTaskClick}
-        />
+        <div className="relative flex flex-1 flex-col rounded-xl">
+          {boardLocked && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-xl bg-background/70 px-6 text-center backdrop-blur-sm">
+              <p className="text-sm font-semibold text-foreground">AI loop running</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Board edits are temporarily disabled until the run completes or is canceled.
+              </p>
+            </div>
+          )}
+          <div className={cn('flex flex-1 flex-col ', boardLocked && 'pointer-events-none opacity-60')}>
+            <KanbanBoard
+              board={board}
+              onUpdateBoard={handleUpdateBoard}
+              onTaskClick={handleTaskClick}
+            />
+          </div>
+        </div>
 
         <TaskEditorDialog
           task={selectedTask}
@@ -431,7 +539,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
             </SheetDescription>
           </SheetHeader>
           {activeRun ? (
-            <div className="mt-4 space-y-5">
+            <div className="p-4 space-y-5">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Status</p>
@@ -460,6 +568,10 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
                 <div>
                   <p className="text-muted-foreground">Executor</p>
                   <p className="font-medium capitalize">{activeRun.executorMode}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Branch</p>
+                  <p className="font-medium break-words">{activeRun.sandboxBranch || '—'}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Started</p>
@@ -496,6 +608,41 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
           )}
         </SheetContent>
       </Sheet>
+
+      <Dialog open={startRunDialogOpen} onOpenChange={handleRunDialogChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Start AI Loop</DialogTitle>
+            <DialogDescription>
+              Provide the branch name the agent should use. The runner will create a git worktree on this branch
+              and only cleans up the sandbox after commits are pushed to origin.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="runBranch">Branch name</Label>
+            <Input
+              id="runBranch"
+              value={runBranchInput}
+              onChange={(event) => setRunBranchInput(event.target.value)}
+              placeholder="run/feature-awesome"
+              autoFocus
+            />
+            {runBranchError ? (
+              <p className="text-sm text-destructive">{runBranchError}</p>
+            ) : branchPreviewDiffers ? (
+              <p className="text-xs text-muted-foreground">
+                The new branch will be: <code className="rounded bg-muted px-1 py-0.5 text-[11px]">{normalizedBranchPreview}</code>
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => handleRunDialogChange(false)}>Cancel</Button>
+            <Button onClick={handleConfirmRunStart} disabled={runLoading}>
+              {runLoading ? 'Starting…' : 'Start Run'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

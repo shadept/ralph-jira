@@ -81,7 +81,7 @@ On boards:
 The runner autonomously executes tasks from your active board and now runs entirely through the web experience.
 
 #### Run Locally
-- Open any board and click **Run AI Loop** to enqueue a background job
+- Open any board, click **Run AI Loop**, enter (or accept the suggested) review branch name, and enqueue a background job
 - Or send `POST /api/runs/start?projectId=current-workspace` with `{ "boardId": "prd" }`
 - Monitor progress from the run drawer on the board or the `/runs` history page
 
@@ -136,7 +136,7 @@ docker compose up web
 
 ```bash
 # Set RUN_LOOP_EXECUTOR=docker for the web container
-# Then click "Run AI Loop" (the API will spawn `docker compose run runner node tools/runner/run-loop.mjs ...` automatically)
+# Then click "Run AI Loop", provide the branch name, and the API will spawn `docker compose run runner node tools/runner/run-loop.mjs ...` automatically
 ```
 
 #### Environment Variables
@@ -212,12 +212,12 @@ Use Vercel AI SDK v6 with structured outputs (`generateObject`, `generateText`).
 
 - Runs from `tools/runner/run-loop.mjs`, triggered by `POST /api/runs/start` (via the "Run AI Loop" button).
 - Each run writes a control file to `plans/runs/<runId>.json` plus sandbox logs under `.pm/sandboxes/<runId>/`.
-- The runner clones/copies the repo into the sandbox, copies settings/PRD, runs setup (`settings.automation.setup`), then iterates:
+- The runner creates a git worktree on the branch selected in the Run AI modal (e.g. `feature/new-ui`), copies settings/PRD, runs setup (`settings.automation.setup`), then iterates:
   1. Pick the highest-priority task (in_progress → todo) from the sandbox PRD
   2. Call Vercel AI SDK with the system loop prompt for planning notes
   3. Execute `settings.howToTest.commands` inside the sandbox
   4. Update sandbox `plans/prd.json` + `progress.txt`, persist run state, and continue until completion/cancel/max iterations
-- On stop it syncs relevant task fields back into `plans/prd.json`, moves passing tasks to `review`, appends a summary to root `progress.txt`, and archives the sandbox log to `plans/runs/<runId>.progress.txt`.
+- On stop it syncs relevant task fields back into `plans/prd.json`, moves passing tasks to `review`, appends a summary to root `progress.txt`, archives the sandbox log to `plans/runs/<runId>.progress.txt`, and removes the git worktree sandbox once the branch is clean and fully pushed (the `run-<runId>` branch itself remains for review/merge).
 - Two execution modes exist: local (default) and Docker (`RUN_LOOP_EXECUTOR=docker`), both controlled via the same run record so the UI can poll status/log tails in near real time.
 
 ## Configuration
@@ -246,10 +246,21 @@ Edit via UI (`/settings`) or directly in `plans/settings.json`:
   },
   "automation": {
     "setup": ["npm ci"],
-    "maxIterations": 5
+    "maxIterations": 5,
+    "agent": {
+      "name": "claude",
+      "model": "opus-4.5",
+      "permissionMode": "acceptEdits",
+      "extraArgs": []
+    }
   }
 }
 ```
+
+Key automation fields:
+- `setup`: Commands run inside the sandbox before the agent starts (leave empty to skip setup).
+- `maxIterations`: Default iteration budget when launching the loop.
+- `agent`: CLI preferences for the autonomous runner (`name`, `model`, optional `bin`, `permissionMode`, and `extraArgs`).
 
 ### Board Structure
 
@@ -314,6 +325,7 @@ Optional:
 - `RUN_LOOP_EXECUTOR`: Set to `docker` to spawn the loop via `docker compose run runner`
 - `RUN_LOOP_AGENT`: Choose `claude` (default) or `opencode` as the CLI agent
 - `RUN_LOOP_AGENT_BIN`: Override the CLI binary name/path for the agent
+- `RUN_LOOP_AGENT_MODEL`: Force a specific model ID for the CLI agent
 - `RUN_LOOP_AGENT_EXTRA_ARGS`: JSON array of extra flags passed to the agent CLI
 - `RUN_LOOP_CLAUDE_PERMISSION_MODE`: Customize Claude's `--permission-mode` (defaults to `acceptEdits`)
 

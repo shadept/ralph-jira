@@ -165,6 +165,10 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
                 <p className="font-medium capitalize">{run.executorMode}</p>
               </div>
               <div>
+                <p className="text-muted-foreground">Branch</p>
+                <p className="font-medium break-words">{run.sandboxBranch || '—'}</p>
+              </div>
+              <div>
                 <p className="text-muted-foreground">Created</p>
                 <p className="font-medium">{formatDate(run.createdAt)}</p>
               </div>

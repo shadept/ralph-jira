@@ -126,6 +126,7 @@ export function createInitialRunRecord(params: {
   selectedTaskIds: string[];
   maxIterations: number;
   executorMode: 'local' | 'docker';
+  sandboxBranch?: string;
 }): RunRecord {
   const now = new Date().toISOString();
   const relativeSandbox = relativeSandboxPath(params.runId);
@@ -141,6 +142,7 @@ export function createInitialRunRecord(params: {
     reason: undefined,
     boardSourcePath: boardSourcePathFromId(params.boardId),
     sandboxPath: relativeSandbox,
+    sandboxBranch: params.sandboxBranch,
     cancelFlagPath: cancelFlagRelative(params.runId),
     logPath: runLogRelative(params.runId),
     sandboxLogPath: path.join(relativeSandbox, 'progress.txt'),
