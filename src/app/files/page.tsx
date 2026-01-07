@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -89,12 +90,13 @@ export default function FilesPage() {
               <CardDescription>The active board configuration</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                View and edit the active board at{' '}
-                <a href="/board/prd" className="text-primary underline">
-                  /board/prd
-                </a>
-              </p>
+                <p className="text-sm text-muted-foreground">
+                  View and edit the active board at{' '}
+                  <Link href="/board/prd" className="text-primary underline">
+                    /board/prd
+                  </Link>
+                </p>
+
             </CardContent>
           </Card>
         </TabsContent>
@@ -106,12 +108,13 @@ export default function FilesPage() {
               <CardDescription>Project configuration</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                View and edit settings at{' '}
-                <a href="/settings" className="text-primary underline">
-                  /settings
-                </a>
-              </p>
+                <p className="text-sm text-muted-foreground">
+                  View and edit settings at{' '}
+                  <Link href="/settings" className="text-primary underline">
+                    /settings
+                  </Link>
+                </p>
+
             </CardContent>
           </Card>
         </TabsContent>

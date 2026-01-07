@@ -9,7 +9,6 @@
     "shadcn/ui",
     "Vercel AI SDK"
   ],
-  "codingStyle": "Clean, typed TypeScript with functional patterns. Use async/await. Prefer composition over inheritance. Keep functions small and focused.",
   "howToTest": {
     "commands": [
       "npm run typecheck",
@@ -51,10 +50,10 @@
     ],
     "maxIterations": 5,
     "agent": {
-      "name": "claude",
-      "model": "opus-4.5",
-      "permissionMode": "acceptEdits",
+      "name": "opencode",
+      "model": "openai/gpt-5.1-codex",
       "extraArgs": []
-    }
+    },
+    "codingStyle": "Clean, typed TypeScript with functional patterns. Use async/await. Prefer composition over inheritance. Keep functions small and focused."
   }
 }

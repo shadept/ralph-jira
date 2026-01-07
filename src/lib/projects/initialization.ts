@@ -42,7 +42,6 @@ export async function initializeProjectStructure(projectPath: string) {
     projectName: 'New Project',
     projectDescription: 'Describe your project goals and constraints.',
     techStack: [],
-    codingStyle: 'Write clean, maintainable code.',
     howToTest: {
       commands: [],
       notes: '',
@@ -62,6 +61,17 @@ export async function initializeProjectStructure(projectPath: string) {
       folders: {},
       naming: '',
       commitStyle: '',
+    },
+    automation: {
+      codingStyle: 'Write clean, maintainable code.',
+      setup: [],
+      maxIterations: 5,
+      agent: {
+        name: 'claude',
+        model: 'opus-4.5',
+        permissionMode: 'acceptEdits',
+        extraArgs: [],
+      },
     },
   };
 

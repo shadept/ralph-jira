@@ -9,7 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "npm run lint",
-    "verify": "node scripts/verify-setup.js"
+    "verify": "node scripts/verify-setup.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.7",

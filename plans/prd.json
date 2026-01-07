@@ -87,7 +87,7 @@
       ],
       "passes": false,
       "id": "task-1767796987568",
-      "status": "todo",
+      "status": "in_progress",
       "priority": "medium",
       "createdAt": "2026-01-07T14:43:07.568Z",
       "updatedAt": "2026-01-07T18:54:31.452Z",
@@ -99,7 +99,7 @@
     }
   ],
   "createdAt": "2026-01-07T00:00:00.000Z",
-  "updatedAt": "2026-01-07T18:54:31.466Z",
+  "updatedAt": "2026-01-07T22:17:40.538Z",
   "metrics": {
     "velocity": 0,
     "completed": 0,

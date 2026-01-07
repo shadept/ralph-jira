@@ -66,7 +66,9 @@ plans/
 
 - `settings.automation.agent.name` selects the CLI (`claude` or `opencode`).
 - `settings.automation.agent.model` supplies the model identifier (claude defaults to `opus-4.5`).
-- `settings.automation.agent.bin`, `permissionMode`, and `extraArgs` customize the CLI invocation on a per-project basis.
+- `settings.automation.codingStyle` (optional) is appended to the loop prompt in a `<coding-style>` block so agents can follow project-specific guidelines.
+- `settings.automation.agent.permissionMode` and `extraArgs` customize the CLI invocation on a per-project basis (Claude invocations add `--non-interactive` automatically so loops never block waiting for user input). Override the binary via the `RUN_LOOP_AGENT_BIN` environment variable if the default (`claude` or `opencode`) is not sufficient.
+- The settings UI fetches available OpenCode models by running `opencode models` on the server and caches the response until the process restarts.
 - `RUN_LOOP_AGENT`, `RUN_LOOP_AGENT_BIN`, `RUN_LOOP_AGENT_MODEL`, `RUN_LOOP_AGENT_EXTRA_ARGS`, and `RUN_LOOP_CLAUDE_PERMISSION_MODE` override the settings file when present.
 - `RUN_LOOP_EXECUTOR` remains available to switch between local and Docker execution modes.
 

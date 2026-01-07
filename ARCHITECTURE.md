@@ -143,7 +143,6 @@ Preserves original required fields and extends with Kanban features:
   projectName: string
   projectDescription: string
   techStack: string[]
-  codingStyle: string
   howToTest: { commands: string[], notes: string }
   howToRun: { commands: string[], notes: string }
   aiPreferences: {
@@ -159,13 +158,13 @@ Preserves original required fields and extends with Kanban features:
     commitStyle?: string
   }
   automation?: {
+    codingStyle?: string
     setup?: string[]
     maxIterations?: number
     sandboxRoot?: string
     agent?: {
       name: 'claude' | 'opencode'
       model?: string
-      bin?: string
       permissionMode?: string
       extraArgs?: string[]
     }

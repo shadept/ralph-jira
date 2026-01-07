@@ -54,30 +54,55 @@ export const BoardSchema = z.object({
 export type Board = z.infer<typeof BoardSchema>;
 
 // Project Settings schema
+export const CLAUDE_MODELS = ['opus', 'sonnet'] as const;
+export const CLAUDE_PERMISSION_MODES = [
+  'acceptEdits',
+  'bypassPermissions',
+  'default',
+  'delegate',
+  'dontAsk',
+  'plan',
+] as const;
+export const DEFAULT_CLAUDE_MODEL = CLAUDE_MODELS[0];
+export const DEFAULT_CLAUDE_PERMISSION_MODE = 'acceptEdits';
+
 const AgentAutomationSchema = z.object({
   name: z.enum(['claude', 'opencode']).default('claude'),
   model: z.string().optional(),
-  bin: z.string().optional(),
   permissionMode: z.string().optional(),
   extraArgs: z.array(z.string()).default([]),
 });
 
 export type AgentAutomationSettings = z.infer<typeof AgentAutomationSchema>;
 
+export const DEFAULT_AGENT_SETTINGS: AgentAutomationSettings = {
+  name: 'claude',
+  model: DEFAULT_CLAUDE_MODEL,
+  permissionMode: DEFAULT_CLAUDE_PERMISSION_MODE,
+  extraArgs: [],
+};
+
 const AutomationSettingsSchema = z.object({
   setup: z.array(z.string()).default([]),
   maxIterations: z.number().int().positive().default(5),
   sandboxRoot: z.string().optional(),
   agent: AgentAutomationSchema.optional(),
+  codingStyle: z.string().default(''),
 });
 
 export type AutomationSettings = z.infer<typeof AutomationSettingsSchema>;
+
+export const DEFAULT_AUTOMATION_SETTINGS: AutomationSettings = {
+  setup: [],
+  maxIterations: 5,
+  agent: DEFAULT_AGENT_SETTINGS,
+  codingStyle: '',
+};
 
 export const ProjectSettingsSchema = z.object({
   projectName: z.string(),
   projectDescription: z.string(),
   techStack: z.array(z.string()),
-  codingStyle: z.string(),
   howToTest: z.object({
     commands: z.array(z.string()),
     notes: z.string(),
@@ -102,6 +127,60 @@ export const ProjectSettingsSchema = z.object({
 });
 
 export type ProjectSettings = z.infer<typeof ProjectSettingsSchema>;
+
+export function isKnownClaudeModel(value?: string | null): value is (typeof CLAUDE_MODELS)[number] {
+  if (!value) return false;
+  return CLAUDE_MODELS.includes(value as (typeof CLAUDE_MODELS)[number]);
+}
+
+export function ensureAgentDefaults(agent?: AgentAutomationSettings | null): AgentAutomationSettings {
+  const hasCustomExtraArgs = Array.isArray(agent?.extraArgs);
+  const extraArgs = hasCustomExtraArgs
+    ? [...(agent?.extraArgs as string[])]
+    : [...DEFAULT_AGENT_SETTINGS.extraArgs];
+  const name = agent?.name ?? DEFAULT_AGENT_SETTINGS.name;
+  const model = agent?.model;
+  const permissionMode = agent?.permissionMode;
+
+  if (name === 'claude') {
+    return {
+      name,
+      model: model ?? DEFAULT_CLAUDE_MODEL,
+      permissionMode: permissionMode ?? DEFAULT_CLAUDE_PERMISSION_MODE,
+      extraArgs,
+    };
+  }
+
+  return {
+    name: 'opencode',
+    model: model ?? undefined,
+    permissionMode: permissionMode ?? undefined,
+    extraArgs,
+  };
+}
+
+export function ensureAutomationDefaults(automation?: AutomationSettings | null): AutomationSettings {
+  const base = automation ?? DEFAULT_AUTOMATION_SETTINGS;
+  return {
+    ...DEFAULT_AUTOMATION_SETTINGS,
+    ...base,
+    setup: Array.isArray(base.setup) ? [...base.setup] : [],
+    maxIterations:
+      typeof base.maxIterations === 'number' && base.maxIterations > 0
+        ? base.maxIterations
+        : DEFAULT_AUTOMATION_SETTINGS.maxIterations,
+    codingStyle:
+      typeof base.codingStyle === 'string' ? base.codingStyle : DEFAULT_AUTOMATION_SETTINGS.codingStyle,
+    agent: ensureAgentDefaults(base.agent),
+  };
+}
+
+export function withAutomationDefaults(settings: ProjectSettings): ProjectSettings {
+  return {
+    ...settings,
+    automation: ensureAutomationDefaults(settings.automation),
+  };
+}
 
 export const RunStatusSchema = z.enum(['queued', 'running', 'stopped', 'completed', 'failed', 'canceled']);
 export const RunReasonSchema = z.enum(['completed', 'max_iterations', 'canceled', 'error']);
