@@ -310,6 +310,11 @@ class RunLoop {
     await writeJson(this.sandboxBoardPath, sandboxBoard);
     this.sandboxSettingsPath = path.join(this.sandboxDir, 'plans', 'settings.json');
     await fs.copyFile(this.settingsPath, this.sandboxSettingsPath);
+
+    // Decouple PRD and settings from git tracking in the sandbox to avoid conflicts
+    await this.runCommand('git', ['update-index', '--skip-worktree', 'plans/prd.json'], this.sandboxDir);
+    await this.runCommand('git', ['update-index', '--skip-worktree', 'plans/settings.json'], this.sandboxDir);
+
     await fs.writeFile(this.sandboxLogPath, `# Run ${this.runId} progress\n`, 'utf-8');
     await this.loadSettingsFrom(this.sandboxSettingsPath);
   }
@@ -383,6 +388,8 @@ class RunLoop {
         shell: useShell,
       });
 
+      child.stdin?.end();
+
       const stdoutChunks = [];
       const stderrChunks = [];
 
@@ -423,7 +430,7 @@ class RunLoop {
     if (this.agentName === 'opencode') {
       return {
         command: this.agentBin,
-        args: [...baseArgs, '-p', prompt],
+        args: ["run", ...baseArgs, prompt],
         prompt,
       };
     }
@@ -470,7 +477,7 @@ class RunLoop {
       `Command: ${this.describeInvocation(invocation)}`,
     ]);
 
-    const result = await this.runCommand(invocation.command, invocation.args, this.sandboxDir);
+    const result = await this.runCommand(invocation.command, invocation.args, this.sandboxDir, { shell: true });
     const combinedOutput = `${result.stdout}${result.stderr ? `\n${result.stderr}` : ''}`.trim();
     if (!combinedOutput) {
       await this.appendSandboxLog('(no output)');

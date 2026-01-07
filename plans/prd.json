@@ -42,7 +42,7 @@
         "Verify task status is updated",
         "Refresh page and verify persistence"
       ],
-      "passes": false,
+      "passes": true,
       "id": "task-002",
       "status": "done",
       "priority": "high",
@@ -105,10 +105,29 @@
         "src/app/board/[id]/page.tsx"
       ],
       "lastRun": "2026-01-07T20:45:00.000Z"
+    },
+    {
+      "category": "functional",
+      "description": "Add human to mark tasks as passing via UI",
+      "steps": [
+        "Clicking the passes circle should togle the passes state"
+      ],
+      "passes": false,
+      "id": "task-1767826467552",
+      "status": "in_progress",
+      "priority": "high",
+      "estimate": 1,
+      "createdAt": "2026-01-07T22:54:27.552Z",
+      "updatedAt": "2026-01-07T22:55:30.481Z",
+      "tags": [
+        "UX"
+      ],
+      "filesTouched": [],
+      "lastRun": "2026-01-07T22:58:30.511Z"
     }
   ],
   "createdAt": "2026-01-07T00:00:00.000Z",
-  "updatedAt": "2026-01-07T22:17:40.538Z",
+  "updatedAt": "2026-01-07T22:58:30.511Z",
   "metrics": {
     "velocity": 0,
     "completed": 1,
