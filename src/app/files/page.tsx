@@ -1,9 +1,9 @@
 'use client';
- 
+
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
- 
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -97,7 +97,6 @@ export default function FilesPage() {
                   /board/prd
                 </Link>
               </p>
-
             </CardContent>
           </Card>
         </TabsContent>
@@ -115,7 +114,6 @@ export default function FilesPage() {
                   /settings
                 </Link>
               </p>
-
             </CardContent>
           </Card>
         </TabsContent>

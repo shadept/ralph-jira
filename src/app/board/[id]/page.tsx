@@ -433,7 +433,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
         <ClockCounterClockwise className="w-4 h-4 mr-2" />
         Run History
       </Button>
-      <Button variant="default" onClick={handleRunButtonClick} disabled={runLoading || isRunActive}>
+      <Button variant="default" onClick={handleRunButtonClick} disabled={runLoading}>
         <PlayCircle className="w-4 h-4 mr-2" />
         {isRunActive ? 'Loop Running…' : 'Run AI Loop'}
       </Button>
@@ -533,7 +533,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
             </SheetDescription>
           </SheetHeader>
           {activeRun ? (
-            <div className="p-4 space-y-5">
+            <div className="flex flex-1 flex-col p-4 space-y-5">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Status</p>
@@ -584,9 +584,9 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
                   Cancel Run
                 </Button>
               </div>
-              <div>
+              <div className="flex flex-1 flex-col">
                 <p className="text-sm font-medium mb-2">Live Log</p>
-                <ScrollArea className="h-64 rounded-md border bg-muted/30 p-3">
+                <ScrollArea className="h-full rounded-md border bg-muted/30 p-3">
                   {runLog.length ? (
                     <pre className="text-xs whitespace-pre-wrap leading-relaxed">{runLog.join('\n')}</pre>
                   ) : (

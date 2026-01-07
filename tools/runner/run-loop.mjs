@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { promises as fs, existsSync } from 'node:fs';
-import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { existsSync, promises as fs } from 'node:fs';
+import path from 'node:path';
 
 const LOOP_PROMPT = `@plans/prd.json @progress.txt
 1. Find the highest-priority feature to work on and work only on that feature.
@@ -18,14 +18,14 @@ const PENDING_STATUSES = new Set(['todo', 'in_progress']);
 const MAX_LOG_SNIPPET = 1200;
 const DEFAULT_SETUP = Object.freeze([]);
 const DEFAULT_AGENT_NAME = 'claude';
-const DEFAULT_CLAUDE_MODEL = 'opus-4.5';
+const DEFAULT_CLAUDE_MODEL = 'opus';
 
 function normalizeStringArray(value) {
   if (!Array.isArray(value)) return [];
   return value.map(item => `${item}`.trim()).filter(Boolean);
 }
 
-class CancellationSignal extends Error {}
+class CancellationSignal extends Error { }
 
 async function readJson(filePath) {
   const buffer = await fs.readFile(filePath, 'utf-8');
@@ -335,8 +335,7 @@ class RunLoop {
     const resolvedAgentName = (envAgentName || normalizedAgentName || DEFAULT_AGENT_NAME).toLowerCase();
 
     this.agentName = resolvedAgentName;
-    const normalizedBin = typeof agentSettings.bin === 'string' ? agentSettings.bin.trim() : undefined;
-    this.agentBin = envAgentBin || normalizedBin || this.agentName;
+    this.agentBin = envAgentBin || this.agentName;
 
     const defaultModel = resolvedAgentName === 'claude' ? DEFAULT_CLAUDE_MODEL : null;
     const normalizedModel =
@@ -387,8 +386,14 @@ class RunLoop {
       const stdoutChunks = [];
       const stderrChunks = [];
 
-      child.stdout?.on('data', chunk => stdoutChunks.push(chunk));
-      child.stderr?.on('data', chunk => stderrChunks.push(chunk));
+      child.stdout?.on('data', chunk => {
+        stdoutChunks.push(chunk);
+        this.appendSandboxLog(chunk.toString('utf-8')).catch(() => { });
+      });
+      child.stderr?.on('data', chunk => {
+        stderrChunks.push(chunk);
+        this.appendSandboxLog(chunk.toString('utf-8')).catch(() => { });
+      });
       child.on('error', reject);
       child.on('close', code => {
         const stdout = Buffer.concat(stdoutChunks).toString('utf-8');
@@ -424,9 +429,13 @@ class RunLoop {
     }
 
     if (this.agentName === 'claude') {
+      const claudeArgs = [...baseArgs];
+      if (!claudeArgs.includes('--non-interactive')) {
+        claudeArgs.push('--non-interactive');
+      }
       return {
         command: this.agentBin,
-        args: [...baseArgs, '--permission-mode', this.claudePermissionMode, '-p', prompt],
+        args: [...claudeArgs, '--permission-mode', this.claudePermissionMode, '-p', prompt],
         prompt,
       };
     }
@@ -442,8 +451,19 @@ class RunLoop {
       .join(' ')}`.trim();
   }
 
+  buildPrompt() {
+    const rawCodingStyle =
+      typeof this.settings?.automation?.codingStyle === 'string'
+        ? this.settings.automation.codingStyle.trim()
+        : '';
+    if (!rawCodingStyle) {
+      return LOOP_PROMPT;
+    }
+    return `${LOOP_PROMPT}\n<coding-style>\n${rawCodingStyle}\n</coding-style>`;
+  }
+
   async runAgentIteration(iteration) {
-    const prompt = LOOP_PROMPT;
+    const prompt = this.buildPrompt();
     const invocation = this.getAgentInvocation(prompt);
     await this.appendSandboxLog([
       `Running ${this.agentName} (iteration ${iteration})`,
@@ -452,8 +472,9 @@ class RunLoop {
 
     const result = await this.runCommand(invocation.command, invocation.args, this.sandboxDir);
     const combinedOutput = `${result.stdout}${result.stderr ? `\n${result.stderr}` : ''}`.trim();
-    const snippet = limitOutput(combinedOutput);
-    await this.appendSandboxLog(snippet || '(no output)');
+    if (!combinedOutput) {
+      await this.appendSandboxLog('(no output)');
+    }
     return { output: combinedOutput, exitCode: result.code ?? 0 };
   }
 

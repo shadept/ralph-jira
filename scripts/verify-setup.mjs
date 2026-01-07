@@ -5,8 +5,8 @@
  * Checks that all required files and directories exist
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs';
+import path from 'node:path';
 
 const checks = [
   {

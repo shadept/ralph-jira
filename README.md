@@ -107,6 +107,8 @@ Install either the `claude` CLI or the `opencode` CLI and ensure it is available
 - `RUN_LOOP_AGENT_EXTRA_ARGS` accepts a JSON array of additional CLI flags (optional).
 - `RUN_LOOP_CLAUDE_PERMISSION_MODE` overrides the claude permission mode (defaults to `acceptEdits`).
 
+OpenCode model options inside the automation settings UI come from running `opencode models` once per server start; restart the server to refresh that cached list.
+
 The runner executes the agent inside the sandbox directory so the CLI can freely edit files, run commands, and update `plans/prd.json` / `progress.txt`. The loop stops when the agent prints `<promise>COMPLETE</promise>` or hits the iteration limit/cancellation flag.
 
 #### Safety Features
@@ -230,7 +232,6 @@ Edit via UI (`/settings`) or directly in `plans/settings.json`:
 {
   "projectName": "Your Project",
   "techStack": ["TypeScript", "React", "Next.js"],
-  "codingStyle": "Functional, typed, small functions",
   "howToTest": {
     "commands": ["npm test", "npm run typecheck"],
     "notes": "Run tests after each change"
@@ -245,6 +246,7 @@ Edit via UI (`/settings`) or directly in `plans/settings.json`:
     "guardrails": [...]
   },
   "automation": {
+    "codingStyle": "Functional, typed, small functions",
     "setup": ["npm ci"],
     "maxIterations": 5,
     "agent": {
@@ -258,9 +260,10 @@ Edit via UI (`/settings`) or directly in `plans/settings.json`:
 ```
 
 Key automation fields:
+- `codingStyle`: Optional style guide appended to the loop prompt (wrapped in `<coding-style>`).
 - `setup`: Commands run inside the sandbox before the agent starts (leave empty to skip setup).
 - `maxIterations`: Default iteration budget when launching the loop.
-- `agent`: CLI preferences for the autonomous runner (`name`, `model`, optional `bin`, `permissionMode`, and `extraArgs`).
+- `agent`: CLI preferences for the autonomous runner (`name`, `model`, `permissionMode`, and `extraArgs`).
 
 ### Board Structure
 
@@ -327,7 +330,7 @@ Optional:
 - `RUN_LOOP_AGENT_BIN`: Override the CLI binary name/path for the agent
 - `RUN_LOOP_AGENT_MODEL`: Force a specific model ID for the CLI agent
 - `RUN_LOOP_AGENT_EXTRA_ARGS`: JSON array of extra flags passed to the agent CLI
-- `RUN_LOOP_CLAUDE_PERMISSION_MODE`: Customize Claude's `--permission-mode` (defaults to `acceptEdits`)
+- `RUN_LOOP_CLAUDE_PERMISSION_MODE`: Customize Claude's `--permission-mode` (defaults to `acceptEdits`). Claude invocations also force `--non-interactive` so loops never wait for user prompts.
 
 ## Deployment
 

@@ -179,9 +179,10 @@ export function ProjectManagerDialog({ open, onOpenChange }: ProjectManagerDialo
                   {...({ webkitdirectory: 'true', directory: 'true', mozdirectory: 'true' } as Record<string, string>)}
                 />
               </div>
-              <p id="project-path-help" className="text-xs text-muted-foreground mt-2">
-                Chrome will show an "Upload folder" prompt because it scans the folder to infer its path. Ralph never uploads your files—everything stays on this device. If the picker only returns the folder name, copy the full path from your file manager and paste it above.
-              </p>
+                <p id="project-path-help" className="text-xs text-muted-foreground mt-2">
+                  Chrome will show an &ldquo;Upload folder&rdquo; prompt because it scans the folder to infer its path. Ralph never uploads your files—everything stays on this device. If the picker only returns the folder name, copy the full path from your file manager and paste it above.
+                </p>
+
               {needsManualPathEntry && (
                 <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                   {BROWSER_FOLDER_LIMITATION_MESSAGE}

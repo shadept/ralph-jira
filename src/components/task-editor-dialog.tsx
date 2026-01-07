@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { startTransition, useEffect, useMemo, useState } from 'react';
 import { Task } from '@/lib/schemas';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
@@ -30,21 +30,23 @@ export function TaskEditorDialog({ task, open, onClose, onSave, onDelete, onAIAc
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
 
   useEffect(() => {
-    if (task) {
-      const clonedTask: Task = {
-        ...task,
-        steps: [...task.steps],
-        tags: [...task.tags],
-        filesTouched: [...task.filesTouched],
-      };
-      setEditedTask(clonedTask);
-      setInitialTask(clonedTask);
-    } else {
-      setEditedTask(null);
-      setInitialTask(null);
-    }
-    setNewStep('');
-    setNewTag('');
+    startTransition(() => {
+      if (task) {
+        const clonedTask: Task = {
+          ...task,
+          steps: [...task.steps],
+          tags: [...task.tags],
+          filesTouched: [...task.filesTouched],
+        };
+        setEditedTask(clonedTask);
+        setInitialTask(clonedTask);
+      } else {
+        setEditedTask(null);
+        setInitialTask(null);
+      }
+      setNewStep('');
+      setNewTag('');
+    });
   }, [task]);
 
   const isDirty = useMemo(() => {

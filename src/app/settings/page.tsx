@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FloppyDiskIcon } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 
@@ -8,6 +8,14 @@ import { AppLayout } from '@/components/layout/app-layout';
 import { useProjectContext } from '@/components/projects/project-provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,59 +30,33 @@ import {
   AutomationSettings,
   ProjectSettings,
   AgentAutomationSettings,
+  CLAUDE_MODELS,
+  CLAUDE_PERMISSION_MODES,
+  DEFAULT_CLAUDE_MODEL,
+  DEFAULT_CLAUDE_PERMISSION_MODE,
+  DEFAULT_AUTOMATION_SETTINGS,
+  ensureAgentDefaults,
+  ensureAutomationDefaults,
+  withAutomationDefaults,
+  isKnownClaudeModel,
 } from '@/lib/schemas';
 
-const DEFAULT_AGENT_SETTINGS: AgentAutomationSettings = {
-  name: 'claude',
-  model: 'opus-4.5',
-  bin: undefined,
-  permissionMode: 'acceptEdits',
-  extraArgs: [],
+type OpencodeModelsState = {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  data: string[];
+  error: string | null;
 };
-
-const DEFAULT_AUTOMATION_SETTINGS: AutomationSettings = {
-  setup: [],
-  maxIterations: 5,
-  agent: DEFAULT_AGENT_SETTINGS,
-};
-
-function ensureAgentDefaults(agent?: AgentAutomationSettings | null): AgentAutomationSettings {
-  if (!agent) {
-    return { ...DEFAULT_AGENT_SETTINGS, extraArgs: [...DEFAULT_AGENT_SETTINGS.extraArgs] };
-  }
-  return {
-    ...DEFAULT_AGENT_SETTINGS,
-    ...agent,
-    extraArgs: Array.isArray(agent.extraArgs) ? [...agent.extraArgs] : [],
-  };
-}
-
-function ensureAutomationDefaults(automation?: AutomationSettings | null): AutomationSettings {
-  const base = automation ?? DEFAULT_AUTOMATION_SETTINGS;
-  return {
-    ...DEFAULT_AUTOMATION_SETTINGS,
-    ...base,
-    setup: Array.isArray(base.setup) ? [...base.setup] : [],
-    maxIterations:
-      typeof base.maxIterations === 'number' && base.maxIterations > 0
-        ? base.maxIterations
-        : DEFAULT_AUTOMATION_SETTINGS.maxIterations,
-    agent: ensureAgentDefaults(base.agent),
-  };
-}
-
-function withAutomationDefaults(settings: ProjectSettings): ProjectSettings {
-  return {
-    ...settings,
-    automation: ensureAutomationDefaults(settings.automation),
-  };
-}
 
 export default function SettingsPage() {
   const { currentProject, loading: projectLoading, apiFetch } = useProjectContext();
   const [settings, setSettings] = useState<ProjectSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [opencodeModelsState, setOpencodeModelsState] = useState<OpencodeModelsState>({
+    status: 'idle',
+    data: [],
+    error: null,
+  });
 
   const loadSettings = useCallback(async () => {
     if (!currentProject) {
@@ -99,6 +81,41 @@ export default function SettingsPage() {
   useEffect(() => {
     loadSettings();
   }, [loadSettings]);
+
+  const loadOpencodeModels = useCallback(async () => {
+    setOpencodeModelsState(prev => ({ ...prev, status: 'loading', error: null }));
+    try {
+      const res = await apiFetch('/api/opencode/models');
+      const data = await res.json();
+      const models = Array.isArray(data.models)
+        ? data.models.map((model: unknown) => `${model}`.trim()).filter(Boolean)
+        : [];
+      setOpencodeModelsState({ status: 'success', data: models, error: null });
+    } catch (error) {
+      console.error('Failed to load opencode models', error);
+      setOpencodeModelsState(prev => ({
+        ...prev,
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Failed to load opencode models',
+      }));
+    }
+  }, [apiFetch]);
+
+  const activeAgentName = useMemo(() => {
+    if (!settings) return null;
+    const automationWithDefaults = ensureAutomationDefaults(settings.automation);
+    const agentWithDefaults = ensureAgentDefaults(automationWithDefaults.agent);
+    return agentWithDefaults.name;
+  }, [settings]);
+
+  useEffect(() => {
+    if (activeAgentName !== 'opencode') {
+      return;
+    }
+    if (opencodeModelsState.status === 'idle') {
+      loadOpencodeModels();
+    }
+  }, [activeAgentName, loadOpencodeModels, opencodeModelsState.status]);
 
   const handleSave = async () => {
     if (!settings || !currentProject) return;
@@ -136,12 +153,7 @@ export default function SettingsPage() {
     }));
   };
 
-  const actions = settings && currentProject ? (
-    <Button onClick={handleSave} disabled={saving}>
-      <FloppyDiskIcon className="w-4 h-4 mr-2" />
-      {saving ? 'Saving…' : 'Save Settings'}
-    </Button>
-  ) : undefined;
+  const canSave = Boolean(settings && currentProject);
 
   const renderContent = () => {
     if (projectLoading) {
@@ -220,15 +232,221 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Coding Style</CardTitle>
-            <CardDescription>Guidelines for code generation</CardDescription>
+            <CardTitle>Automation</CardTitle>
+            <CardDescription>Runner setup commands and agent configuration</CardDescription>
           </CardHeader>
-          <CardContent>
-            <Textarea
-              value={settings.codingStyle}
-              onChange={(e) => setSettings({ ...settings, codingStyle: e.target.value })}
-              rows={4}
-            />
+          <CardContent className="space-y-4">
+
+            <div>
+              <Label htmlFor="setupCommands">Setup Commands (one per line)</Label>
+              <Textarea
+                id="setupCommands"
+                value={automation.setup.join('\n')}
+                onChange={(e) => {
+                  const commands = e.target.value
+                    .split('\n')
+                    .map(line => line.trim())
+                    .filter(Boolean);
+                  updateAutomation(current => ({ ...current, setup: commands }));
+                }}
+                rows={3}
+                className="mt-1"
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="agentName">Runner Agent</Label>
+                <Select
+                  value={agent.name}
+                  onValueChange={(value) =>
+                    updateAgent(current => {
+                      const nextName = value as AgentAutomationSettings['name'];
+                      if (nextName === 'claude') {
+                        const nextModel = isKnownClaudeModel(current.model)
+                          ? current.model
+                          : DEFAULT_CLAUDE_MODEL;
+                        return {
+                          ...current,
+                          name: nextName,
+                          model: nextModel,
+                          permissionMode: current.permissionMode ?? DEFAULT_CLAUDE_PERMISSION_MODE,
+                        };
+                      }
+                      return {
+                        ...current,
+                        name: nextName,
+                        model: undefined,
+                        permissionMode: undefined,
+                      };
+                    })
+                  }
+                >
+                  <SelectTrigger id="agentName" className="mt-1 w-full">
+                    <SelectValue placeholder="Select agent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="claude">Claude</SelectItem>
+                    <SelectItem value="opencode">OpenCode</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="maxIterations">Max Iterations</Label>
+                <Input
+                  id="maxIterations"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={automation.maxIterations}
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value, 10);
+                    const sanitized = Number.isNaN(parsed)
+                      ? DEFAULT_AUTOMATION_SETTINGS.maxIterations
+                      : Math.min(Math.max(parsed, 1), 10);
+                    updateAutomation(current => ({
+                      ...current,
+                      maxIterations: sanitized,
+                    }));
+                  }}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            {agent.name === 'claude' && (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="agentModel">Agent Model</Label>
+                  <Select
+                    value={isKnownClaudeModel(agent.model) ? agent.model : DEFAULT_CLAUDE_MODEL}
+                    onValueChange={(value) =>
+                      updateAgent(current => ({ ...current, model: value || DEFAULT_CLAUDE_MODEL }))
+                    }
+                  >
+                    <SelectTrigger id="agentModel" className="mt-1 w-full">
+                      <SelectValue placeholder="Select model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CLAUDE_MODELS.map(model => (
+                        <SelectItem key={model} value={model}>
+                          {model}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="permissionMode">Permission Mode</Label>
+                  <Select
+                    value={agent.permissionMode ?? DEFAULT_CLAUDE_PERMISSION_MODE}
+                    onValueChange={(value) =>
+                      updateAgent(current => ({ ...current, permissionMode: value }))
+                    }
+                  >
+                    <SelectTrigger id="permissionMode" className="mt-1 w-full">
+                      <SelectValue placeholder="Select permission mode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CLAUDE_PERMISSION_MODES.map(mode => (
+                        <SelectItem key={mode} value={mode}>
+                          {mode}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+            {agent.name === 'opencode' && (
+              <div>
+                <Label htmlFor="agentModel">Agent Model</Label>
+                {opencodeModelsState.status === 'error' ? (
+                  <>
+                    <Input
+                      id="agentModel"
+                      value={agent.model ?? ''}
+                      onChange={(e) => {
+                        const value = e.target.value.trim();
+                        updateAgent(current => ({ ...current, model: value || undefined }));
+                      }}
+                      className="mt-1 w-full"
+                      placeholder="Enter model ID"
+                    />
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-destructive">
+                      <span>{opencodeModelsState.error ?? 'Failed to load OpenCode models.'}</span>
+                      <Button type="button" size="sm" variant="outline" onClick={loadOpencodeModels}>
+                        Retry
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Combobox
+                      items={opencodeModelsState.data}
+                      value={agent.model ?? null}
+                      onValueChange={(value) =>
+                        updateAgent(current => ({ ...current, model: value ?? undefined }))
+                      }
+                      filter={(item, query) => `${item}`.toLowerCase().includes(query.toLowerCase())}
+                    >
+                      <ComboboxInput
+                        id="agentModel"
+                        placeholder="Search for a model"
+                        className="mt-1 !w-full"
+
+                        showClear
+                        disabled={opencodeModelsState.status === 'loading' && !opencodeModelsState.data.length}
+                      />
+                      <ComboboxContent>
+                        <ComboboxEmpty>
+                          {opencodeModelsState.status === 'loading' && !opencodeModelsState.data.length
+                            ? 'Loading models…'
+                            : 'No models found.'}
+                        </ComboboxEmpty>
+                        <ComboboxList>
+                          {(model: string) => (
+                            <ComboboxItem key={model} value={model}>
+                              {model}
+                            </ComboboxItem>
+                          )}
+                        </ComboboxList>
+                      </ComboboxContent>
+                    </Combobox>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Model list is cached on the server and refreshes when it restarts.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+            <div>
+              <Label htmlFor="agentExtraArgs">Extra CLI Args (one per line)</Label>
+              <Textarea
+                id="agentExtraArgs"
+                value={(agent.extraArgs ?? []).join('\n')}
+                onChange={(e) => {
+                  const args = e.target.value
+                    .split('\n')
+                    .map(line => line.trim())
+                    .filter(Boolean);
+                  updateAgent(current => ({ ...current, extraArgs: args }));
+                }}
+                rows={3}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="codingStyle">Coding Style Guidance</Label>
+              <Textarea
+                id="codingStyle"
+                value={automation.codingStyle}
+                onChange={(e) =>
+                  updateAutomation(current => ({ ...current, codingStyle: e.target.value }))
+                }
+                rows={4}
+                className="mt-1"
+                placeholder="Document lint rules, formatting, or architecture tips"
+              />
+            </div>
           </CardContent>
         </Card>
 
@@ -385,126 +603,14 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Automation</CardTitle>
-            <CardDescription>Runner setup commands and agent configuration</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="setupCommands">Setup Commands (one per line)</Label>
-              <Textarea
-                id="setupCommands"
-                value={automation.setup.join('\n')}
-                onChange={(e) => {
-                  const commands = e.target.value
-                    .split('\n')
-                    .map(line => line.trim())
-                    .filter(Boolean);
-                  updateAutomation(current => ({ ...current, setup: commands }));
-                }}
-                rows={3}
-                className="mt-1"
-              />
-            </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <Label htmlFor="maxIterations">Max Iterations</Label>
-                <Input
-                  id="maxIterations"
-                  type="number"
-                  min={1}
-                  value={automation.maxIterations}
-                  onChange={(e) => {
-                    const parsed = parseInt(e.target.value, 10);
-                    updateAutomation(current => ({
-                      ...current,
-                      maxIterations:
-                        Number.isNaN(parsed) || parsed <= 0
-                          ? DEFAULT_AUTOMATION_SETTINGS.maxIterations
-                          : parsed,
-                    }));
-                  }}
-                  className="mt-1"
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="agentName">Runner Agent</Label>
-              <Select
-                value={agent.name}
-                onValueChange={(value) =>
-                  updateAgent(current => ({ ...current, name: value as AgentAutomationSettings['name'] }))
-                }
-              >
-                <SelectTrigger id="agentName" className="mt-1">
-                  <SelectValue placeholder="Select agent" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="claude">Claude</SelectItem>
-                  <SelectItem value="opencode">OpenCode</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <Label htmlFor="agentModel">Agent Model</Label>
-                <Input
-                  id="agentModel"
-                  value={agent.model ?? ''}
-                  onChange={(e) => {
-                    const value = e.target.value.trim();
-                    updateAgent(current => ({ ...current, model: value || undefined }));
-                  }}
-                  className="mt-1"
-                  placeholder={agent.name === 'claude' ? 'opus-4.5 (default)' : 'Enter model ID'}
-                />
-              </div>
-              <div>
-                <Label htmlFor="agentBin">CLI Binary Override</Label>
-                <Input
-                  id="agentBin"
-                  value={agent.bin ?? ''}
-                  onChange={(e) => {
-                    const value = e.target.value.trim();
-                    updateAgent(current => ({ ...current, bin: value || undefined }));
-                  }}
-                  className="mt-1"
-                  placeholder={agent.name}
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="permissionMode">Permission Mode (Claude only)</Label>
-              <Input
-                id="permissionMode"
-                value={agent.permissionMode ?? ''}
-                onChange={(e) => {
-                  const value = e.target.value.trim();
-                  updateAgent(current => ({ ...current, permissionMode: value || undefined }));
-                }}
-                className="mt-1"
-                placeholder="acceptEdits"
-              />
-            </div>
-            <div>
-              <Label htmlFor="agentExtraArgs">Extra CLI Args (one per line)</Label>
-              <Textarea
-                id="agentExtraArgs"
-                value={(agent.extraArgs ?? []).join('\n')}
-                onChange={(e) => {
-                  const args = e.target.value
-                    .split('\n')
-                    .map(line => line.trim())
-                    .filter(Boolean);
-                  updateAgent(current => ({ ...current, extraArgs: args }));
-                }}
-                rows={3}
-                className="mt-1"
-              />
-            </div>
-          </CardContent>
-        </Card>
+        {canSave && (
+          <div className="flex justify-end">
+            <Button onClick={handleSave} disabled={saving}>
+              <FloppyDiskIcon className="w-4 h-4 mr-2" />
+              {saving ? 'Saving…' : 'Save Settings'}
+            </Button>
+          </div>
+        )}
       </div>
     );
   };
@@ -513,7 +619,6 @@ export default function SettingsPage() {
     <AppLayout
       title="Project Settings"
       description="Configure project defaults and AI automation preferences"
-      actions={actions}
       backLink={{ href: '/', label: 'Back to Dashboard' }}
     >
       {renderContent()}

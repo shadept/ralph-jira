@@ -11,6 +11,12 @@ interface ProjectErrorState {
   details?: string;
 }
 
+interface ProjectErrorPayload {
+  error?: string;
+  code?: string;
+  details?: string;
+}
+
 interface ProjectContextValue {
   projects: ProjectMetadata[];
   currentProject: ProjectMetadata | null;
@@ -109,7 +115,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     const response = await fetch(targetUrl, init);
 
     if (!response.ok) {
-      let payload: any = null;
+      let payload: ProjectErrorPayload | null = null;
       try {
         payload = await response.json();
       } catch {
