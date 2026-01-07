@@ -3,7 +3,8 @@
 import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Sparkle, PlayCircle, ArrowLeft, Plus, ClockCounterClockwise } from '@phosphor-icons/react';
+import { Sparkle, PlayCircle, Plus, ClockCounterClockwise } from '@phosphor-icons/react';
+
 
 import { Board, Task, RunRecord } from '@/lib/schemas';
 import { KanbanBoard } from '@/components/kanban-board';
@@ -404,21 +405,12 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
 
   const actions = (
     <div className="flex flex-wrap items-center gap-2">
-      <Button
-        variant="ghost"
-        className="gap-2"
-        onClick={() => router.push('/')}
-        disabled={boardLocked}
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Back to Boards
-      </Button>
-      <Button variant="outline" onClick={handleNewTask} disabled={boardLocked}
-        >
+      <Button variant="outline" onClick={handleNewTask} disabled={boardLocked}>
         <Plus className="w-4 h-4 mr-2" />
         New Task
       </Button>
       <DropdownMenu>
+
         <DropdownMenuTrigger asChild>
           <Button variant="outline" disabled={boardLocked}>
             <Sparkle className="w-4 h-4 mr-2" />
@@ -525,10 +517,12 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
       title={board ? board.name : 'Board'}
       description={board ? board.goal : 'Plan and track sprint progress'}
       actions={actions}
+      backLink={{ href: '/', label: 'Back to Boards' }}
       fluid
     >
 
       {renderContent()}
+
 
       <Sheet open={runDrawerOpen && Boolean(activeRun)} onOpenChange={handleDrawerChange}>
         <SheetContent side="right" className="w-full sm:max-w-lg">

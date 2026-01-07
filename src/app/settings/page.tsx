@@ -237,218 +237,218 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
 
-             <div>
-               <Label htmlFor="setupCommands">Setup Commands (one per line)</Label>
-               <Textarea
-                 id="setupCommands"
-                 value={automation.setup.join('\n')}
-                 onChange={(e) => {
-                   const commands = e.target.value
-                     .split('\n')
-                     .map(line => line.trim())
-                     .filter(Boolean);
-                   updateAutomation(current => ({ ...current, setup: commands }));
-                 }}
-                 rows={3}
-                 className="mt-1"
-               />
-             </div>
-             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-               <div>
-                 <Label htmlFor="agentName">Runner Agent</Label>
-                 <Select
-                   value={agent.name}
-                   onValueChange={(value) =>
-                     updateAgent(current => {
-                       const nextName = value as AgentAutomationSettings['name'];
-                       if (nextName === 'claude') {
-                         const nextModel = isKnownClaudeModel(current.model)
-                           ? current.model
-                           : DEFAULT_CLAUDE_MODEL;
-                         return {
-                           ...current,
-                           name: nextName,
-                           model: nextModel,
-                           permissionMode: current.permissionMode ?? DEFAULT_CLAUDE_PERMISSION_MODE,
-                         };
-                       }
-                       return {
-                         ...current,
-                         name: nextName,
-                         model: undefined,
-                         permissionMode: undefined,
-                       };
-                     })
-                   }
-                 >
-                   <SelectTrigger id="agentName" className="mt-1 w-full">
-                     <SelectValue placeholder="Select agent" />
-                   </SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="claude">Claude</SelectItem>
-                     <SelectItem value="opencode">OpenCode</SelectItem>
-                   </SelectContent>
-                 </Select>
-               </div>
-               <div>
-                 <Label htmlFor="maxIterations">Max Iterations</Label>
-                 <Input
-                   id="maxIterations"
-                   type="number"
-                   min={1}
-                   max={10}
-                   value={automation.maxIterations}
-                   onChange={(e) => {
-                     const parsed = parseInt(e.target.value, 10);
-                     const sanitized = Number.isNaN(parsed)
-                       ? DEFAULT_AUTOMATION_SETTINGS.maxIterations
-                       : Math.min(Math.max(parsed, 1), 10);
-                     updateAutomation(current => ({
-                       ...current,
-                       maxIterations: sanitized,
-                     }));
-                   }}
-                   className="mt-1"
-                 />
-               </div>
-             </div>
-             {agent.name === 'claude' && (
-               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                 <div>
-                   <Label htmlFor="agentModel">Agent Model</Label>
-                   <Select
-                     value={isKnownClaudeModel(agent.model) ? agent.model : DEFAULT_CLAUDE_MODEL}
-                     onValueChange={(value) =>
-                       updateAgent(current => ({ ...current, model: value || DEFAULT_CLAUDE_MODEL }))
-                     }
-                   >
-                     <SelectTrigger id="agentModel" className="mt-1 w-full">
-                       <SelectValue placeholder="Select model" />
-                     </SelectTrigger>
-                     <SelectContent>
-                       {CLAUDE_MODELS.map(model => (
-                         <SelectItem key={model} value={model}>
-                           {model}
-                         </SelectItem>
-                       ))}
-                     </SelectContent>
-                   </Select>
-                 </div>
-                 <div>
-                   <Label htmlFor="permissionMode">Permission Mode</Label>
-                   <Select
-                     value={agent.permissionMode ?? DEFAULT_CLAUDE_PERMISSION_MODE}
-                     onValueChange={(value) =>
-                       updateAgent(current => ({ ...current, permissionMode: value }))
-                     }
-                   >
-                     <SelectTrigger id="permissionMode" className="mt-1 w-full">
-                       <SelectValue placeholder="Select permission mode" />
-                     </SelectTrigger>
-                     <SelectContent>
-                       {CLAUDE_PERMISSION_MODES.map(mode => (
-                         <SelectItem key={mode} value={mode}>
-                           {mode}
-                         </SelectItem>
-                       ))}
-                     </SelectContent>
-                   </Select>
-                 </div>
-               </div>
-             )}
-             {agent.name === 'opencode' && (
-               <div>
-                 <Label htmlFor="agentModel">Agent Model</Label>
-                 {opencodeModelsState.status === 'error' ? (
-                   <>
-                     <Input
-                       id="agentModel"
-                       value={agent.model ?? ''}
-                       onChange={(e) => {
-                         const value = e.target.value.trim();
-                         updateAgent(current => ({ ...current, model: value || undefined }));
-                       }}
-                       className="mt-1 w-full"
-                       placeholder="Enter model ID"
-                     />
-                     <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-destructive">
-                       <span>{opencodeModelsState.error ?? 'Failed to load OpenCode models.'}</span>
-                       <Button type="button" size="sm" variant="outline" onClick={loadOpencodeModels}>
-                         Retry
-                       </Button>
-                     </div>
-                   </>
-                 ) : (
-                   <>
-                     <Combobox
-                       items={opencodeModelsState.data}
-                       value={agent.model ?? null}
-                       onValueChange={(value) =>
-                         updateAgent(current => ({ ...current, model: value ?? undefined }))
-                       }
-                       filter={(item, query) => `${item}`.toLowerCase().includes(query.toLowerCase())}
-                     >
-                       <ComboboxInput
-                         id="agentModel"
+            <div>
+              <Label htmlFor="setupCommands">Setup Commands (one per line)</Label>
+              <Textarea
+                id="setupCommands"
+                value={automation.setup.join('\n')}
+                onChange={(e) => {
+                  const commands = e.target.value
+                    .split('\n')
+                    .map(line => line.trim())
+                    .filter(Boolean);
+                  updateAutomation(current => ({ ...current, setup: commands }));
+                }}
+                rows={3}
+                className="mt-1"
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="agentName">Runner Agent</Label>
+                <Select
+                  value={agent.name}
+                  onValueChange={(value) =>
+                    updateAgent(current => {
+                      const nextName = value as AgentAutomationSettings['name'];
+                      if (nextName === 'claude') {
+                        const nextModel = isKnownClaudeModel(current.model)
+                          ? current.model
+                          : DEFAULT_CLAUDE_MODEL;
+                        return {
+                          ...current,
+                          name: nextName,
+                          model: nextModel,
+                          permissionMode: current.permissionMode ?? DEFAULT_CLAUDE_PERMISSION_MODE,
+                        };
+                      }
+                      return {
+                        ...current,
+                        name: nextName,
+                        model: undefined,
+                        permissionMode: undefined,
+                      };
+                    })
+                  }
+                >
+                  <SelectTrigger id="agentName" className="mt-1 w-full">
+                    <SelectValue placeholder="Select agent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="claude">Claude</SelectItem>
+                    <SelectItem value="opencode">OpenCode</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="maxIterations">Max Iterations</Label>
+                <Input
+                  id="maxIterations"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={automation.maxIterations}
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value, 10);
+                    const sanitized = Number.isNaN(parsed)
+                      ? DEFAULT_AUTOMATION_SETTINGS.maxIterations
+                      : Math.min(Math.max(parsed, 1), 10);
+                    updateAutomation(current => ({
+                      ...current,
+                      maxIterations: sanitized,
+                    }));
+                  }}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            {agent.name === 'claude' && (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="agentModel">Agent Model</Label>
+                  <Select
+                    value={isKnownClaudeModel(agent.model) ? agent.model : DEFAULT_CLAUDE_MODEL}
+                    onValueChange={(value) =>
+                      updateAgent(current => ({ ...current, model: value || DEFAULT_CLAUDE_MODEL }))
+                    }
+                  >
+                    <SelectTrigger id="agentModel" className="mt-1 w-full">
+                      <SelectValue placeholder="Select model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CLAUDE_MODELS.map(model => (
+                        <SelectItem key={model} value={model}>
+                          {model}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="permissionMode">Permission Mode</Label>
+                  <Select
+                    value={agent.permissionMode ?? DEFAULT_CLAUDE_PERMISSION_MODE}
+                    onValueChange={(value) =>
+                      updateAgent(current => ({ ...current, permissionMode: value }))
+                    }
+                  >
+                    <SelectTrigger id="permissionMode" className="mt-1 w-full">
+                      <SelectValue placeholder="Select permission mode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CLAUDE_PERMISSION_MODES.map(mode => (
+                        <SelectItem key={mode} value={mode}>
+                          {mode}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+            {agent.name === 'opencode' && (
+              <div>
+                <Label htmlFor="agentModel">Agent Model</Label>
+                {opencodeModelsState.status === 'error' ? (
+                  <>
+                    <Input
+                      id="agentModel"
+                      value={agent.model ?? ''}
+                      onChange={(e) => {
+                        const value = e.target.value.trim();
+                        updateAgent(current => ({ ...current, model: value || undefined }));
+                      }}
+                      className="mt-1 w-full"
+                      placeholder="Enter model ID"
+                    />
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-destructive">
+                      <span>{opencodeModelsState.error ?? 'Failed to load OpenCode models.'}</span>
+                      <Button type="button" size="sm" variant="outline" onClick={loadOpencodeModels}>
+                        Retry
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Combobox
+                      items={opencodeModelsState.data}
+                      value={agent.model ?? null}
+                      onValueChange={(value) =>
+                        updateAgent(current => ({ ...current, model: value ?? undefined }))
+                      }
+                      filter={(item, query) => `${item}`.toLowerCase().includes(query.toLowerCase())}
+                    >
+                      <ComboboxInput
+                        id="agentModel"
                         placeholder="Search for a model"
                         className="mt-1 !w-full"
 
-                         showClear
-                         disabled={opencodeModelsState.status === 'loading' && !opencodeModelsState.data.length}
-                       />
-                       <ComboboxContent>
-                         <ComboboxEmpty>
-                           {opencodeModelsState.status === 'loading' && !opencodeModelsState.data.length
-                             ? 'Loading models…'
-                             : 'No models found.'}
-                         </ComboboxEmpty>
-                         <ComboboxList>
-                           {(model: string) => (
-                             <ComboboxItem key={model} value={model}>
-                               {model}
-                             </ComboboxItem>
-                           )}
-                         </ComboboxList>
-                       </ComboboxContent>
-                     </Combobox>
-                     <p className="mt-2 text-xs text-muted-foreground">
-                       Model list is cached on the server and refreshes when it restarts.
-                     </p>
-                   </>
-                 )}
-               </div>
-             )}
-              <div>
-                <Label htmlFor="agentExtraArgs">Extra CLI Args (one per line)</Label>
-                <Textarea
-                  id="agentExtraArgs"
-                  value={(agent.extraArgs ?? []).join('\n')}
-                  onChange={(e) => {
-                    const args = e.target.value
-                      .split('\n')
-                      .map(line => line.trim())
-                      .filter(Boolean);
-                    updateAgent(current => ({ ...current, extraArgs: args }));
-                  }}
-                  rows={3}
-                  className="mt-1"
-                />
+                        showClear
+                        disabled={opencodeModelsState.status === 'loading' && !opencodeModelsState.data.length}
+                      />
+                      <ComboboxContent>
+                        <ComboboxEmpty>
+                          {opencodeModelsState.status === 'loading' && !opencodeModelsState.data.length
+                            ? 'Loading models…'
+                            : 'No models found.'}
+                        </ComboboxEmpty>
+                        <ComboboxList>
+                          {(model: string) => (
+                            <ComboboxItem key={model} value={model}>
+                              {model}
+                            </ComboboxItem>
+                          )}
+                        </ComboboxList>
+                      </ComboboxContent>
+                    </Combobox>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Model list is cached on the server and refreshes when it restarts.
+                    </p>
+                  </>
+                )}
               </div>
-              <div>
-                <Label htmlFor="codingStyle">Coding Style Guidance</Label>
-                <Textarea
-                  id="codingStyle"
-                  value={automation.codingStyle}
-                  onChange={(e) =>
-                    updateAutomation(current => ({ ...current, codingStyle: e.target.value }))
-                  }
-                  rows={4}
-                  className="mt-1"
-                  placeholder="Document lint rules, formatting, or architecture tips"
-                />
-              </div>
-            </CardContent>
-          </Card>
+            )}
+            <div>
+              <Label htmlFor="agentExtraArgs">Extra CLI Args (one per line)</Label>
+              <Textarea
+                id="agentExtraArgs"
+                value={(agent.extraArgs ?? []).join('\n')}
+                onChange={(e) => {
+                  const args = e.target.value
+                    .split('\n')
+                    .map(line => line.trim())
+                    .filter(Boolean);
+                  updateAgent(current => ({ ...current, extraArgs: args }));
+                }}
+                rows={3}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="codingStyle">Coding Style Guidance</Label>
+              <Textarea
+                id="codingStyle"
+                value={automation.codingStyle}
+                onChange={(e) =>
+                  updateAutomation(current => ({ ...current, codingStyle: e.target.value }))
+                }
+                rows={4}
+                className="mt-1"
+                placeholder="Document lint rules, formatting, or architecture tips"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
@@ -616,7 +616,11 @@ export default function SettingsPage() {
   };
 
   return (
-    <AppLayout title="Project Settings" description="Configure your project and AI preferences">
+    <AppLayout
+      title="Project Settings"
+      description="Configure project defaults and AI automation preferences"
+      backLink={{ href: '/', label: 'Back to Dashboard' }}
+    >
       {renderContent()}
     </AppLayout>
   );

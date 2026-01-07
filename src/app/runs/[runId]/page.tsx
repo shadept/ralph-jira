@@ -238,8 +238,10 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
       title={`Run ${runId}`}
       description="Inspect a single AI loop execution"
       actions={actions}
+      backLink={{ href: '/runs', label: 'Back to Runs' }}
     >
       {renderContent()}
     </AppLayout>
   );
 }
+

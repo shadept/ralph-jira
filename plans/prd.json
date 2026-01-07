@@ -85,24 +85,33 @@
       "steps": [
         "Every page has a back button"
       ],
-      "passes": false,
+      "passes": true,
       "id": "task-1767796987568",
-      "status": "in_progress",
+      "status": "done",
       "priority": "medium",
       "createdAt": "2026-01-07T14:43:07.568Z",
-      "updatedAt": "2026-01-07T18:54:31.452Z",
+      "updatedAt": "2026-01-07T20:45:00.000Z",
       "tags": [
         "ux"
       ],
-      "filesTouched": [],
-      "lastRun": "2026-01-07T17:43:05.400Z"
+      "filesTouched": [
+        "src/components/layout/back-button.tsx",
+        "src/components/layout/app-layout.tsx",
+        "src/app/assistant/page.tsx",
+        "src/app/files/page.tsx",
+        "src/app/runs/page.tsx",
+        "src/app/runs/[runId]/page.tsx",
+        "src/app/settings/page.tsx",
+        "src/app/board/[id]/page.tsx"
+      ],
+      "lastRun": "2026-01-07T20:45:00.000Z"
     }
   ],
   "createdAt": "2026-01-07T00:00:00.000Z",
   "updatedAt": "2026-01-07T22:17:40.538Z",
   "metrics": {
     "velocity": 0,
-    "completed": 0,
+    "completed": 1,
     "total": 3
   }
 }
