@@ -109,7 +109,7 @@ if (allPassed) {
   console.log('✅ All checks passed!');
   console.log('\nYou can now run:');
   console.log('  npm run dev       - Start the webapp');
-  console.log('  npm run pm:run    - Run the AI executor');
+  console.log('  Use the "Run AI Loop" button or POST /api/runs/start to kick off the runner');
 } else {
   console.log('❌ Some checks failed. Please run:');
   console.log('  npm install       - If node_modules is missing');

@@ -26,4 +26,4 @@ services:
     working_dir: /workspace
     profiles:
       - runner
-    command: ["npm", "run", "pm:run"]
+    command: ["tail", "-f", "/dev/null"]

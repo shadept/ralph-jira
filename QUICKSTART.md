@@ -38,18 +38,17 @@ npm run dev
 - Update project name, tech stack, test commands
 - Set AI preferences and guardrails
 
-### 5. Run the AI Runner
-```bash
-# Set your API key in .env.local first!
-npm run pm:run
-```
+### 5. Run the AI Loop
+- Open any board and click **Run AI Loop** (top-right)
+- Or send `POST /api/runs/start` with `{ "boardId": "prd" }`
 
 The runner will:
-- Read tasks from `plans/prd.json`
-- Generate implementation plans
-- Run your tests
-- Update task status
-- Log everything to `progress.txt`
+- Clone the repo into `.pm/sandboxes/<runId>`
+- Read only the `todo` + `in_progress` tasks from `plans/prd.json`
+- Generate implementation notes via the Vercel AI SDK
+- Run your configured test/typecheck commands inside the sandbox
+- Update sandbox `plans/prd.json` and append to `progress.txt`
+- Sync the results back into the main `plans/prd.json` and `progress.txt`
 
 ### 6. View Progress
 - Go to `/files`
@@ -64,8 +63,9 @@ npm run build            # Production build
 npm start                # Run production build
 
 # AI Runner
-npm run pm:run           # Run with defaults
-npm run pm:run:help      # See all options
+curl -X POST "http://localhost:3000/api/runs/start?projectId=current-workspace" \
+  -H "Content-Type: application/json" \
+  -d '{"boardId":"prd"}'
 
 # Quality
 npm run typecheck        # Type checking
@@ -96,9 +96,9 @@ docker compose run runner                # Run AI runner
 3. Tasks appear in your active board
 
 ### Run Autonomous Execution
-1. Ensure tests are configured in Settings
-2. Run: `npm run pm:run`
-3. Watch `progress.txt` for live updates
+1. Ensure tests and automation settings are configured in Settings
+2. Click **Run AI Loop** on a board (or call `POST /api/runs/start`)
+3. Watch the run drawer or `/runs` for live status/logs
 
 ### Deploy to Production
 ```bash
@@ -121,6 +121,8 @@ docker compose up -d web
 **Runner won't start**
 - Ensure `plans/prd.json` and `plans/settings.json` exist
 - Verify `OPENAI_API_KEY` environment variable
+- Confirm `plans/runs/` and `.pm/` are writable
+- If using Docker mode, set `RUN_LOOP_EXECUTOR=docker` and rerun the request
 
 **Type errors**
 - Run `npm run typecheck` to see details

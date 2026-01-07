@@ -19,5 +19,5 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Default command
-CMD ["npm", "run", "pm:run"]
+# Default command (kept idle; the web app runs commands via docker compose run)
+CMD ["tail", "-f", "/dev/null"]

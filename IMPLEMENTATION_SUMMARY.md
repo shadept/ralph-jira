@@ -171,28 +171,19 @@ npm run dev
 # 4. Open http://localhost:3000
 ```
 
-### Run AI Runner
-```bash
-# Run with defaults
-npm run pm:run
-
-# With options
-npm run pm:run -- --board prd --max-iterations 10
-
-# View help
-npm run pm:run:help
-```
+### Run AI Loop
+- Open any board and click **Run AI Loop** (spawns a background job and opens the run drawer)
+- Or call `POST /api/runs/start?projectId=current-workspace` with `{ "boardId": "prd" }`
+- Monitor progress from the board drawer or `/runs`
 
 ### Docker Deployment
 ```bash
-# Web app
+# Web app (Next.js)
 docker compose up web
 
-# Runner (one-time)
-docker compose run runner
-
-# Runner with options
-docker compose run runner npm run pm:run -- --max-iterations 5
+# Runner (UI/API triggered)
+# Set RUN_LOOP_EXECUTOR=docker in the web container env and click "Run AI Loop"
+# The API will spawn `docker compose run runner node tools/runner/run-loop.mjs ...` on demand
 ```
 
 ## Sample Data Included

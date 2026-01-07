@@ -289,100 +289,42 @@ Flow:
 
 ### Architecture
 
-The runner (`runner/index.ts`) is a Node.js CLI application that:
-1. Loads board and settings from JSON files
-2. Selects tasks to execute based on priority
-3. Uses AI to plan implementation
-4. Executes commands (tests, builds)
-5. Updates task status and logs progress
+The background loop now lives in `tools/runner/run-loop.mjs`. Instead of a monolithic CLI it consumes a persisted run record (`plans/runs/<runId>.json`) that is created by the web API whenever the "Run AI Loop" button is pressed. The record stores metadata (board, sandbox path, max iterations, cancellation flag, PID, etc.) and is treated as the source of truth for the UI.
 
-### Task Selection Logic
+At startup the loop performs the following:
 
-Priority order:
-1. Tasks with `status === 'in_progress'`
-2. Tasks with `status === 'todo'`
-3. Tasks with `status === 'backlog'`
+1. Clone or copy the current repo into `.pm/sandboxes/<runId>` (git clone `--local` first, fs copy as a fallback).
+2. Copy `plans/settings.json` and generate a sandbox `plans/prd.json` that only includes `todo` or `in_progress` tasks from the active board.
+3. Run sandbox setup commands defined in `plans/settings.json.automation.setup` (defaults to `npm ci`).
+4. Iterate up to `maxIterations`, launching the configured CLI agent (`claude` or `opencode`) with the shared loop prompt so it can decide what to build, run whatever commands/tests it needs, update files, and append its own notes to `progress.txt`. The runner captures stdout/stderr for observability and watches for `<promise>COMPLETE</promise>` to know when to stop.
+5. Respect cancellation by checking for `plans/runs/<runId>.cancel` between every major step.
+6. On completion/cancel/error copy the sandbox log to `plans/runs/<runId>.progress.txt`, sync task fields back into the root `plans/prd.json`, append a summary to the root `progress.txt`, and update the run record with final status + reason (`completed`, `max_iterations`, `canceled`, or `error`).
 
-Filter: Only tasks where `passes === false`
+Two execution modes are supported:
+- **Local** (default): the API spawns `node tools/runner/run-loop.mjs --runId <id> --projectPath <root>` as a detached child process.
+- **Docker**: set `RUN_LOOP_EXECUTOR=docker` and the API will spawn `docker compose run runner node tools/runner/run-loop.mjs --runId <id> --projectPath /workspace`. The compose file mounts the repo so state stays in sync.
 
-### Execution Flow
+### Task Selection & Loop Logic
 
-```
-┌─────────────┐
-│   Start     │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────────┐
-│  Load Settings  │
-│   & Board       │
-└──────┬──────────┘
-       │
-       ▼
-┌─────────────────┐
-│ Get Next Task   │◄────────┐
-└──────┬──────────┘         │
-       │                    │
-       ▼                    │
-┌─────────────────┐         │
-│ AI: Create Plan │         │
-└──────┬──────────┘         │
-       │                    │
-       ▼                    │
-┌─────────────────┐         │
-│ Apply Changes   │ (TODO)  │
-└──────┬──────────┘         │
-       │                    │
-       ▼                    │
-┌─────────────────┐         │
-│   Run Tests     │         │
-└──────┬──────────┘         │
-       │                    │
-       ├─ Pass ──► Mark Done│
-       │                    │
-       └─ Fail ──► Mark     │
-                   Review   │
-       │                    │
-       ▼                    │
-┌─────────────────┐         │
-│  Update Board   │         │
-│  Append Log     │         │
-└──────┬──────────┘         │
-       │                    │
-       ├─ More Tasks? ──────┘
-       │
-       ▼
-┌─────────────────┐
-│  Save Run Log   │
-│      Done       │
-└─────────────────┘
-```
+- Only `todo` and `in_progress` tasks from the active board are loaded into the sandbox PRD.
+- Each iteration updates the run record with `currentIteration`, `lastTaskId`, `lastMessage`, `lastCommand`, and command exit codes for live UI feedback.
+- Tasks marked `passes=true` in the sandbox are synced back to the root PRD with `status=review`. Remaining selected tasks are forced into `status=in_progress` so reviewers know the loop attempted them.
+- The loop stops when all sandbox tasks pass, the max iteration count is reached, a cancellation file appears, or a fatal error occurs.
+
+### Logging & Persistence
+
+- `.pm/sandboxes/<runId>/progress.txt` receives detailed per-iteration sections (timestamp, task, AI notes, commands, pass/fail results). The tail of this file is streamed into the UI.
+- `plans/runs/<runId>.progress.txt` stores the preserved log once the run finalizes.
+- `plans/runs/<runId>.json` is the authoritative run record used by the UI, history pages, and the runner itself. It includes timestamps, status, reason, executor mode, PID, and any errors.
+- Root `progress.txt` gets a short summary per run so humans have a linear audit log.
 
 ### Safety Guardrails
 
-Implemented in runner:
-- Command whitelist (npm, test, lint, typecheck only)
-- No file deletions without explicit requirement
-- No network requests to unknown endpoints
-- Respects .gitignore patterns
-- All actions logged
-
-### Logging Strategy
-
-**progress.txt** (append-only text):
-- Timestamp for each entry
-- Task description and plan
-- Actions taken (files, commands)
-- Command outputs (trimmed)
-- Pass/fail result with reasoning
-- Human-readable format
-
-**plans/runs/*.json** (structured):
-- Run metadata (ID, timestamps)
-- Tasks attempted with results
-- Files changed per task
-- Commands executed
-- Environment info
+- Sandbox-only mutations: root repo is untouched until the post-run sync step.
+- Runner-executed commands are limited to setup steps plus the single agent CLI; all other shell activity happens inside the sandbox under the agent's control.
+- Cancellation flag checked between setup commands, between every agent iteration, and before each loop cycle.
+- Atomic JSON writes for boards, settings, and run files to prevent corruption.
+- Logs never include hidden reasoning; they stay factual for handoff purposes.
 
 ## Docker Deployment
 
@@ -462,7 +404,7 @@ No automated tests included (single-shot implementation).
    - Create `.env.local` with test API key
    - Run `npm run dev`
    - Test all UI flows
-   - Run `npm run pm:run` with sample tasks
+   - Trigger the loop via the "Run AI Loop" button or `POST /api/runs/start` and monitor `/runs`
 
 ## Performance Considerations
 

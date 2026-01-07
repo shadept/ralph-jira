@@ -24,6 +24,8 @@
 .DS_Store
 *.pem
 projects.json
+.pm/
+plans/runs/
 
 # debug
 npm-debug.log*

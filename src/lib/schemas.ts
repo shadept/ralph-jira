@@ -54,6 +54,14 @@ export const BoardSchema = z.object({
 export type Board = z.infer<typeof BoardSchema>;
 
 // Project Settings schema
+const AutomationSettingsSchema = z.object({
+  setup: z.array(z.string()).default(['npm ci']),
+  maxIterations: z.number().int().positive().default(5),
+  sandboxRoot: z.string().optional(),
+});
+
+export type AutomationSettings = z.infer<typeof AutomationSettingsSchema>;
+
 export const ProjectSettingsSchema = z.object({
   projectName: z.string(),
   projectDescription: z.string(),
@@ -79,9 +87,43 @@ export const ProjectSettingsSchema = z.object({
     naming: z.string(),
     commitStyle: z.string().optional(),
   }),
+  automation: AutomationSettingsSchema.optional(),
 });
 
 export type ProjectSettings = z.infer<typeof ProjectSettingsSchema>;
+
+export const RunStatusSchema = z.enum(['queued', 'running', 'stopped', 'completed', 'failed', 'canceled']);
+export const RunReasonSchema = z.enum(['completed', 'max_iterations', 'canceled', 'error']);
+
+export const RunRecordSchema = z.object({
+  runId: z.string(),
+  projectId: z.string().optional(),
+  boardId: z.string(),
+  boardName: z.string().optional(),
+  createdAt: z.string(),
+  startedAt: z.string().nullable(),
+  finishedAt: z.string().nullable(),
+  status: RunStatusSchema,
+  reason: RunReasonSchema.optional(),
+  boardSourcePath: z.string(),
+  sandboxPath: z.string(),
+  cancelFlagPath: z.string(),
+  logPath: z.string().optional(),
+  sandboxLogPath: z.string().optional(),
+  maxIterations: z.number().int().positive(),
+  currentIteration: z.number().int().nonnegative(),
+  selectedTaskIds: z.array(z.string()),
+  lastTaskId: z.string().optional(),
+  lastMessage: z.string().optional(),
+  lastCommand: z.string().optional(),
+  lastCommandExitCode: z.number().nullable().optional(),
+  errors: z.array(z.string()).default([]),
+  lastProgressAt: z.string().optional(),
+  executorMode: z.enum(['local', 'docker']).default('local'),
+  pid: z.number().optional(),
+});
+
+export type RunRecord = z.infer<typeof RunRecordSchema>;
 
 // Run log schema
 export const RunLogSchema = z.object({

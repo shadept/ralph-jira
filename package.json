@@ -8,8 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "pm:run": "tsx runner/index.ts",
-    "pm:run:help": "tsx runner/index.ts --help",
+    "test": "npm run lint",
     "verify": "node scripts/verify-setup.js"
   },
   "dependencies": {

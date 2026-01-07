@@ -44,5 +44,11 @@
     },
     "naming": "kebab-case for files and folders, PascalCase for components, camelCase for functions",
     "commitStyle": "Conventional commits (feat:, fix:, docs:, etc.)"
+  },
+  "automation": {
+    "setup": [
+      "npm ci"
+    ],
+    "maxIterations": 5
   }
 }
