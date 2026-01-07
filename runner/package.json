@@ -1,0 +1,10 @@
+{
+  "name": "@ralph-jira/runner",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Autonomous AI task execution runner",
+  "main": "index.ts",
+  "scripts": {
+    "start": "tsx index.ts"
+  }
+}

@@ -12,22 +12,20 @@
   "codingStyle": "Clean, typed TypeScript with functional patterns. Use async/await. Prefer composition over inheritance. Keep functions small and focused.",
   "howToTest": {
     "commands": [
-      "npm test",
       "npm run typecheck",
-      "npm run lint"
+      "npm run lint",
+      "npm test"
     ],
     "notes": "Run tests after each change. Ensure type safety. Follow linting rules."
   },
   "howToRun": {
     "commands": [
-      "npm run dev",
-      "npm run build",
-      "npm start"
+      "npm run dev"
     ],
     "notes": "Development server on port 3000. Build before production deployment."
   },
   "aiPreferences": {
-    "defaultModel": "gpt-4-turbo-preview",
+    "defaultModel": "gpt-5.1-codex",
     "provider": "openai",
     "temperature": 0.7,
     "maxTokens": 4000,

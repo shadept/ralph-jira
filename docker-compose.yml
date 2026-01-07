@@ -1,0 +1,29 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      # Mount repository root so changes are persisted
+      - ./plans:/app/plans
+      - ./progress.txt:/app/progress.txt
+    restart: unless-stopped
+
+  runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.runner
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      # Mount entire repo so runner can edit files
+      - .:/workspace
+    working_dir: /workspace
+    profiles:
+      - runner
+    command: ["npm", "run", "pm:run"]

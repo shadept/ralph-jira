@@ -33,27 +33,6 @@
   ],
   "tasks": [
     {
-      "id": "task-001",
-      "category": "functional",
-      "description": "User can create a new task in the Kanban board",
-      "steps": [
-        "Navigate to active board view",
-        "Click 'New Task' button",
-        "Fill in task details (description, priority, estimate)",
-        "Save task",
-        "Verify task appears in the backlog column"
-      ],
-      "passes": false,
-      "status": "todo",
-      "priority": "high",
-      "estimate": 3,
-      "createdAt": "2026-01-07T00:00:00.000Z",
-      "updatedAt": "2026-01-07T00:00:00.000Z",
-      "tags": ["ui", "crud"],
-      "filesTouched": []
-    },
-    {
-      "id": "task-002",
       "category": "functional",
       "description": "User can drag and drop tasks between columns",
       "steps": [
@@ -64,16 +43,19 @@
         "Refresh page and verify persistence"
       ],
       "passes": false,
-      "status": "todo",
+      "id": "task-002",
+      "status": "done",
       "priority": "high",
       "estimate": 5,
       "createdAt": "2026-01-07T00:00:00.000Z",
-      "updatedAt": "2026-01-07T00:00:00.000Z",
-      "tags": ["ui", "drag-drop"],
+      "updatedAt": "2026-01-07T14:43:56.395Z",
+      "tags": [
+        "ui",
+        "drag-drop"
+      ],
       "filesTouched": []
     },
     {
-      "id": "task-003",
       "category": "functional",
       "description": "AI can generate new tasks from a description",
       "steps": [
@@ -85,17 +67,38 @@
         "Verify tasks have proper acceptance criteria"
       ],
       "passes": false,
+      "id": "task-003",
       "status": "backlog",
       "priority": "medium",
       "estimate": 8,
       "createdAt": "2026-01-07T00:00:00.000Z",
       "updatedAt": "2026-01-07T00:00:00.000Z",
-      "tags": ["ai", "generation"],
+      "tags": [
+        "ai",
+        "generation"
+      ],
+      "filesTouched": []
+    },
+    {
+      "category": "functional",
+      "description": "Add back button to all non-main pages",
+      "steps": [
+        "Every page has a back button"
+      ],
+      "passes": false,
+      "id": "task-1767796987568",
+      "status": "todo",
+      "priority": "medium",
+      "createdAt": "2026-01-07T14:43:07.568Z",
+      "updatedAt": "2026-01-07T14:43:49.383Z",
+      "tags": [
+        "ux"
+      ],
       "filesTouched": []
     }
   ],
   "createdAt": "2026-01-07T00:00:00.000Z",
-  "updatedAt": "2026-01-07T00:00:00.000Z",
+  "updatedAt": "2026-01-07T14:43:56.407Z",
   "metrics": {
     "velocity": 0,
     "completed": 0,
