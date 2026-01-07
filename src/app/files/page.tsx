@@ -1,9 +1,11 @@
 'use client';
-
+ 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-
+ 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useProjectContext } from '@/components/projects/project-provider';
@@ -91,10 +93,11 @@ export default function FilesPage() {
             <CardContent>
               <p className="text-sm text-muted-foreground">
                 View and edit the active board at{' '}
-                <a href="/board/prd" className="text-primary underline">
+                <Link href="/board/prd" className="text-primary underline">
                   /board/prd
-                </a>
+                </Link>
               </p>
+
             </CardContent>
           </Card>
         </TabsContent>
@@ -108,10 +111,11 @@ export default function FilesPage() {
             <CardContent>
               <p className="text-sm text-muted-foreground">
                 View and edit settings at{' '}
-                <a href="/settings" className="text-primary underline">
+                <Link href="/settings" className="text-primary underline">
                   /settings
-                </a>
+                </Link>
               </p>
+
             </CardContent>
           </Card>
         </TabsContent>
@@ -123,8 +127,10 @@ export default function FilesPage() {
     <AppLayout
       title="Files & Artifacts"
       description="Inspect planning assets, logs, and generated data"
+      backLink={{ href: '/', label: 'Back to Dashboard' }}
     >
       {renderContent()}
     </AppLayout>
   );
 }
+

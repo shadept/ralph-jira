@@ -167,8 +167,10 @@ export default function RunsPage() {
       title="Run History"
       description="Review previous AI loop executions and their status"
       actions={actions}
+      backLink={{ href: '/', label: 'Back to Dashboard' }}
     >
       {renderContent()}
     </AppLayout>
   );
 }
+

@@ -121,8 +121,10 @@ export default function AssistantPage() {
     <AppLayout
       title="AI Assistant"
       description="Use AI to generate tasks, improve planning, and more"
+      backLink={{ href: '/', label: 'Back to Dashboard' }}
     >
       {renderContent()}
     </AppLayout>
   );
 }
+

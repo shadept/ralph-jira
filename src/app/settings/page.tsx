@@ -512,10 +512,12 @@ export default function SettingsPage() {
   return (
     <AppLayout
       title="Project Settings"
-      description="Configure your project and AI preferences"
+      description="Configure project defaults and AI automation preferences"
       actions={actions}
+      backLink={{ href: '/', label: 'Back to Dashboard' }}
     >
       {renderContent()}
     </AppLayout>
   );
 }
+
