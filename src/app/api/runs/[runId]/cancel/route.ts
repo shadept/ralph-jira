@@ -18,8 +18,27 @@ export async function POST(
     const cancelPath = path.join(project.path, run.cancelFlagPath);
     await fs.writeFile(cancelPath, `canceled at ${new Date().toISOString()}`, 'utf-8');
 
+    let lastMessage = 'Cancellation requested…';
+    let forceKilled = false;
+
+    if (run.cancellationRequestedAt && run.pid) {
+      try {
+        // Second time requesting cancellation - kill the process
+        process.kill(run.pid, 'SIGTERM');
+        lastMessage = 'Process force killed.';
+        forceKilled = true;
+      } catch (err) {
+        console.error(`Failed to kill process ${run.pid}`, err);
+        lastMessage = 'Process already dead or could not be killed.';
+      }
+    }
+
     const updated = await upsertRun(project.path, run, {
-      lastMessage: 'Cancellation requested…',
+      lastMessage,
+      cancellationRequestedAt: run.cancellationRequestedAt || new Date().toISOString(),
+      status: 'canceled',
+      reason: 'canceled',
+      finishedAt: forceKilled ? new Date().toISOString() : run.finishedAt,
     });
 
     return NextResponse.json({ run: updated });

@@ -1,3 +1,6 @@
+import path from 'node:path';
+import { existsSync } from 'node:fs';
+
 /**
  * @typedef {Object} AgentOptions
  * @property {string} name - The name of the agent.
@@ -58,7 +61,7 @@ export class ClaudeAgent extends Agent {
      * @returns {Promise<{ output: string, exitCode: number }>}
      */
     async run({ sandboxDir, runCommand, appendSandboxLog, iteration }) {
-        const prompt = [
+        const promptLines = [
             '@plans/prd.json @progress.txt',
             '1. Find the highest-priority feature to work on and work only on that feature.',
             'This should be the one YOU decide has the highest priority - not necessarily the first in the list.',
@@ -69,11 +72,13 @@ export class ClaudeAgent extends Agent {
             '5. make a git commit of the feature.',
             'ONLY WORK ON A SINGLE FEATURE.',
             'If, while implementing the feature, you notice the PRD is complete, output <promise>COMPLETE</promise>'
-        ].join(' ');
+        ];
 
-        const finalPrompt = this.codingStyle
-            ? `${prompt} <coding-style>${this.codingStyle}</coding-style>`
-            : prompt;
+        let finalPrompt = promptLines.join('\n');
+
+        if (this.codingStyle) {
+            finalPrompt += `\n\n<coding-style>\n${this.codingStyle}\n</coding-style>`;
+        }
 
         const args = [...this.extraArgs];
 
@@ -81,10 +86,18 @@ export class ClaudeAgent extends Agent {
             args.push('--model', this.model);
         }
 
-        args.push('--permission-mode', this.permissionMode, '--print', finalPrompt);
+        args.push(
+            '--permission-mode', this.permissionMode,
+            '--verbose',
+            '--output-format', 'stream-json',
+            '--include-partial-messages',
+            '--print',
+            finalPrompt
+        );
 
         const describeInvocation = () => {
-            return `${this.bin} ${args.map(a => a === finalPrompt ? '[prompt omitted]' : a).join(' ')}`.trim();
+            const displayArgs = args.map(a => a === finalPrompt ? '[prompt omitted]' : a);
+            return `${this.bin} ${displayArgs.join(' ')}`.trim();
         };
 
         await appendSandboxLog([
@@ -92,8 +105,47 @@ export class ClaudeAgent extends Agent {
             `Command: ${describeInvocation()}`,
         ]);
 
-        const result = await runCommand(this.bin, args, sandboxDir);
-        const combinedOutput = `${result.stdout}${result.stderr ? `\n${result.stderr}` : ''}`.trim();
+        let bin = this.bin;
+        if (process.platform === 'win32' && bin === 'claude') {
+            const userProfile = process.env.USERPROFILE || '';
+            const possibleLocalBin = path.join(userProfile, '.local', 'bin', 'claude.exe');
+            if (existsSync(possibleLocalBin)) {
+                bin = possibleLocalBin;
+            }
+        }
+
+        let stdoutBuffer = '';
+        let fullContent = '';
+
+        const onStdout = (chunk) => {
+            stdoutBuffer += chunk.toString('utf-8');
+            const lines = stdoutBuffer.split('\n');
+            stdoutBuffer = lines.pop(); // Keep partial line
+
+            for (const line of lines) {
+                if (!line.trim()) continue;
+                try {
+                    const data = JSON.parse(line);
+                    if (data.type === 'text' && data.text) {
+                        appendSandboxLog(data.text).catch(() => { });
+                        fullContent += data.text;
+                    } else if (data.type === 'progress' && data.message) {
+                        appendSandboxLog(`[Progress] ${data.message}`).catch(() => { });
+                    } else if (data.type === 'error' && data.message) {
+                        appendSandboxLog(`[Error] ${data.message}`).catch(() => { });
+                    }
+                } catch (e) {
+                    // Not JSON or partial, just log as-is
+                    appendSandboxLog(line).catch(() => { });
+                }
+            }
+        };
+
+        const result = await runCommand(bin, args, sandboxDir, { onStdout });
+
+        // Final cleanup of content if needed, though stream-json should give us everything
+        const finalOutput = fullContent || result.stdout;
+        const combinedOutput = `${finalOutput}${result.stderr ? `\n${result.stderr}` : ''}`.trim();
 
         await appendSandboxLog(`Claude execution finished with code ${result.code}. Output length: ${combinedOutput.length}`);
 
@@ -133,6 +185,7 @@ export class OpenCodeAgent extends Agent {
             `Command: ${describeInvocation()}`,
         ]);
 
+        // Using shell: false to avoid parsing issues.
         const result = await runCommand(this.bin, args, sandboxDir);
         const combinedOutput = `${result.stdout}${result.stderr ? `\n${result.stderr}` : ''}`.trim();
 

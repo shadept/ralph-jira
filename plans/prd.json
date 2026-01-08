@@ -57,30 +57,6 @@
     },
     {
       "category": "functional",
-      "description": "AI can generate new tasks from a description",
-      "steps": [
-        "Navigate to board",
-        "Click 'AI Generate Tasks' button",
-        "Enter project description or feature request",
-        "Submit to AI",
-        "Verify multiple relevant tasks are created",
-        "Verify tasks have proper acceptance criteria"
-      ],
-      "passes": false,
-      "id": "task-003",
-      "status": "backlog",
-      "priority": "medium",
-      "estimate": 8,
-      "createdAt": "2026-01-07T00:00:00.000Z",
-      "updatedAt": "2026-01-07T00:00:00.000Z",
-      "tags": [
-        "ai",
-        "generation"
-      ],
-      "filesTouched": []
-    },
-    {
-      "category": "functional",
       "description": "Add back button to all non-main pages",
       "steps": [
         "Every page has a back button"
@@ -164,13 +140,13 @@
       "status": "done",
       "priority": "medium",
       "createdAt": "2026-01-08T15:31:30.745Z",
-      "updatedAt": "2026-01-08T21:55:51.766Z",
+      "updatedAt": "2026-01-08T23:05:00.000Z",
       "tags": [],
       "filesTouched": [
         "tools/runner/run-loop.mjs",
-        "src/lib/schemas.ts"
+        "tools/runner/agents.mjs"
       ],
-      "lastRun": "2026-01-08T21:30:00.000Z"
+      "lastRun": "2026-01-08T23:05:00.000Z"
     },
     {
       "category": "functional",
@@ -204,17 +180,22 @@
         "Generation should prefer less, high quality tasks (no step by step guides)",
         "Acceptance criteria should not include specific to unknowns"
       ],
-      "passes": false,
+      "passes": true,
       "id": "task-1767909913409",
-      "status": "in_progress",
+      "status": "done",
       "priority": "high",
       "estimate": 5,
       "createdAt": "2026-01-08T22:05:13.409Z",
-      "updatedAt": "2026-01-08T22:19:41.896Z",
+      "updatedAt": "2026-01-08T23:11:25.408Z",
       "tags": [
         "AI"
       ],
-      "filesTouched": []
+      "filesTouched": [
+        "src/lib/storage/interface.ts",
+        "src/lib/storage/local-filesystem.ts",
+        "src/app/api/ai/board/route.ts"
+      ],
+      "lastRun": "2026-01-08T22:40:00.000Z"
     },
     {
       "category": "functional",
@@ -223,23 +204,111 @@
         "In board view, there should be a button at top right of nav bar actions that opens board properties modal",
         "Should be able to change most properties, keep columns locked (disabled) for now"
       ],
-      "passes": false,
+      "passes": true,
       "id": "task-1767910050540",
-      "status": "in_progress",
+      "status": "done",
       "priority": "high",
       "createdAt": "2026-01-08T22:07:30.540Z",
-      "updatedAt": "2026-01-08T22:19:41.896Z",
+      "updatedAt": "2026-01-08T23:11:28.768Z",
       "tags": [
         "UX"
+      ],
+      "filesTouched": [
+        "src/components/board-properties-dialog.tsx",
+        "src/app/board/[id]/page.tsx"
+      ],
+      "lastRun": "2026-01-08T23:00:00.000Z"
+    },
+    {
+      "category": "functional",
+      "description": "Unify board creation and editing dialog into a shared modal component",
+      "steps": [
+        "Extract existing board edit dialog into a reusable component",
+        "Add props/state to support both create and edit modes",
+        "Ensure modal initializes fields correctly based on mode"
+      ],
+      "passes": false,
+      "id": "task-1767913585123-0",
+      "status": "in_progress",
+      "priority": "high",
+      "estimate": 5,
+      "createdAt": "2026-01-08T23:06:25.123Z",
+      "updatedAt": "2026-01-08T23:18:11.903Z",
+      "tags": [
+        "ui",
+        "refactor"
+      ],
+      "filesTouched": []
+    },
+    {
+      "category": "functional",
+      "description": "Enhance board editing with delete capability",
+      "steps": [
+        "Add a clearly labeled delete action within the board modal",
+        "Display confirmation dialog to prevent accidental deletions",
+        "Execute board deletion and refresh UI state appropriately"
+      ],
+      "passes": false,
+      "id": "task-1767913585123-3",
+      "status": "in_progress",
+      "priority": "high",
+      "estimate": 4,
+      "createdAt": "2026-01-08T23:06:25.123Z",
+      "updatedAt": "2026-01-08T23:18:11.903Z",
+      "tags": [
+        "ux",
+        "data-management"
+      ],
+      "filesTouched": []
+    },
+    {
+      "category": "functional",
+      "description": "Remove non functional AI actions",
+      "steps": [
+        "Remove prioritize tasks",
+        "Remove improve acceptance criteria",
+        "Remove split into sprints",
+        "Keep current AI Actions button and menu to allow future expansion"
+      ],
+      "passes": false,
+      "id": "task-1767914028900",
+      "status": "in_progress",
+      "priority": "medium",
+      "estimate": 2,
+      "createdAt": "2026-01-08T23:13:48.900Z",
+      "updatedAt": "2026-01-08T23:18:11.903Z",
+      "tags": [
+        "ux"
+      ],
+      "filesTouched": []
+    },
+    {
+      "category": "functional",
+      "description": "Convert @plans/prd.json to new board format",
+      "steps": [
+        "File renamed to board-1767913506302",
+        "@plans/prd.json in worktree is preserved and untouched, this change relates only to @plans/prd.json",
+        "When creating a new project plans/prd.json is no longer created, instead a new board is created in its place, using new naming schema"
+      ],
+      "passes": false,
+      "id": "task-1767914131636",
+      "status": "in_progress",
+      "priority": "low",
+      "estimate": 1,
+      "createdAt": "2026-01-08T23:15:31.636Z",
+      "updatedAt": "2026-01-08T23:18:11.903Z",
+      "tags": [
+        "ux",
+        "data-management"
       ],
       "filesTouched": []
     }
   ],
   "createdAt": "2026-01-07T00:00:00.000Z",
-  "updatedAt": "2026-01-08T22:19:41.896Z",
+  "updatedAt": "2026-01-08T23:18:11.903Z",
   "metrics": {
     "velocity": 0,
     "completed": 6,
-    "total": 12
+    "total": 14
   }
 }

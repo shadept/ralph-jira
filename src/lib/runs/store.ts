@@ -158,6 +158,7 @@ export function createInitialRunRecord(params: {
     executorMode: params.executorMode,
     pid: undefined,
     commands: [],
+    cancellationRequestedAt: undefined,
   };
 
   return RunRecordSchema.parse(run);

@@ -183,6 +183,8 @@ class RunLoop {
     );
     this.agentExtraArgs = parseAgentExtraArgs();
     this.claudePermissionMode = process.env.RUN_LOOP_CLAUDE_PERMISSION_MODE || 'acceptEdits';
+    this.updateQueue = Promise.resolve();
+    this.lastProgressUpdateAt = 0;
   }
 
   /**
@@ -221,11 +223,17 @@ class RunLoop {
    */
   async updateRun(patch) {
     this.run = { ...this.run, ...patch };
-    try {
-      await writeJson(this.runFile, this.run);
-    } catch (error) {
-      console.error('Unable to persist run update', error);
-    }
+
+    // Chain update to queue to avoid concurrent writes/atomic rename issues on Windows
+    this.updateQueue = this.updateQueue.then(async () => {
+      try {
+        await writeJson(this.runFile, this.run);
+      } catch (error) {
+        console.error('Unable to persist run update', error);
+      }
+    });
+
+    return this.updateQueue;
   }
 
   /**
@@ -235,9 +243,15 @@ class RunLoop {
    */
   async appendSandboxLog(lines) {
     const payload = Array.isArray(lines) ? lines.join('\n') : lines;
-    const timestamp = new Date().toISOString();
+    const now = Date.now();
+    const timestamp = new Date(now).toISOString();
     await fs.appendFile(this.sandboxLogPath, `\n[${timestamp}]\n${payload}\n`, 'utf-8');
-    await this.updateRun({ lastProgressAt: timestamp });
+
+    // Throttle UI progress update to once every 2 seconds to avoid file lock spam
+    if (now - this.lastProgressUpdateAt > 2000) {
+      this.lastProgressUpdateAt = now;
+      await this.updateRun({ lastProgressAt: timestamp });
+    }
   }
 
   /**
@@ -475,16 +489,21 @@ class RunLoop {
     if (!branchName) return null;
 
     // Check if gh CLI is available
-    const ghCheck = await this.runCommand('gh', ['--version'], this.sandboxDir);
-    if (ghCheck.code !== 0) {
-      await this.appendSandboxLog('GitHub CLI (gh) not available. Skipping PR creation.');
-      return null;
-    }
+    try {
+      const ghCheck = await this.runCommand('gh', ['--version'], this.sandboxDir);
+      if (ghCheck.code !== 0) {
+        await this.appendSandboxLog('GitHub CLI (gh) not available (exit code != 0). Skipping PR creation.');
+        return null;
+      }
 
-    // Check if authenticated
-    const authCheck = await this.runCommand('gh', ['auth', 'status'], this.sandboxDir);
-    if (authCheck.code !== 0) {
-      await this.appendSandboxLog('GitHub CLI not authenticated. Skipping PR creation.');
+      // Check if authenticated
+      const authCheck = await this.runCommand('gh', ['auth', 'status'], this.sandboxDir);
+      if (authCheck.code !== 0) {
+        await this.appendSandboxLog('GitHub CLI not authenticated. Skipping PR creation.');
+        return null;
+      }
+    } catch (err) {
+      await this.appendSandboxLog(`GitHub CLI check failed: ${err.message}. Skipping PR creation.`);
       return null;
     }
 
@@ -506,35 +525,40 @@ class RunLoop {
     ].join('\n');
 
     await this.appendSandboxLog(`Creating pull request for branch ${branchName}...`);
-    const result = await this.runCommand(
-      'gh',
-      ['pr', 'create', '--title', title, '--body', body, '--base', 'main', '--head', branchName],
-      this.sandboxDir,
-    );
+    try {
+      const result = await this.runCommand(
+        'gh',
+        ['pr', 'create', '--title', title, '--body', body, '--base', 'main', '--head', branchName],
+        this.sandboxDir,
+      );
 
-    if (result.code !== 0) {
-      // Check if PR already exists
-      if (result.stderr?.includes('already exists') || result.stdout?.includes('already exists')) {
-        await this.appendSandboxLog('Pull request already exists for this branch');
-        // Try to get existing PR URL
-        const viewResult = await this.runCommand(
-          'gh',
-          ['pr', 'view', branchName, '--json', 'url', '-q', '.url'],
-          this.sandboxDir,
-        );
-        if (viewResult.code === 0 && viewResult.stdout.trim()) {
-          return viewResult.stdout.trim();
+      if (result.code !== 0) {
+        // Check if PR already exists
+        if (result.stderr?.includes('already exists') || result.stdout?.includes('already exists')) {
+          await this.appendSandboxLog('Pull request already exists for this branch');
+          // Try to get existing PR URL
+          const viewResult = await this.runCommand(
+            'gh',
+            ['pr', 'view', branchName, '--json', 'url', '-q', '.url'],
+            this.sandboxDir,
+          );
+          if (viewResult.code === 0 && viewResult.stdout.trim()) {
+            return viewResult.stdout.trim();
+          }
+          return null;
         }
+        const snippet = limitOutput(result.stderr || result.stdout || '');
+        await this.appendSandboxLog(`Failed to create PR: ${snippet}`);
         return null;
       }
-      const snippet = limitOutput(result.stderr || result.stdout || '');
-      await this.appendSandboxLog(`Failed to create PR: ${snippet}`);
+
+      const prUrl = result.stdout.trim();
+      await this.appendSandboxLog(`Created pull request: ${prUrl}`);
+      return prUrl;
+    } catch (err) {
+      await this.appendSandboxLog(`Unable to create PR: ${err.message}`);
       return null;
     }
-
-    const prUrl = result.stdout.trim();
-    await this.appendSandboxLog(`Created pull request: ${prUrl}`);
-    return prUrl;
   }
 
   /**
@@ -730,9 +754,15 @@ class RunLoop {
 
     return new Promise((resolve, reject) => {
       console.log("Spawning", command, args)
+
+      // Clean environment variables to prevent VSCode debugger interference
+      const cleanEnv = { ...(options.env || process.env) };
+      delete cleanEnv.NODE_OPTIONS;
+      delete cleanEnv.VSCODE_INSPECTOR_OPTIONS;
+
       const child = spawn(command, args, {
         cwd,
-        env: options.env ? { ...process.env, ...options.env } : { ...process.env },
+        env: cleanEnv,
         shell: options.shell || false,
         windowsHide: true,
       });
@@ -744,11 +774,19 @@ class RunLoop {
 
       child.stdout?.on('data', chunk => {
         stdoutChunks.push(chunk);
-        this.appendSandboxLog(chunk.toString('utf-8')).catch(() => { });
+        if (typeof options.onStdout === 'function') {
+          options.onStdout(chunk);
+        } else {
+          this.appendSandboxLog(chunk.toString('utf-8')).catch(() => { });
+        }
       });
       child.stderr?.on('data', chunk => {
         stderrChunks.push(chunk);
-        this.appendSandboxLog(chunk.toString('utf-8')).catch(() => { });
+        if (typeof options.onStderr === 'function') {
+          options.onStderr(chunk);
+        } else {
+          this.appendSandboxLog(chunk.toString('utf-8')).catch(() => { });
+        }
       });
       child.on('error', err => {
         const stdout = Buffer.concat(stdoutChunks).toString('utf-8');
@@ -788,7 +826,13 @@ class RunLoop {
   async verifyCancellation() {
     if (!this.cancelFlagPath) return false;
     if (existsSync(this.cancelFlagPath)) {
-      await this.updateRun({ lastMessage: 'Cancellation signal received', reason: 'canceled' });
+      this.status = 'canceled';
+      this.reason = 'canceled';
+      await this.updateRun({
+        lastMessage: 'Cancellation signal received',
+        status: 'canceled',
+        reason: 'canceled'
+      });
       return true;
     }
     return false;
@@ -1087,15 +1131,24 @@ class RunLoop {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const runner = new RunLoop(args);
+  let finalized = false;
+
   try {
     await runner.init();
     await runner.runLoop();
+    finalized = true;
     await runner.finalize();
   } catch (error) {
     console.error('Runner failed', error);
     runner.status = 'failed';
     runner.reason = runner.reason === 'completed' ? 'error' : runner.reason;
-    await runner.finalize(error);
+    if (!finalized) {
+      try {
+        await runner.finalize(error);
+      } catch (finalizeError) {
+        console.error('Critical failure in finalize during error handling', finalizeError);
+      }
+    }
     process.exit(1);
   }
 }

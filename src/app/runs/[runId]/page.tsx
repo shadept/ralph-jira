@@ -84,7 +84,8 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
     if (!run) return;
     try {
       await apiFetch(`/api/runs/${run.runId}/cancel`, { method: 'POST' });
-      toast.success('Cancellation requested');
+      const isForceKill = !!run.cancellationRequestedAt;
+      toast.success(isForceKill ? 'Process killed' : 'Cancellation requested');
       await loadRun();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to cancel run';
@@ -124,8 +125,8 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
           Retry Run
         </Button>
       )}
-      <Button variant="destructive" size="sm" onClick={handleCancel} disabled={run.status !== 'running'}>
-        Cancel Run
+      <Button variant="destructive" size="sm" onClick={handleCancel} disabled={!['running', 'queued'].includes(run.status)}>
+        {run.cancellationRequestedAt ? 'Force Kill' : 'Cancel Run'}
       </Button>
     </div>
   ) : undefined;

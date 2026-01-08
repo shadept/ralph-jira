@@ -224,6 +224,7 @@ export const RunRecordSchema = z.object({
   executorMode: z.enum(['local', 'docker']).default('local'),
   pid: z.number().optional(),
   prUrl: z.string().optional(),
+  cancellationRequestedAt: z.string().optional(),
   commands: z.array(CommandRecordSchema).default([]),
 });
 

@@ -54,6 +54,7 @@ export async function POST(
             lastMessage: 'Retrying run...',
             errors: [],
             commands: [],
+            cancellationRequestedAt: undefined,
         });
 
         const executorMode = run.executorMode || (process.env.RUN_LOOP_EXECUTOR === 'docker' ? 'docker' : 'local');
