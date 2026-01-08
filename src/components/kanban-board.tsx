@@ -11,9 +11,10 @@ interface KanbanBoardProps {
   board: Board;
   onUpdateBoard: (board: Board) => Promise<void>;
   onTaskClick: (task: Task) => void;
+  onTogglePasses?: (taskId: string) => void;
 }
 
-export function KanbanBoard({ board, onUpdateBoard, onTaskClick }: KanbanBoardProps) {
+export function KanbanBoard({ board, onUpdateBoard, onTaskClick, onTogglePasses }: KanbanBoardProps) {
   const [activeTask, setActiveTask] = useState<Task | null>(null);
 
   const sensors = useSensors(
@@ -36,6 +37,34 @@ export function KanbanBoard({ board, onUpdateBoard, onTaskClick }: KanbanBoardPr
 
     const targetTask = board.tasks.find(t => t.id === targetId);
     return targetTask?.status;
+  };
+
+  const handleTogglePasses = async (taskId: string) => {
+    if (onTogglePasses) {
+      onTogglePasses(taskId);
+      return;
+    }
+
+    const task = board.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const nextTasks = board.tasks.map(t =>
+      t.id === taskId
+        ? {
+            ...t,
+            passes: !t.passes,
+            updatedAt: new Date().toISOString(),
+          }
+        : t
+    );
+
+    const updatedBoard = {
+      ...board,
+      tasks: nextTasks,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await onUpdateBoard(updatedBoard);
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -99,6 +128,7 @@ export function KanbanBoard({ board, onUpdateBoard, onTaskClick }: KanbanBoardPr
                 column={column}
                 tasks={columnTasks}
                 onTaskClick={onTaskClick}
+                onTogglePasses={handleTogglePasses}
               />
             );
           })}

@@ -10,10 +10,11 @@ import { CheckCircle, Circle } from '@phosphor-icons/react';
 interface TaskCardProps {
   task: Task;
   onClick: () => void;
+  onTogglePasses?: () => void;
   isDragging?: boolean;
 }
 
-export function TaskCard({ task, onClick, isDragging = false }: TaskCardProps) {
+export function TaskCard({ task, onClick, onTogglePasses, isDragging = false }: TaskCardProps) {
   const {
     attributes,
     listeners,
@@ -48,11 +49,20 @@ export function TaskCard({ task, onClick, isDragging = false }: TaskCardProps) {
       onClick={onClick}
     >
       <div className="flex items-start gap-2 mb-2">
-        {task.passes ? (
-          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" weight="fill" />
-        ) : (
-          <Circle className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onTogglePasses?.();
+          }}
+          className="flex-shrink-0 mt-0.5 hover:scale-110 transition-transform"
+        >
+          {task.passes ? (
+            <CheckCircle className="w-5 h-5 text-green-600" weight="fill" />
+          ) : (
+            <Circle className="w-5 h-5 text-muted-foreground hover:text-green-600" />
+          )}
+        </button>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium line-clamp-2">{task.description}</p>
         </div>
