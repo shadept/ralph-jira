@@ -182,4 +182,19 @@ export class LocalFilesystemAdapter implements StorageAdapter {
       return [];
     }
   }
+
+  async readProjectReadme(): Promise<string | null> {
+    const readmeNames = ['README.md', 'readme.md', 'Readme.md', 'README.MD'];
+
+    for (const name of readmeNames) {
+      try {
+        const content = await fs.readFile(path.join(this.repoRoot, name), 'utf-8');
+        return content;
+      } catch {
+        // Try next name
+      }
+    }
+
+    return null;
+  }
 }

@@ -14,7 +14,13 @@ export async function POST(request: Request) {
 
     switch (action) {
       case 'generate-tasks': {
-        const { description, count = 5, category = 'functional' } = data;
+        const { description, count = 3, category = 'functional' } = data;
+
+        // Read project README for context
+        const readme = await storage.readProjectReadme();
+        const readmeContext = readme
+          ? `\n\nProject README (for context):\n${readme.slice(0, 2000)}${readme.length > 2000 ? '\n...(truncated)' : ''}`
+          : '';
 
         const result = await generateText({
           model: openai(settings.aiPreferences.defaultModel || 'gpt-4-turbo'),
@@ -30,20 +36,27 @@ export async function POST(request: Request) {
               })),
             }),
           }),
-          prompt: `Generate up to ${count} specific, actionable tasks for the following feature or requirement:
+          prompt: `Generate ${count} high-quality, focused tasks for the following feature or requirement:
 
 "${description}"
 
-Context:
+Project Context:
 - Project: ${settings.projectName}
 - Tech Stack: ${settings.techStack.join(', ')}
+- Description: ${settings.projectDescription || 'Not provided'}${readmeContext}
 
-Each task should:
-- Have a clear, testable description
-- Include 3-7 concrete acceptance steps
-- Be scoped to take less than 1 day of work
-- Include relevant tags
-- Have realistic priority and story point estimate
+IMPORTANT Guidelines:
+- Generate FEWER tasks (prefer 1-3) that are meaningful and well-scoped
+- Each task should represent a coherent unit of work, NOT a step-by-step guide
+- Combine related work into single tasks rather than splitting unnecessarily
+- Task descriptions should be concise and outcome-focused
+
+Acceptance Criteria Guidelines:
+- Write criteria that verify observable behavior or outcomes
+- AVOID specifics that depend on unknowns (exact file paths, specific function names, implementation details)
+- Use flexible language like "appropriate", "relevant", "as needed" for implementation-specific details
+- Focus on WHAT should work, not HOW it should be implemented
+- Keep criteria testable but not prescriptive
 
 Category: ${category}`,
         });

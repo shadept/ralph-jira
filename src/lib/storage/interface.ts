@@ -24,4 +24,7 @@ export interface StorageAdapter {
   readFile(path: string): Promise<string>;
   writeFile(path: string, content: string): Promise<void>;
   listFiles(pattern: string): Promise<string[]>;
+
+  // Project context operations
+  readProjectReadme(): Promise<string | null>;
 }
