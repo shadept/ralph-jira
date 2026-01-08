@@ -212,6 +212,7 @@ export const RunRecordSchema = z.object({
   lastProgressAt: z.string().optional(),
   executorMode: z.enum(['local', 'docker']).default('local'),
   pid: z.number().optional(),
+  prUrl: z.string().optional(),
 });
 
 export type RunRecord = z.infer<typeof RunRecordSchema>;
