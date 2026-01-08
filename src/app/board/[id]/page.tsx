@@ -3,12 +3,13 @@
 import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Sparkle, PlayCircle, Plus, ClockCounterClockwise } from '@phosphor-icons/react';
+import { Sparkle, PlayCircle, Plus, ClockCounterClockwise, GearSix } from '@phosphor-icons/react';
 
 
 import { Board, Task, RunRecord } from '@/lib/schemas';
 import { KanbanBoard } from '@/components/kanban-board';
 import { TaskEditorDialog } from '@/components/task-editor-dialog';
+import { BoardPropertiesDialog } from '@/components/board-properties-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -83,6 +84,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
   const [createTasksDialogOpen, setCreateTasksDialogOpen] = useState(false);
   const [createTasksDescription, setCreateTasksDescription] = useState('');
   const [createTasksLoading, setCreateTasksLoading] = useState(false);
+  const [boardPropertiesOpen, setBoardPropertiesOpen] = useState(false);
 
   const toKebabCase = useCallback((value: string) => {
     const normalized = value
@@ -490,6 +492,10 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <Button variant="outline" onClick={() => setBoardPropertiesOpen(true)} disabled={boardLocked}>
+        <GearSix className="w-4 h-4 mr-2" />
+        Properties
+      </Button>
       <Button variant="outline" onClick={() => router.push('/runs')}>
         <ClockCounterClockwise className="w-4 h-4 mr-2" />
         Run History
@@ -751,6 +757,13 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BoardPropertiesDialog
+        board={board}
+        open={boardPropertiesOpen}
+        onClose={() => setBoardPropertiesOpen(false)}
+        onSave={handleUpdateBoard}
+      />
     </AppLayout>
   );
 }
