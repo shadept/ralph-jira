@@ -52,7 +52,8 @@ export async function POST(
             finishedAt: null,
             reason: undefined,
             lastMessage: 'Retrying run...',
-            errors: [], // Clear errors on retry? Or keep them? User said "retrigger AI loop", usually implies clean slate for current attempt.
+            errors: [],
+            commands: [],
         });
 
         const executorMode = run.executorMode || (process.env.RUN_LOOP_EXECUTOR === 'docker' ? 'docker' : 'local');

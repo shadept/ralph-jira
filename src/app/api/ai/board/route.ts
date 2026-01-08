@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { openai } from '@ai-sdk/openai';
-import { generateObject, generateText } from 'ai';
+import { generateObject, generateText, Output } from 'ai';
 import { z } from 'zod';
 import { getProjectStorage, handleProjectRouteError } from '@/lib/projects/server';
 
@@ -16,19 +16,21 @@ export async function POST(request: Request) {
       case 'generate-tasks': {
         const { description, count = 5, category = 'functional' } = data;
 
-        const result = await generateObject({
+        const result = await generateText({
           model: openai(settings.aiPreferences.defaultModel || 'gpt-4-turbo'),
-          schema: z.object({
-            tasks: z.array(z.object({
-              category: z.string(),
-              description: z.string(),
-              steps: z.array(z.string()),
-              priority: z.enum(['low', 'medium', 'high', 'urgent']),
-              estimate: z.number().optional(),
-              tags: z.array(z.string()),
-            })),
+          output: Output.object({
+            schema: z.object({
+              tasks: z.array(z.object({
+                category: z.string(),
+                description: z.string(),
+                steps: z.array(z.string()),
+                priority: z.enum(['low', 'medium', 'high', 'urgent']),
+                estimate: z.number(),
+                tags: z.array(z.string()),
+              })),
+            }),
           }),
-          prompt: `Generate ${count} specific, actionable tasks for the following feature or requirement:
+          prompt: `Generate up to ${count} specific, actionable tasks for the following feature or requirement:
 
 "${description}"
 
@@ -48,7 +50,7 @@ Category: ${category}`,
 
         // Convert to full task objects
         const now = new Date().toISOString();
-        const newTasks = result.object.tasks.map((t, idx) => ({
+        const newTasks = result.output.tasks.map((t, idx) => ({
           ...t,
           id: `task-${Date.now()}-${idx}`,
           passes: false,

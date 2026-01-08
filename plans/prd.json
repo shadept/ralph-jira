@@ -195,13 +195,51 @@
         "tools/runner/run-loop.mjs"
       ],
       "lastRun": "2026-01-08T22:15:00.000Z"
+    },
+    {
+      "category": "functional",
+      "description": "Add project context to AI Action/Create Task",
+      "steps": [
+        "From project folder read content of README.md and supply as context",
+        "Generation should prefer less, high quality tasks (no step by step guides)",
+        "Acceptance criteria should not include specific to unknowns"
+      ],
+      "passes": false,
+      "id": "task-1767909913409",
+      "status": "in_progress",
+      "priority": "high",
+      "estimate": 5,
+      "createdAt": "2026-01-08T22:05:13.409Z",
+      "updatedAt": "2026-01-08T22:19:41.896Z",
+      "tags": [
+        "AI"
+      ],
+      "filesTouched": []
+    },
+    {
+      "category": "functional",
+      "description": "Allow creation/editing of board properties",
+      "steps": [
+        "In board view, there should be a button at top right of nav bar actions that opens board properties modal",
+        "Should be able to change most properties, keep columns locked (disabled) for now"
+      ],
+      "passes": false,
+      "id": "task-1767910050540",
+      "status": "in_progress",
+      "priority": "high",
+      "createdAt": "2026-01-08T22:07:30.540Z",
+      "updatedAt": "2026-01-08T22:19:41.896Z",
+      "tags": [
+        "UX"
+      ],
+      "filesTouched": []
     }
   ],
   "createdAt": "2026-01-07T00:00:00.000Z",
-  "updatedAt": "2026-01-08T21:55:51.795Z",
+  "updatedAt": "2026-01-08T22:19:41.896Z",
   "metrics": {
     "velocity": 0,
     "completed": 6,
-    "total": 6
+    "total": 12
   }
 }

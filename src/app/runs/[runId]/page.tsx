@@ -36,6 +36,15 @@ const formatReason = (reason?: string | null) => {
   return reason.replace(/_/g, ' ');
 };
 
+const escapeForDisplay = (arg: string) => {
+  if (typeof arg !== 'string') return `${arg}`;
+  if (arg.length === 0) return '""';
+  if (/[ \t\n\r"']/.test(arg)) {
+    return `"${arg.replace(/"/g, '\\"')}"`;
+  }
+  return arg;
+};
+
 export default function RunDetailPage({ params }: { params: Promise<{ runId: string }> }) {
   const { runId } = use(params);
   const router = useRouter();
@@ -246,7 +255,7 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
                     <div key={idx} className="border-b pb-2 last:border-0 last:pb-0">
                       <div className="flex items-center justify-between gap-2">
                         <code className="text-xs bg-muted px-1 py-0.5 rounded break-all">
-                          {cmd.command} {cmd.args.join(' ')}
+                          {cmd.command} {cmd.args.map(escapeForDisplay).join(' ')}
                         </code>
                         <Badge variant={cmd.exitCode === 0 ? "outline" : "destructive"}>
                           {cmd.exitCode ?? '—'}

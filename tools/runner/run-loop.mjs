@@ -23,6 +23,30 @@ function normalizeStringArray(value) {
 }
 
 /**
+ * Parses a command string into an array of arguments, respecting double quotes.
+ * @param {string} command 
+ * @returns {string[]}
+ */
+function parseCommandString(command) {
+  const parts = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < command.length; i++) {
+    const char = command[i];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ' ' && !inQuotes) {
+      if (current) parts.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  if (current) parts.push(current);
+  return parts;
+}
+
+/**
  * Signal used to stop the loop when cancellation is detected.
  */
 class CancellationSignal extends Error { }
@@ -684,7 +708,6 @@ class RunLoop {
     };
 
     console.log("runCommand", command, args)
-    const cmdString = [command, ...args].map(escapeForDisplay).join(' ');
     const startedAt = new Date().toISOString();
     const commandRecord = {
       command,
@@ -698,6 +721,7 @@ class RunLoop {
     }
     this.run.commands.push(commandRecord);
 
+    const cmdString = [command, ...args].map(escapeForDisplay).join(' ');
     await this.updateRun({
       lastCommand: cmdString,
       lastCommandExitCode: undefined,
@@ -709,7 +733,7 @@ class RunLoop {
       const child = spawn(command, args, {
         cwd,
         env: options.env ? { ...process.env, ...options.env } : { ...process.env },
-        shell: false,
+        shell: options.shell || false,
         windowsHide: true,
       });
 
@@ -805,7 +829,12 @@ class RunLoop {
     }
     for (const command of commands) {
       await this.appendSandboxLog(`Running setup command: ${command}`);
-      const result = await this.runCommand(command, [], this.sandboxDir, { shell: true });
+
+      const parts = parseCommandString(command);
+      const [cmd, ...args] = parts;
+      if (!cmd) continue;
+
+      const result = await this.runCommand(cmd, args, this.sandboxDir, { shell: true });
       await this.appendSandboxLog(limitOutput(result.stdout || result.stderr));
       if (await this.verifyCancellation()) {
         throw new CancellationSignal('Cancellation during setup');
