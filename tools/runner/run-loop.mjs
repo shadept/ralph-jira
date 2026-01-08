@@ -561,14 +561,25 @@ class RunLoop {
    * @returns {Promise<void>}
    */
   async prepareSandboxPlan() {
-    const board = await readJson(this.rootBoardPath);
-    const filteredTasks = board.tasks.filter(task => PENDING_STATUSES.has(task.status));
-    const sandboxBoard = { ...board, tasks: filteredTasks };
-    await fs.mkdir(path.dirname(this.sandboxBoardPath), { recursive: true });
-    await writeJson(this.sandboxBoardPath, sandboxBoard);
+    if (!(await fileExists(this.sandboxBoardPath))) {
+      const board = await readJson(this.rootBoardPath);
+      const filteredTasks = board.tasks.filter(task => PENDING_STATUSES.has(task.status));
+      const sandboxBoard = { ...board, tasks: filteredTasks };
+      await fs.mkdir(path.dirname(this.sandboxBoardPath), { recursive: true });
+      await writeJson(this.sandboxBoardPath, sandboxBoard);
+    }
+
     this.sandboxSettingsPath = path.join(this.sandboxDir, 'plans', 'settings.json');
-    await fs.copyFile(this.settingsPath, this.sandboxSettingsPath);
-    await fs.writeFile(this.sandboxLogPath, `# Run ${this.runId} progress\n`, 'utf-8');
+    if (!(await fileExists(this.sandboxSettingsPath))) {
+      await fs.mkdir(path.dirname(this.sandboxSettingsPath), { recursive: true });
+      await fs.copyFile(this.settingsPath, this.sandboxSettingsPath);
+    }
+
+    if (!(await fileExists(this.sandboxLogPath))) {
+      await fs.writeFile(this.sandboxLogPath, `# Run ${this.runId} progress\n`, 'utf-8');
+    } else {
+      await fs.appendFile(this.sandboxLogPath, `\n# Run ${this.runId} resumed\n`, 'utf-8');
+    }
 
     // Decouple PRD, settings, and logs from git tracking in the sandbox to avoid conflicts
     await this.runCommand('git', ['update-index', '--skip-worktree', 'plans/prd.json'], this.sandboxDir);
@@ -672,8 +683,26 @@ class RunLoop {
       return arg;
     };
 
+    console.log("runCommand", command, args)
     const cmdString = [command, ...args].map(escapeForDisplay).join(' ');
-    await this.updateRun({ lastCommand: cmdString, lastCommandExitCode: undefined });
+    const startedAt = new Date().toISOString();
+    const commandRecord = {
+      command,
+      args,
+      cwd,
+      startedAt,
+    };
+
+    if (!Array.isArray(this.run.commands)) {
+      this.run.commands = [];
+    }
+    this.run.commands.push(commandRecord);
+
+    await this.updateRun({
+      lastCommand: cmdString,
+      lastCommandExitCode: undefined,
+      commands: this.run.commands
+    });
 
     return new Promise((resolve, reject) => {
       console.log("Spawning", command, args)
@@ -700,13 +729,29 @@ class RunLoop {
       child.on('error', err => {
         const stdout = Buffer.concat(stdoutChunks).toString('utf-8');
         const stderr = Buffer.concat(stderrChunks).toString('utf-8');
-        this.updateRun({ lastCommandExitCode: -1 }).catch(() => { });
+        const finishedAt = new Date().toISOString();
+        commandRecord.exitCode = -1;
+        commandRecord.finishedAt = finishedAt;
+
+        this.updateRun({
+          lastCommandExitCode: -1,
+          commands: this.run.commands
+        }).catch(() => { });
+
         reject(Object.assign(err, { stdout, stderr, code: -1 }));
       });
       child.on('close', code => {
         const stdout = Buffer.concat(stdoutChunks).toString('utf-8');
         const stderr = Buffer.concat(stderrChunks).toString('utf-8');
-        this.updateRun({ lastCommandExitCode: code ?? null });
+        const finishedAt = new Date().toISOString();
+        commandRecord.exitCode = code ?? null;
+        commandRecord.finishedAt = finishedAt;
+
+        this.updateRun({
+          lastCommandExitCode: code ?? null,
+          commands: this.run.commands
+        }).catch(() => { });
+
         resolve({ code, stdout, stderr });
       });
     });

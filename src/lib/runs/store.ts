@@ -157,6 +157,7 @@ export function createInitialRunRecord(params: {
     lastProgressAt: undefined,
     executorMode: params.executorMode,
     pid: undefined,
+    commands: [],
   };
 
   return RunRecordSchema.parse(run);

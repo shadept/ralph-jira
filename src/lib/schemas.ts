@@ -185,6 +185,17 @@ export function withAutomationDefaults(settings: ProjectSettings): ProjectSettin
 export const RunStatusSchema = z.enum(['queued', 'running', 'stopped', 'completed', 'failed', 'canceled']);
 export const RunReasonSchema = z.enum(['completed', 'max_iterations', 'canceled', 'error']);
 
+export const CommandRecordSchema = z.object({
+  command: z.string(),
+  args: z.array(z.string()),
+  cwd: z.string(),
+  exitCode: z.number().nullable().optional(),
+  startedAt: z.string(),
+  finishedAt: z.string().optional(),
+});
+
+export type CommandRecord = z.infer<typeof CommandRecordSchema>;
+
 export const RunRecordSchema = z.object({
   runId: z.string(),
   projectId: z.string().optional(),
@@ -213,6 +224,7 @@ export const RunRecordSchema = z.object({
   executorMode: z.enum(['local', 'docker']).default('local'),
   pid: z.number().optional(),
   prUrl: z.string().optional(),
+  commands: z.array(CommandRecordSchema).default([]),
 });
 
 export type RunRecord = z.infer<typeof RunRecordSchema>;

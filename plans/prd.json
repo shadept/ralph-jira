@@ -156,24 +156,52 @@
         "Push worktree branch to origin",
         "Create PR (assuming GitHub)",
         "Ensure plans/prd.json is properly merged back into main branch",
-        "Delete worktree on success"
+        "Delete worktree on success",
+        "if not commit on worktree branch, delete branch"
       ],
-      "passes": false,
+      "passes": true,
       "id": "task-1767886290745",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "createdAt": "2026-01-08T15:31:30.745Z",
-      "updatedAt": "2026-01-08T19:36:48.495Z",
+      "updatedAt": "2026-01-08T21:55:51.766Z",
       "tags": [],
-      "filesTouched": [],
-      "lastRun": "2026-01-08T15:46:55.373Z"
+      "filesTouched": [
+        "tools/runner/run-loop.mjs",
+        "src/lib/schemas.ts"
+      ],
+      "lastRun": "2026-01-08T21:30:00.000Z"
+    },
+    {
+      "category": "functional",
+      "description": "Add retry button to run view when run has failed",
+      "steps": [
+        "When run has fail, rerun button should be available",
+        "Clicking rerun button will run retrigger AI loop for that run",
+        "Rerunning should not replace @plans/prd.json in worktree if one exists"
+      ],
+      "passes": true,
+      "id": "task-1767907183418",
+      "status": "done",
+      "priority": "medium",
+      "createdAt": "2026-01-08T21:19:43.418Z",
+      "updatedAt": "2026-01-08T22:15:00.000Z",
+      "tags": [
+        "UX"
+      ],
+      "filesTouched": [
+        "src/app/runs/[runId]/page.tsx",
+        "src/app/api/runs/[runId]/retry/route.ts",
+        "tools/runner/run-loop.mjs"
+      ],
+      "lastRun": "2026-01-08T22:15:00.000Z"
     }
   ],
   "createdAt": "2026-01-07T00:00:00.000Z",
-  "updatedAt": "2026-01-08T19:36:48.509Z",
+  "updatedAt": "2026-01-08T21:55:51.795Z",
   "metrics": {
     "velocity": 0,
-    "completed": 5,
+    "completed": 6,
     "total": 6
   }
 }

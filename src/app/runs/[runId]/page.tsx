@@ -84,6 +84,19 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
     }
   };
 
+  const handleRetry = async () => {
+    if (!run) return;
+    try {
+      await apiFetch(`/api/runs/${run.runId}/retry`, { method: 'POST' });
+      toast.success('Run restarted');
+      await loadRun();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to retry run';
+      toast.error(message);
+      console.error('Retry run error', error);
+    }
+  };
+
   const viewBoard = () => {
     if (!run) return;
     router.push(`/board/${run.boardId}`);
@@ -97,6 +110,11 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
       <Button variant="outline" size="sm" onClick={viewBoard}>
         Open Board
       </Button>
+      {['failed', 'stopped', 'completed', 'canceled'].includes(run.status) && (
+        <Button variant="default" size="sm" onClick={handleRetry}>
+          Retry Run
+        </Button>
+      )}
       <Button variant="destructive" size="sm" onClick={handleCancel} disabled={run.status !== 'running'}>
         Cancel Run
       </Button>
@@ -217,6 +235,40 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
 
         <Card>
           <CardHeader>
+            <CardTitle className="text-base">Command History</CardTitle>
+            <CardDescription>All commands executed during this run</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-64 rounded-md border p-4">
+              {run.commands && run.commands.length > 0 ? (
+                <div className="space-y-4">
+                  {run.commands.map((cmd, idx) => (
+                    <div key={idx} className="border-b pb-2 last:border-0 last:pb-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <code className="text-xs bg-muted px-1 py-0.5 rounded break-all">
+                          {cmd.command} {cmd.args.join(' ')}
+                        </code>
+                        <Badge variant={cmd.exitCode === 0 ? "outline" : "destructive"}>
+                          {cmd.exitCode ?? '—'}
+                        </Badge>
+                      </div>
+                      <div className="mt-1 flex gap-4 text-[10px] text-muted-foreground">
+                        <span>Started: {formatDate(cmd.startedAt)}</span>
+                        {cmd.finishedAt && <span>Finished: {formatDate(cmd.finishedAt)}</span>}
+                        <span>CWD: {cmd.cwd}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No commands recorded.</p>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle className="text-base">Log Output</CardTitle>
             <CardDescription>Last 200 lines from the sandbox progress log</CardDescription>
           </CardHeader>
@@ -245,4 +297,3 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
     </AppLayout>
   );
 }
-
