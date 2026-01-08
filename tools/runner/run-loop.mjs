@@ -12,24 +12,48 @@ const DEFAULT_SETUP = Object.freeze([]);
 const DEFAULT_AGENT_NAME = 'claude';
 const DEFAULT_CLAUDE_MODEL = 'opus';
 
+/**
+ * Normalizes an input into a trimmed array of strings.
+ * @param {any} value
+ * @returns {string[]}
+ */
 function normalizeStringArray(value) {
   if (!Array.isArray(value)) return [];
   return value.map(item => `${item}`.trim()).filter(Boolean);
 }
 
+/**
+ * Signal used to stop the loop when cancellation is detected.
+ */
 class CancellationSignal extends Error { }
 
+/**
+ * Reads a JSON file and parses its content.
+ * @param {string} filePath
+ * @returns {Promise<any>}
+ */
 async function readJson(filePath) {
   const buffer = await fs.readFile(filePath, 'utf-8');
   return JSON.parse(buffer);
 }
 
+/**
+ * Writes a payload to a JSON file atomically using a temp file.
+ * @param {string} filePath
+ * @param {any} payload
+ * @returns {Promise<void>}
+ */
 async function writeJson(filePath, payload) {
   const tmp = `${filePath}.tmp`;
   await fs.writeFile(tmp, JSON.stringify(payload, null, 2), 'utf-8');
   await fs.rename(tmp, filePath);
 }
 
+/**
+ * Checks if a file exists at the given path.
+ * @param {string} filePath
+ * @returns {Promise<boolean>}
+ */
 async function fileExists(filePath) {
   try {
     await fs.access(filePath);
@@ -39,12 +63,23 @@ async function fileExists(filePath) {
   }
 }
 
+/**
+ * Truncates a string to a maximum length for logging.
+ * @param {string} output
+ * @param {number} [maxLength]
+ * @returns {string}
+ */
 function limitOutput(output, maxLength = MAX_LOG_SNIPPET) {
   if (!output) return '';
   if (output.length <= maxLength) return output.trim();
   return `${output.slice(0, maxLength)}\n...(output truncated)...`;
 }
 
+/**
+ * Parses command line arguments.
+ * @param {string[]} argv
+ * @returns {{runId: string, projectPath: string}}
+ */
 function parseArgs(argv) {
   const args = { runId: null, projectPath: process.cwd() };
   for (let i = 0; i < argv.length; i += 1) {
@@ -65,6 +100,10 @@ function parseArgs(argv) {
   return args;
 }
 
+/**
+ * Parses extra agent arguments from the environment.
+ * @returns {string[]}
+ */
 function parseAgentExtraArgs() {
   const raw = process.env.RUN_LOOP_AGENT_EXTRA_ARGS;
   if (!raw) return [];
@@ -79,7 +118,14 @@ function parseAgentExtraArgs() {
   return [];
 }
 
+/**
+ * Manages the execution loop for an autonomous coding agent.
+ * Handles setup, worktree management, iterations, and cleanup.
+ */
 class RunLoop {
+  /**
+   * @param {{runId: string, projectPath: string}} options
+   */
   constructor({ runId, projectPath }) {
     this.runId = runId;
     this.projectPath = projectPath;
@@ -115,6 +161,10 @@ class RunLoop {
     this.claudePermissionMode = process.env.RUN_LOOP_CLAUDE_PERMISSION_MODE || 'acceptEdits';
   }
 
+  /**
+   * Initializes the run state by reading configuration files.
+   * @returns {Promise<void>}
+   */
   async init() {
     this.run = await readJson(this.runFile);
     this.sandboxDir = path.join(this.projectPath, this.run.sandboxPath);
@@ -140,6 +190,11 @@ class RunLoop {
     await this.loadSettingsFrom(this.settingsPath);
   }
 
+  /**
+   * Persists a patch to the run state.
+   * @param {Partial<object>} patch
+   * @returns {Promise<void>}
+   */
   async updateRun(patch) {
     this.run = { ...this.run, ...patch };
     try {
@@ -149,6 +204,11 @@ class RunLoop {
     }
   }
 
+  /**
+   * Appends lines to the sandbox iteration log.
+   * @param {string | string[]} lines
+   * @returns {Promise<void>}
+   */
   async appendSandboxLog(lines) {
     const payload = Array.isArray(lines) ? lines.join('\n') : lines;
     const timestamp = new Date().toISOString();
@@ -156,16 +216,29 @@ class RunLoop {
     await this.updateRun({ lastProgressAt: timestamp });
   }
 
+  /**
+   * Appends a summary to the root progress file.
+   * @param {string} summary
+   * @returns {Promise<void>}
+   */
   async appendRootProgress(summary) {
     const timestamp = new Date().toISOString();
     const block = `\n[${timestamp}]\n${summary.trim()}\n`;
     await fs.appendFile(this.rootProgressFile, block, 'utf-8');
   }
 
+  /**
+   * Ensures the parent directory for the sandbox exists.
+   * @returns {Promise<void>}
+   */
   async ensureSandboxParent() {
     await fs.mkdir(path.dirname(this.sandboxDir), { recursive: true });
   }
 
+  /**
+   * Gets the branch name intended for the worktree.
+   * @returns {string}
+   */
   getEffectiveBranchName() {
     if (this.worktreeBranch?.trim().length) {
       return this.worktreeBranch.trim();
@@ -176,11 +249,20 @@ class RunLoop {
     return `run-${this.runId}`;
   }
 
+  /**
+   * Checks if a git branch exists.
+   * @param {string} branchName
+   * @returns {Promise<boolean>}
+   */
   async branchExists(branchName) {
     const result = await this.runCommand('git', ['rev-parse', '--verify', branchName], this.projectPath);
     return result.code === 0;
   }
 
+  /**
+   * Creates a git worktree for the sandbox.
+   * @returns {Promise<void>}
+   */
   async checkoutWorkspace() {
     await this.ensureSandboxParent();
     await this.removeWorktree({ silent: true });
@@ -201,6 +283,12 @@ class RunLoop {
     this.worktreeAdded = true;
   }
 
+  /**
+   * Removes the git worktree and deletes the sandbox directory.
+   * @param {object} [options]
+   * @param {boolean} [options.silent] - If true, suppressed error logging.
+   * @returns {Promise<void>}
+   */
   async removeWorktree(options = {}) {
     const { silent = false } = options;
     try {
@@ -232,6 +320,10 @@ class RunLoop {
     this.worktreeBranch = null;
   }
 
+  /**
+   * Executes sandbox cleanup if it is safe.
+   * @returns {Promise<void>}
+   */
   async cleanupSandbox() {
     if (!this.worktreeAdded && !(await fileExists(this.sandboxDir))) {
       return;
@@ -247,6 +339,10 @@ class RunLoop {
     await this.removeWorktree({ silent: false });
   }
 
+  /**
+   * Verifies if the worktree has no uncommitted changes and no unpushed commits.
+   * @returns {Promise<boolean>}
+   */
   async ensureWorktreeSafeToDelete() {
     if (!this.worktreeAdded) {
       return true;
@@ -295,6 +391,10 @@ class RunLoop {
     return true;
   }
 
+  /**
+   * Prepares the sandbox plan by filtering the PRD tasks and copying settings.
+   * @returns {Promise<void>}
+   */
   async prepareSandboxPlan() {
     const board = await readJson(this.rootBoardPath);
     const filteredTasks = board.tasks.filter(task => PENDING_STATUSES.has(task.status));
@@ -315,11 +415,19 @@ class RunLoop {
     await this.loadSettingsFrom(this.sandboxSettingsPath);
   }
 
+  /**
+   * Loads global or sandbox settings from a file.
+   * @param {string} filePath
+   * @returns {Promise<void>}
+   */
   async loadSettingsFrom(filePath) {
     this.settings = await readJson(filePath);
     this.applyAutomationSettings();
   }
 
+  /**
+   * Applies settings from the configuration to the internal runner state.
+   */
   applyAutomationSettings() {
     const automation = this.settings?.automation || {};
     const setupCommands = normalizeStringArray(automation.setup);
@@ -367,22 +475,35 @@ class RunLoop {
     });
   }
 
+  /**
+   * Returns a copy of the setup commands.
+   * @returns {string[]}
+   */
   getSetupCommands() {
     return Array.isArray(this.setupCommands) ? [...this.setupCommands] : [];
   }
 
+  /**
+   * Spawns a shell command and captures its output.
+   * @param {string} command
+   * @param {string | string[]} argsOrString
+   * @param {string} cwd
+   * @param {object} [options]
+   * @param {boolean} [options.shell] - Whether to use a shell for execution.
+   * @param {object} [options.env] - Additional environment variables.
+   * @returns {Promise<{stdout: string, stderr: string, code: number}>}
+   */
   async runCommand(command, argsOrString, cwd, options = {}) {
     const useShell = typeof argsOrString === 'string' || options.shell === true;
-    const cmdString = Array.isArray(argsOrString)
-      ? `${command} ${argsOrString.join(' ')}`
-      : argsOrString;
-    const finalCommand = useShell
-      ? typeof argsOrString === 'string'
-        ? argsOrString
-        : `${command} ${argsOrString.join(' ')}`
-      : command;
-    const args = useShell ? [] : Array.isArray(argsOrString) ? argsOrString : [];
+    let finalCommand = command;
+    let args = Array.isArray(argsOrString) ? argsOrString : [];
 
+    if (typeof argsOrString === 'string') {
+      finalCommand = argsOrString;
+      args = [];
+    }
+
+    const cmdString = Array.isArray(argsOrString) ? `${command} ${argsOrString.join(' ')}` : argsOrString;
     await this.updateRun({ lastCommand: cmdString, lastCommandExitCode: undefined });
 
     return new Promise((resolve, reject) => {
@@ -415,6 +536,10 @@ class RunLoop {
     });
   }
 
+  /**
+   * Checks if a cancellation flag file exists on disk.
+   * @returns {Promise<boolean>}
+   */
   async verifyCancellation() {
     if (!this.cancelFlagPath) return false;
     if (existsSync(this.cancelFlagPath)) {
@@ -424,7 +549,11 @@ class RunLoop {
     return false;
   }
 
-
+  /**
+   * Invokes the agent for a single iteration.
+   * @param {number} iteration
+   * @returns {Promise<{output: string, exitCode: number}>}
+   */
   async runAgentIteration(iteration) {
     if (!this.agent) {
       throw new Error('Agent not initialized');
@@ -443,6 +572,10 @@ class RunLoop {
     return { output, exitCode };
   }
 
+  /**
+   * Runs the configured setup commands in the sandbox.
+   * @returns {Promise<void>}
+   */
   async runSetup() {
     const commands = this.getSetupCommands();
     if (!commands.length) {
@@ -462,6 +595,10 @@ class RunLoop {
     }
   }
 
+  /**
+   * Synchronizes changes from the sandbox PRD back to the root PRD.
+   * @returns {Promise<void>}
+   */
   async syncBackToRoot() {
     const sandboxBoard = await readJson(this.sandboxBoardPath).catch(() => null);
     if (!sandboxBoard) return;
@@ -500,11 +637,19 @@ class RunLoop {
     await writeJson(this.rootBoardPath, rootBoard);
   }
 
+  /**
+   * Copies sandbox logs to the persisted run log location.
+   * @returns {Promise<void>}
+   */
   async copyLogs() {
     await fs.mkdir(path.dirname(this.persistedLogPath), { recursive: true });
     await fs.copyFile(this.sandboxLogPath, this.persistedLogPath);
   }
 
+  /**
+   * Updates internal stats based on the final state of the sandbox board.
+   * @returns {Promise<void>}
+   */
   async captureSandboxStats() {
     try {
       const board = await readJson(this.sandboxBoardPath);
@@ -515,6 +660,10 @@ class RunLoop {
     }
   }
 
+  /**
+   * The main iteration loop.
+   * @returns {Promise<void>}
+   */
   async runLoop() {
     this.status = 'running';
     this.reason = 'completed';
@@ -586,6 +735,11 @@ class RunLoop {
     }
   }
 
+  /**
+   * Performs final cleanup and persists the final run state.
+   * @param {Error} [error] - The error that caused the loop to fail, if any.
+   * @returns {Promise<void>}
+   */
   async finalize(error) {
     try {
       await this.syncBackToRoot();
@@ -631,6 +785,9 @@ class RunLoop {
   }
 }
 
+/**
+ * CLI entry point.
+ */
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const runner = new RunLoop(args);
