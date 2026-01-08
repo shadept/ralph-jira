@@ -111,6 +111,7 @@ export async function POST(request: Request) {
 
     let child: ReturnType<typeof spawn>;
     try {
+      console.log("Starting run process", command, args);
       child = spawn(command, args, {
         cwd,
         detached: true,

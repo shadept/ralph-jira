@@ -222,8 +222,9 @@ class RunLoop {
    * @returns {Promise<void>}
    */
   async appendRootProgress(summary) {
-    const timestamp = new Date().toISOString();
-    const block = `\n[${timestamp}]\n${summary.trim()}\n`;
+    // const timestamp = new Date().toISOString();
+    // const block = `\n[${timestamp}]\n${summary.trim()}\n`;
+    const block = summary
     await fs.appendFile(this.rootProgressFile, block, 'utf-8');
   }
 
@@ -363,9 +364,15 @@ class RunLoop {
       return false;
     }
 
+    const remoteCheck = await this.runCommand('git', ['ls-remote', '--heads', 'origin', branchName], this.projectPath);
+    if (remoteCheck.code !== 0 || !remoteCheck.stdout.trim()) {
+      // Branch not on origin; keep local branch but safe to remove worktree if clean
+      return true;
+    }
+
     const fetchResult = await this.runCommand('git', ['fetch', 'origin', branchName], this.projectPath);
     if (fetchResult.code !== 0) {
-      console.warn(`Unable to fetch origin/${branchName}. Push your commits before cleanup.`);
+      console.warn(`Unable to fetch origin/${branchName}. Leaving worktree for safety.`);
       return false;
     }
 
@@ -403,12 +410,12 @@ class RunLoop {
     await writeJson(this.sandboxBoardPath, sandboxBoard);
     this.sandboxSettingsPath = path.join(this.sandboxDir, 'plans', 'settings.json');
     await fs.copyFile(this.settingsPath, this.sandboxSettingsPath);
+    await fs.writeFile(this.sandboxLogPath, `# Run ${this.runId} progress\n`, 'utf-8');
 
     // Decouple PRD, settings, and logs from git tracking in the sandbox to avoid conflicts
     await this.runCommand('git', ['update-index', '--skip-worktree', 'plans/prd.json'], this.sandboxDir);
     await this.runCommand('git', ['update-index', '--skip-worktree', 'plans/settings.json'], this.sandboxDir);
 
-    await fs.writeFile(this.sandboxLogPath, `# Run ${this.runId} progress\n`, 'utf-8');
     // Also skip-worktree for progress.txt if it exists in the sandbox
     await this.runCommand('git', ['update-index', '--skip-worktree', 'progress.txt'], this.sandboxDir);
 
@@ -494,6 +501,10 @@ class RunLoop {
    * @returns {Promise<{stdout: string, stderr: string, code: number}>}
    */
   async runCommand(command, args, cwd, options = {}) {
+    if (!Array.isArray(args)) {
+      throw new Error(`runCommand expects an array for the second argument, got ${typeof args}`);
+    }
+
     const escapeForDisplay = (arg) => {
       if (typeof arg !== 'string') return `${arg}`;
       if (arg.length === 0) return '""';
@@ -503,7 +514,7 @@ class RunLoop {
       return arg;
     };
 
-    const cmdString = [command, ...args].map(escapeForDisplay).join(' ')
+    const cmdString = [command, ...args].map(escapeForDisplay).join(' ');
     await this.updateRun({ lastCommand: cmdString, lastCommandExitCode: undefined });
 
     return new Promise((resolve, reject) => {
@@ -511,7 +522,7 @@ class RunLoop {
       const child = spawn(command, args, {
         cwd,
         env: options.env ? { ...process.env, ...options.env } : { ...process.env },
-        shell: options.shell || false,
+        shell: false,
         windowsHide: true,
       });
 
@@ -528,7 +539,12 @@ class RunLoop {
         stderrChunks.push(chunk);
         this.appendSandboxLog(chunk.toString('utf-8')).catch(() => { });
       });
-      child.on('error', reject);
+      child.on('error', err => {
+        const stdout = Buffer.concat(stdoutChunks).toString('utf-8');
+        const stderr = Buffer.concat(stderrChunks).toString('utf-8');
+        this.updateRun({ lastCommandExitCode: -1 }).catch(() => { });
+        reject(Object.assign(err, { stdout, stderr, code: -1 }));
+      });
       child.on('close', code => {
         const stdout = Buffer.concat(stdoutChunks).toString('utf-8');
         const stderr = Buffer.concat(stderrChunks).toString('utf-8');
@@ -586,7 +602,7 @@ class RunLoop {
     }
     for (const command of commands) {
       await this.appendSandboxLog(`Running setup command: ${command}`);
-      const result = await this.runCommand(command, command, this.sandboxDir, { shell: true });
+      const result = await this.runCommand(command, [], this.sandboxDir, { shell: true });
       await this.appendSandboxLog(limitOutput(result.stdout || result.stderr));
       if (await this.verifyCancellation()) {
         throw new CancellationSignal('Cancellation during setup');
@@ -759,6 +775,13 @@ class RunLoop {
 
     const finishedAt = new Date().toISOString();
     const existingErrors = Array.isArray(this.run.errors) ? this.run.errors : [];
+    const errorLines = [];
+    if (error) {
+      errorLines.push(error.message || String(error));
+      if (error.stdout) errorLines.push(`Final stdout snippet: ${limitOutput(error.stdout, 500)}`);
+      if (error.stderr) errorLines.push(`Final stderr snippet: ${limitOutput(error.stderr, 500)}`);
+    }
+
     const finalRunState = {
       status: this.status,
       reason: this.reason,
@@ -766,7 +789,7 @@ class RunLoop {
       lastMessage: this.status === 'completed'
         ? 'Run completed'
         : `Run stopped (${this.reason})`,
-      errors: error ? [...existingErrors, error.message || String(error)] : existingErrors,
+      errors: [...existingErrors, ...errorLines],
     };
     await this.updateRun(finalRunState);
 

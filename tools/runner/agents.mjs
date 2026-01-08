@@ -92,7 +92,7 @@ export class ClaudeAgent extends Agent {
             `Command: ${describeInvocation()}`,
         ]);
 
-        const result = await runCommand(this.bin, args, sandboxDir, { shell: false });
+        const result = await runCommand(this.bin, args, sandboxDir);
         const combinedOutput = `${result.stdout}${result.stderr ? `\n${result.stderr}` : ''}`.trim();
 
         await appendSandboxLog(`Claude execution finished with code ${result.code}. Output length: ${combinedOutput.length}`);
@@ -133,7 +133,7 @@ export class OpenCodeAgent extends Agent {
             `Command: ${describeInvocation()}`,
         ]);
 
-        const result = await runCommand(this.bin, args, sandboxDir, { shell: false });
+        const result = await runCommand(this.bin, args, sandboxDir);
         const combinedOutput = `${result.stdout}${result.stderr ? `\n${result.stderr}` : ''}`.trim();
 
         return { output: combinedOutput, exitCode: result.code ?? 0 };
