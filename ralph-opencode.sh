@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-if [-z "$1" ]; then
+if [ -z "$1" ]; then
     echo "Usage: $0 <iterations>"
     exit 1
 fi
@@ -19,7 +19,7 @@ Use this to leave a note for the next person working in the codebase. \
 5. make a git commit of the feature. \
 ONLY WORK ON A SINGLE FEATURE. \
 If, while implementing the feature, you notice the PRD is complete, output <promise>COMPLETE</promise> \
-")
+" | tee /dev/tty)
 
     echo $result
 

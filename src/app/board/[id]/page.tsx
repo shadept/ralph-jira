@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/dialog';
 import { useProjectContext } from '@/components/projects/project-provider';
 import { AppLayout } from '@/components/layout/app-layout';
+import { AnsiLog } from '@/components/ansi-log';
 import { cn } from '@/lib/utils';
 
 const RUN_TERMINAL_STATUSES = new Set<RunRecord['status']>(['completed', 'failed', 'canceled', 'stopped']);
@@ -588,7 +589,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
                 <p className="text-sm font-medium mb-2">Live Log</p>
                 <ScrollArea className="h-full rounded-md border bg-muted/30 p-3">
                   {runLog.length ? (
-                    <pre className="text-xs whitespace-pre-wrap leading-relaxed">{runLog.join('\n')}</pre>
+                    <AnsiLog content={runLog} className="text-xs" />
                   ) : (
                     <p className="text-sm text-muted-foreground">Waiting for output…</p>
                   )}

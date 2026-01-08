@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useProjectContext } from '@/components/projects/project-provider';
 import { AppLayout } from '@/components/layout/app-layout';
+import { AnsiLog } from '@/components/ansi-log';
 
 export default function FilesPage() {
   const { currentProject, loading: projectLoading, apiFetch } = useProjectContext();
@@ -76,9 +77,13 @@ export default function FilesPage() {
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[600px] w-full rounded-md border p-4">
-                <pre className="text-sm font-mono whitespace-pre-wrap">
-                  {loading ? 'Loading…' : progress || 'No progress logged yet'}
-                </pre>
+                {loading ? (
+                  <p className="text-sm text-muted-foreground">Loading…</p>
+                ) : progress ? (
+                  <AnsiLog content={progress} className="text-sm" />
+                ) : (
+                  <p className="text-sm text-muted-foreground">No progress logged yet</p>
+                )}
               </ScrollArea>
             </CardContent>
           </Card>

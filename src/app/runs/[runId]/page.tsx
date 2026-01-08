@@ -8,6 +8,7 @@ import { AppLayout } from '@/components/layout/app-layout';
 import { useProjectContext } from '@/components/projects/project-provider';
 import { RunRecord } from '@/lib/schemas';
 import { Button } from '@/components/ui/button';
+import { AnsiLog } from '@/components/ansi-log';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -222,7 +223,7 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
           <CardContent>
             <ScrollArea className="h-96 rounded-md border bg-muted/30 p-4">
               {logLines.length ? (
-                <pre className="text-xs whitespace-pre-wrap leading-relaxed">{logLines.join('\n')}</pre>
+                <AnsiLog content={logLines} className="text-xs" />
               ) : (
                 <p className="text-sm text-muted-foreground">No log output recorded.</p>
               )}

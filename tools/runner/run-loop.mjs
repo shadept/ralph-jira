@@ -3,16 +3,8 @@ import { spawn } from 'node:child_process';
 import { existsSync, promises as fs } from 'node:fs';
 import path from 'node:path';
 
-const LOOP_PROMPT = `@plans/prd.json @progress.txt
-1. Find the highest-priority feature to work on and work only on that feature.
-This should be the one YOU decide has the highest priority - not necessarily the first in the list.
-2. Check that the types check via npm typecheck and that the tests pass via npm test.
-3. Updarte the PRD with the work that was done.
-4. Append your process to the progress.txt file.
-Use this to leave a note for the next person working in the codebase.
-5. make a git commit of the feature.
-ONLY WORK ON A SINGLE FEATURE.
-If, while implementing the feature, you notice the PRD is complete, output <promise>COMPLETE</promise>`;
+import { createAgent } from './agents.mjs';
+
 
 const PENDING_STATUSES = new Set(['todo', 'in_progress']);
 const MAX_LOG_SNIPPET = 1200;
@@ -110,6 +102,7 @@ class RunLoop {
     this.failed = 0;
     this.reason = 'completed';
     this.status = 'completed';
+    this.agent = null;
     const envAgentName = process.env.RUN_LOOP_AGENT || DEFAULT_AGENT_NAME;
     this.agentName = envAgentName.toLowerCase();
     this.agentBin = process.env.RUN_LOOP_AGENT_BIN || this.agentName;
@@ -311,11 +304,14 @@ class RunLoop {
     this.sandboxSettingsPath = path.join(this.sandboxDir, 'plans', 'settings.json');
     await fs.copyFile(this.settingsPath, this.sandboxSettingsPath);
 
-    // Decouple PRD and settings from git tracking in the sandbox to avoid conflicts
+    // Decouple PRD, settings, and logs from git tracking in the sandbox to avoid conflicts
     await this.runCommand('git', ['update-index', '--skip-worktree', 'plans/prd.json'], this.sandboxDir);
     await this.runCommand('git', ['update-index', '--skip-worktree', 'plans/settings.json'], this.sandboxDir);
 
     await fs.writeFile(this.sandboxLogPath, `# Run ${this.runId} progress\n`, 'utf-8');
+    // Also skip-worktree for progress.txt if it exists in the sandbox
+    await this.runCommand('git', ['update-index', '--skip-worktree', 'progress.txt'], this.sandboxDir);
+
     await this.loadSettingsFrom(this.sandboxSettingsPath);
   }
 
@@ -361,6 +357,14 @@ class RunLoop {
 
     this.claudePermissionMode =
       envPermission || normalizedPermission || this.claudePermissionMode || 'acceptEdits';
+
+    this.agent = createAgent(this.agentName, {
+      bin: this.agentBin,
+      model: this.agentModel,
+      extraArgs: this.agentExtraArgs,
+      permissionMode: this.claudePermissionMode,
+      codingStyle: (this.settings?.automation?.codingStyle || '').trim(),
+    });
   }
 
   getSetupCommands() {
@@ -420,69 +424,23 @@ class RunLoop {
     return false;
   }
 
-  getAgentInvocation(prompt) {
-    if (!this.agentModel) {
-      throw new Error(
-        `Agent "${this.agentName}" requires a model. Configure automation.agent.model or RUN_LOOP_AGENT_MODEL.`,
-      );
-    }
-    const baseArgs = [...this.agentExtraArgs, '--model', this.agentModel];
-    if (this.agentName === 'opencode') {
-      return {
-        command: this.agentBin,
-        args: ["run", ...baseArgs, prompt],
-        prompt,
-      };
-    }
-
-    if (this.agentName === 'claude') {
-      const claudeArgs = [...baseArgs];
-      if (!claudeArgs.includes('--non-interactive')) {
-        claudeArgs.push('--non-interactive');
-      }
-      return {
-        command: this.agentBin,
-        args: [...claudeArgs, '--permission-mode', this.claudePermissionMode, '-p', prompt],
-        prompt,
-      };
-    }
-
-    throw new Error(
-      `Unsupported RUN_LOOP_AGENT "${this.agentName}". Set RUN_LOOP_AGENT to "claude" or "opencode".`,
-    );
-  }
-
-  describeInvocation(invocation) {
-    return `${invocation.command} ${invocation.args
-      .map(arg => (arg === invocation.prompt ? '[prompt omitted]' : arg))
-      .join(' ')}`.trim();
-  }
-
-  buildPrompt() {
-    const rawCodingStyle =
-      typeof this.settings?.automation?.codingStyle === 'string'
-        ? this.settings.automation.codingStyle.trim()
-        : '';
-    if (!rawCodingStyle) {
-      return LOOP_PROMPT;
-    }
-    return `${LOOP_PROMPT}\n<coding-style>\n${rawCodingStyle}\n</coding-style>`;
-  }
 
   async runAgentIteration(iteration) {
-    const prompt = this.buildPrompt();
-    const invocation = this.getAgentInvocation(prompt);
-    await this.appendSandboxLog([
-      `Running ${this.agentName} (iteration ${iteration})`,
-      `Command: ${this.describeInvocation(invocation)}`,
-    ]);
+    if (!this.agent) {
+      throw new Error('Agent not initialized');
+    }
 
-    const result = await this.runCommand(invocation.command, invocation.args, this.sandboxDir, { shell: true });
-    const combinedOutput = `${result.stdout}${result.stderr ? `\n${result.stderr}` : ''}`.trim();
-    if (!combinedOutput) {
+    const { output, exitCode } = await this.agent.run({
+      iteration,
+      sandboxDir: this.sandboxDir,
+      runCommand: this.runCommand.bind(this),
+      appendSandboxLog: this.appendSandboxLog.bind(this),
+    });
+
+    if (!output) {
       await this.appendSandboxLog('(no output)');
     }
-    return { output: combinedOutput, exitCode: result.code ?? 0 };
+    return { output, exitCode };
   }
 
   async runSetup() {
