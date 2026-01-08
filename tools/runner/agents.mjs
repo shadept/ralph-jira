@@ -141,7 +141,7 @@ export class ClaudeAgent extends Agent {
             }
         };
 
-        const result = await runCommand(bin, args, sandboxDir, { onStdout });
+        const result = await runCommand(bin, args, sandboxDir, { onStdout, timeout: 1800000 });
 
         // Final cleanup of content if needed, though stream-json should give us everything
         const finalOutput = fullContent || result.stdout;
@@ -186,7 +186,7 @@ export class OpenCodeAgent extends Agent {
         ]);
 
         // Using shell: false to avoid parsing issues.
-        const result = await runCommand(this.bin, args, sandboxDir);
+        const result = await runCommand(this.bin, args, sandboxDir, { timeout: 1800000 });
         const combinedOutput = `${result.stdout}${result.stderr ? `\n${result.stderr}` : ''}`.trim();
 
         return { output: combinedOutput, exitCode: result.code ?? 0 };

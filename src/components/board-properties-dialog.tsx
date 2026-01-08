@@ -32,11 +32,38 @@ import {
   SelectValue,
 } from './ui/select';
 
+export type BoardDialogMode = 'create' | 'edit';
+
 interface BoardPropertiesDialogProps {
   board: Board | null;
   open: boolean;
   onClose: () => void;
   onSave: (board: Board) => Promise<void>;
+  onDelete?: (boardId: string) => Promise<void>;
+  mode?: BoardDialogMode;
+}
+
+const DEFAULT_COLUMNS = [
+  { id: 'backlog', name: 'Backlog', order: 0 },
+  { id: 'todo', name: 'To Do', order: 1 },
+  { id: 'in_progress', name: 'In Progress', order: 2 },
+  { id: 'review', name: 'Review', order: 3 },
+  { id: 'done', name: 'Done', order: 4 },
+];
+
+function createDefaultBoard(): Board {
+  const now = new Date().toISOString();
+  return {
+    id: `board-${Date.now()}`,
+    name: 'New Sprint',
+    goal: '',
+    deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    status: 'planned',
+    columns: DEFAULT_COLUMNS,
+    tasks: [],
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 export function BoardPropertiesDialog({
@@ -44,15 +71,25 @@ export function BoardPropertiesDialog({
   open,
   onClose,
   onSave,
+  onDelete,
+  mode = 'edit',
 }: BoardPropertiesDialogProps) {
   const [editedBoard, setEditedBoard] = useState<Board | null>(board);
   const [initialBoard, setInitialBoard] = useState<Board | null>(board);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const isCreateMode = mode === 'create';
 
   useEffect(() => {
     startTransition(() => {
-      if (board) {
+      if (isCreateMode && open) {
+        const newBoard = createDefaultBoard();
+        setEditedBoard(newBoard);
+        setInitialBoard(newBoard);
+      } else if (board) {
         const cloned: Board = {
           ...board,
           columns: [...board.columns],
@@ -65,7 +102,7 @@ export function BoardPropertiesDialog({
         setInitialBoard(null);
       }
     });
-  }, [board]);
+  }, [board, isCreateMode, open]);
 
   const isDirty = useMemo(() => {
     if (!editedBoard || !initialBoard) return false;
@@ -77,10 +114,12 @@ export function BoardPropertiesDialog({
     );
   }, [editedBoard, initialBoard]);
 
+  const canSave = isCreateMode ? Boolean(editedBoard?.name.trim()) : isDirty;
+
   if (!editedBoard) return null;
 
   const requestClose = () => {
-    if (isDirty) {
+    if (isDirty && !isCreateMode) {
       setConfirmDiscardOpen(true);
       return;
     }
@@ -101,6 +140,20 @@ export function BoardPropertiesDialog({
       setSaving(false);
     }
   };
+
+  const handleDelete = async () => {
+    if (!onDelete || !editedBoard) return;
+    setDeleting(true);
+    try {
+      await onDelete(editedBoard.id);
+      onClose();
+    } finally {
+      setDeleting(false);
+      setConfirmDeleteOpen(false);
+    }
+  };
+
+  const isProtectedBoard = editedBoard.id === 'prd' || editedBoard.id === 'active';
 
   const formatDateForInput = (isoString: string) => {
     try {
@@ -129,7 +182,7 @@ export function BoardPropertiesDialog({
       >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Board Properties</DialogTitle>
+            <DialogTitle>{isCreateMode ? 'Create Board' : 'Board Properties'}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -213,16 +266,56 @@ export function BoardPropertiesDialog({
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={requestClose}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving...' : 'Save Changes'}
-            </Button>
+          <DialogFooter className="justify-between">
+            <div className="flex gap-2">
+              {!isCreateMode && onDelete && (
+                <Button
+                  variant="destructive"
+                  onClick={() => setConfirmDeleteOpen(true)}
+                  disabled={saving || deleting || isProtectedBoard}
+                >
+                  Delete Board
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={requestClose} disabled={saving || deleting}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={saving || deleting || !canSave}>
+                {saving
+                  ? (isCreateMode ? 'Creating...' : 'Saving...')
+                  : (isCreateMode ? 'Create Board' : 'Save Changes')}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this board?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the board "{editedBoard.name}" and all of its tasks.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                handleDelete();
+              }}
+              disabled={deleting}
+            >
+              {deleting ? 'Deleting...' : 'Delete Board'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={confirmDiscardOpen} onOpenChange={setConfirmDiscardOpen}>
         <AlertDialogContent>

@@ -239,6 +239,21 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
     }
   };
 
+  const handleDeleteBoard = async (boardId: string) => {
+    if (!currentProject) return;
+    try {
+      await apiFetch(`/api/boards/${boardId}`, {
+        method: 'DELETE',
+      });
+      toast.success('Board deleted');
+      router.push('/'); // Navigate back to project list or dashboard
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete board';
+      toast.error(message);
+      console.error('Board deletion error:', error);
+    }
+  };
+
   const handleTaskClick = (task: Task) => {
     openTaskEditor(task);
   };
@@ -299,30 +314,6 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
 
     await handleUpdateBoard(updatedBoard);
     closeTaskEditor();
-  };
-
-  const handleAIBoardAction = async (action: string) => {
-    if (!board || !currentProject) return;
-
-    try {
-      toast.info('AI is working...');
-
-      await apiFetch('/api/ai/board', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action,
-          boardId: id,
-          data: {},
-        }),
-      });
-
-      await loadBoard();
-      toast.success('AI action completed');
-    } catch (error) {
-      toast.error('AI action failed');
-      console.error(error);
-    }
   };
 
   const handleCreateTasksClick = () => {
@@ -480,15 +471,6 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
         <DropdownMenuContent>
           <DropdownMenuItem onClick={handleCreateTasksClick}>
             Create Tasks
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handleAIBoardAction('prioritize')}>
-            Prioritize Tasks
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handleAIBoardAction('improve-acceptance')}>
-            Improve Acceptance Criteria
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handleAIBoardAction('split-sprints')}>
-            Split into Sprints
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -763,6 +745,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
         open={boardPropertiesOpen}
         onClose={() => setBoardPropertiesOpen(false)}
         onSave={handleUpdateBoard}
+        onDelete={handleDeleteBoard}
       />
     </AppLayout>
   );

@@ -760,6 +760,9 @@ class RunLoop {
       delete cleanEnv.NODE_OPTIONS;
       delete cleanEnv.VSCODE_INSPECTOR_OPTIONS;
 
+      const timeoutMs = options.timeout || 10000;
+      let timer = null;
+
       const child = spawn(command, args, {
         cwd,
         env: cleanEnv,
@@ -767,10 +770,29 @@ class RunLoop {
         windowsHide: true,
       });
 
-      child.stdin?.end();
-
       const stdoutChunks = [];
       const stderrChunks = [];
+
+      if (timeoutMs > 0) {
+        timer = setTimeout(() => {
+          child.kill('SIGKILL');
+          const err = new Error(`Command timed out after ${timeoutMs}ms: ${cmdString}`);
+          err.code = 'ETIMEDOUT';
+          err.stdout = Buffer.concat(stdoutChunks).toString('utf-8');
+          err.stderr = Buffer.concat(stderrChunks).toString('utf-8');
+
+          commandRecord.exitCode = -2; // Custom code for timeout
+          commandRecord.finishedAt = new Date().toISOString();
+          this.updateRun({
+            lastCommandExitCode: -2,
+            commands: this.run.commands
+          }).catch(() => { });
+
+          reject(err);
+        }, timeoutMs);
+      }
+
+      child.stdin?.end();
 
       child.stdout?.on('data', chunk => {
         stdoutChunks.push(chunk);
@@ -789,6 +811,7 @@ class RunLoop {
         }
       });
       child.on('error', err => {
+        if (timer) clearTimeout(timer);
         const stdout = Buffer.concat(stdoutChunks).toString('utf-8');
         const stderr = Buffer.concat(stderrChunks).toString('utf-8');
         const finishedAt = new Date().toISOString();
@@ -803,6 +826,7 @@ class RunLoop {
         reject(Object.assign(err, { stdout, stderr, code: -1 }));
       });
       child.on('close', code => {
+        if (timer) clearTimeout(timer);
         const stdout = Buffer.concat(stdoutChunks).toString('utf-8');
         const stderr = Buffer.concat(stderrChunks).toString('utf-8');
         const finishedAt = new Date().toISOString();
@@ -878,7 +902,7 @@ class RunLoop {
       const [cmd, ...args] = parts;
       if (!cmd) continue;
 
-      const result = await this.runCommand(cmd, args, this.sandboxDir, { shell: true });
+      const result = await this.runCommand(cmd, args, this.sandboxDir, { shell: true, timeout: 120000 });
       await this.appendSandboxLog(limitOutput(result.stdout || result.stderr));
       if (await this.verifyCancellation()) {
         throw new CancellationSignal('Cancellation during setup');

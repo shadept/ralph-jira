@@ -12,12 +12,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useProjectContext } from '@/components/projects/project-provider';
 import { AppLayout } from '@/components/layout/app-layout';
+import { BoardPropertiesDialog } from '@/components/board-properties-dialog';
 
 export default function DashboardPage() {
   const router = useRouter();
   const { currentProject, loading: projectLoading, apiFetch } = useProjectContext();
   const [boards, setBoards] = useState<Board[]>([]);
   const [loading, setLoading] = useState(true);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const loadBoards = useCallback(async () => {
     if (!currentProject) {
@@ -43,26 +45,8 @@ export default function DashboardPage() {
     loadBoards();
   }, [loadBoards]);
 
-  const createNewBoard = async () => {
+  const handleCreateBoard = async (newBoard: Board) => {
     if (!currentProject) return;
-
-    const newBoard: Board = {
-      id: `board-${Date.now()}`,
-      name: 'New Sprint',
-      goal: 'Sprint goal',
-      deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-      status: 'planned',
-      columns: [
-        { id: 'backlog', name: 'Backlog', order: 0 },
-        { id: 'todo', name: 'To Do', order: 1 },
-        { id: 'in_progress', name: 'In Progress', order: 2 },
-        { id: 'review', name: 'Review', order: 3 },
-        { id: 'done', name: 'Done', order: 4 },
-      ],
-      tasks: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
 
     try {
       const res = await apiFetch('/api/boards', {
@@ -74,6 +58,7 @@ export default function DashboardPage() {
       if (!res.ok) throw new Error('Failed to create board');
 
       toast.success('Board created');
+      setCreateDialogOpen(false);
       router.push(`/board/${newBoard.id}`);
     } catch (error) {
       toast.error('Failed to create board');
@@ -97,7 +82,7 @@ export default function DashboardPage() {
   };
 
   const actions = currentProject ? (
-    <Button onClick={createNewBoard}>
+    <Button onClick={() => setCreateDialogOpen(true)}>
       <Plus className="w-4 h-4 mr-2" />
       New Board
     </Button>
@@ -213,7 +198,7 @@ export default function DashboardPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button onClick={createNewBoard}>
+                  <Button onClick={() => setCreateDialogOpen(true)}>
                     <Plus className="w-4 h-4 mr-2" />
                     Create Board
                   </Button>
@@ -261,6 +246,14 @@ export default function DashboardPage() {
       actions={actions}
     >
       {renderContent()}
+
+      <BoardPropertiesDialog
+        board={null}
+        open={createDialogOpen}
+        onClose={() => setCreateDialogOpen(false)}
+        onSave={handleCreateBoard}
+        mode="create"
+      />
     </AppLayout>
   );
 }

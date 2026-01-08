@@ -227,18 +227,22 @@
         "Add props/state to support both create and edit modes",
         "Ensure modal initializes fields correctly based on mode"
       ],
-      "passes": false,
+      "passes": true,
       "id": "task-1767913585123-0",
-      "status": "in_progress",
+      "status": "done",
       "priority": "high",
       "estimate": 5,
       "createdAt": "2026-01-08T23:06:25.123Z",
-      "updatedAt": "2026-01-08T23:18:11.903Z",
+      "updatedAt": "2026-01-09T00:00:00.000Z",
       "tags": [
         "ui",
         "refactor"
       ],
-      "filesTouched": []
+      "filesTouched": [
+        "src/components/board-properties-dialog.tsx",
+        "src/app/page.tsx"
+      ],
+      "lastRun": "2026-01-09T00:00:00.000Z"
     },
     {
       "category": "functional",
@@ -254,7 +258,7 @@
       "priority": "high",
       "estimate": 4,
       "createdAt": "2026-01-08T23:06:25.123Z",
-      "updatedAt": "2026-01-08T23:18:11.903Z",
+      "updatedAt": "2026-01-08T23:25:51.726Z",
       "tags": [
         "ux",
         "data-management"
@@ -270,17 +274,20 @@
         "Remove split into sprints",
         "Keep current AI Actions button and menu to allow future expansion"
       ],
-      "passes": false,
+      "passes": true,
       "id": "task-1767914028900",
-      "status": "in_progress",
+      "status": "done",
       "priority": "medium",
       "estimate": 2,
       "createdAt": "2026-01-08T23:13:48.900Z",
-      "updatedAt": "2026-01-08T23:18:11.903Z",
+      "updatedAt": "2026-01-08T23:30:00.000Z",
       "tags": [
         "ux"
       ],
-      "filesTouched": []
+      "filesTouched": [
+        "src/app/board/[id]/page.tsx"
+      ],
+      "lastRun": "2026-01-08T23:30:00.000Z"
     },
     {
       "category": "functional",
@@ -296,7 +303,7 @@
       "priority": "low",
       "estimate": 1,
       "createdAt": "2026-01-08T23:15:31.636Z",
-      "updatedAt": "2026-01-08T23:18:11.903Z",
+      "updatedAt": "2026-01-08T23:25:51.726Z",
       "tags": [
         "ux",
         "data-management"
@@ -305,10 +312,10 @@
     }
   ],
   "createdAt": "2026-01-07T00:00:00.000Z",
-  "updatedAt": "2026-01-08T23:18:11.903Z",
+  "updatedAt": "2026-01-09T00:00:00.000Z",
   "metrics": {
     "velocity": 0,
-    "completed": 6,
+    "completed": 10,
     "total": 14
   }
 }
