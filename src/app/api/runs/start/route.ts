@@ -116,6 +116,7 @@ export async function POST(request: Request) {
         detached: true,
         stdio: 'ignore',
         env: { ...process.env },
+        windowsHide: true,
       });
       child.unref();
     } catch (spawnError) {

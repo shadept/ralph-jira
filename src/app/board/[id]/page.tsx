@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Sheet,
   SheetContent,
@@ -77,6 +78,11 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
   const [runBranchInput, setRunBranchInput] = useState('');
   const [runBranchError, setRunBranchError] = useState('');
   const [boardRunCount, setBoardRunCount] = useState(0);
+  const [runIterationsInput, setRunIterationsInput] = useState<number>(5);
+  const [defaultIterations, setDefaultIterations] = useState<number>(5);
+  const [createTasksDialogOpen, setCreateTasksDialogOpen] = useState(false);
+  const [createTasksDescription, setCreateTasksDescription] = useState('');
+  const [createTasksLoading, setCreateTasksLoading] = useState(false);
 
   const toKebabCase = useCallback((value: string) => {
     const normalized = value
@@ -317,6 +323,44 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
     }
   };
 
+  const handleCreateTasksClick = () => {
+    setCreateTasksDescription('');
+    setCreateTasksDialogOpen(true);
+  };
+
+  const handleCreateTasksSubmit = async () => {
+    if (!board || !currentProject || !createTasksDescription.trim()) return;
+
+    setCreateTasksLoading(true);
+    try {
+      toast.info('AI is generating tasks...');
+
+      await apiFetch('/api/ai/board', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate-tasks',
+          boardId: id,
+          data: {
+            description: createTasksDescription.trim(),
+            count: 5,
+            category: 'functional',
+          },
+        }),
+      });
+
+      await loadBoard();
+      toast.success('Tasks created successfully');
+      setCreateTasksDialogOpen(false);
+      setCreateTasksDescription('');
+    } catch (error) {
+      toast.error('Failed to create tasks');
+      console.error(error);
+    } finally {
+      setCreateTasksLoading(false);
+    }
+  };
+
   const handleRunButtonClick = () => {
     if (!currentProject) return;
     if (activeRun?.status === 'running') {
@@ -326,10 +370,23 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
     }
     setRunBranchInput(generateDefaultBranchName());
     setRunBranchError('');
+
+    // Fetch settings to get default max iterations
+    apiFetch('/api/settings')
+      .then(res => res.json())
+      .then(data => {
+        const projectMax = data.settings?.automation?.maxIterations || 5;
+        setDefaultIterations(projectMax);
+        setRunIterationsInput(projectMax);
+      })
+      .catch(err => {
+        console.error('Failed to fetch settings for iterations default', err);
+      });
+
     setStartRunDialogOpen(true);
   };
 
-  const startRun = async (branchName: string) => {
+  const startRun = async (branchName: string, maxIterations: number) => {
     if (!currentProject) return false;
     if (activeRun?.status === 'running') {
       toast.info('AI loop already running');
@@ -342,7 +399,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
       const res = await apiFetch('/api/runs/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ boardId: id, branchName }),
+        body: JSON.stringify({ boardId: id, branchName, maxIterations }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -381,7 +438,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
       return;
     }
     setRunBranchError('');
-    const started = await startRun(normalizedBranch);
+    const started = await startRun(normalizedBranch, runIterationsInput);
     if (started) {
       setStartRunDialogOpen(false);
       setRunBranchInput('');
@@ -419,6 +476,9 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
+          <DropdownMenuItem onClick={handleCreateTasksClick}>
+            Create Tasks
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => handleAIBoardAction('prioritize')}>
             Prioritize Tasks
           </DropdownMenuItem>
@@ -630,10 +690,63 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
               </p>
             ) : null}
           </div>
+          <div className="space-y-2 mt-4">
+            <Label htmlFor="runIterations">Max Iterations</Label>
+            <Input
+              id="runIterations"
+              type="number"
+              min={1}
+              max={20}
+              value={runIterationsInput}
+              onChange={(event) => {
+                const val = parseInt(event.target.value, 10);
+                setRunIterationsInput(isNaN(val) ? 1 : val);
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              Overrides project setting ({defaultIterations}). Max 20 recommended.
+            </p>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => handleRunDialogChange(false)}>Cancel</Button>
             <Button onClick={handleConfirmRunStart} disabled={runLoading}>
               {runLoading ? 'Starting…' : 'Start Run'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={createTasksDialogOpen} onOpenChange={setCreateTasksDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Tasks with AI</DialogTitle>
+            <DialogDescription>
+              Describe a feature or requirement and AI will generate tasks for you.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="createTasksDescription">Description</Label>
+            <Textarea
+              id="createTasksDescription"
+              value={createTasksDescription}
+              onChange={(e) => setCreateTasksDescription(e.target.value)}
+              placeholder="e.g., Add user authentication with login, registration, and password reset"
+              rows={4}
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground">
+              Be specific about what you want to build. The AI will create multiple tasks with acceptance criteria.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateTasksDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateTasksSubmit}
+              disabled={createTasksLoading || !createTasksDescription.trim()}
+            >
+              {createTasksLoading ? 'Creating…' : 'Create Tasks'}
             </Button>
           </DialogFooter>
         </DialogContent>

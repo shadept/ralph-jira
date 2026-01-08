@@ -486,31 +486,33 @@ class RunLoop {
   /**
    * Spawns a shell command and captures its output.
    * @param {string} command
-   * @param {string | string[]} argsOrString
+   * @param {string[]} args
    * @param {string} cwd
    * @param {object} [options]
    * @param {boolean} [options.shell] - Whether to use a shell for execution.
    * @param {object} [options.env] - Additional environment variables.
    * @returns {Promise<{stdout: string, stderr: string, code: number}>}
    */
-  async runCommand(command, argsOrString, cwd, options = {}) {
-    const useShell = typeof argsOrString === 'string' || options.shell === true;
-    let finalCommand = command;
-    let args = Array.isArray(argsOrString) ? argsOrString : [];
+  async runCommand(command, args, cwd, options = {}) {
+    const escapeForDisplay = (arg) => {
+      if (typeof arg !== 'string') return `${arg}`;
+      if (arg.length === 0) return '""';
+      if (/[ \t\n\r"']/.test(arg)) {
+        return `"${arg.replace(/"/g, '\\"')}"`;
+      }
+      return arg;
+    };
 
-    if (typeof argsOrString === 'string') {
-      finalCommand = argsOrString;
-      args = [];
-    }
-
-    const cmdString = Array.isArray(argsOrString) ? `${command} ${argsOrString.join(' ')}` : argsOrString;
+    const cmdString = [command, ...args].map(escapeForDisplay).join(' ')
     await this.updateRun({ lastCommand: cmdString, lastCommandExitCode: undefined });
 
     return new Promise((resolve, reject) => {
-      const child = spawn(finalCommand, args, {
+      console.log("Spawning", command, args)
+      const child = spawn(command, args, {
         cwd,
         env: options.env ? { ...process.env, ...options.env } : { ...process.env },
-        shell: useShell,
+        shell: options.shell || false,
+        windowsHide: true,
       });
 
       child.stdin?.end();

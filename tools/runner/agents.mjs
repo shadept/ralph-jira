@@ -58,21 +58,22 @@ export class ClaudeAgent extends Agent {
      * @returns {Promise<{ output: string, exitCode: number }>}
      */
     async run({ sandboxDir, runCommand, appendSandboxLog, iteration }) {
-        const basePrompt = `@plans/prd.json @progress.txt
-1. Find the highest-priority feature to work on and work only on that feature.
-This should be the one YOU decide has the highest priority - not necessarily the first in the list.
-2. Check that the types check via npm typecheck and that the tests pass via npm test.
-3. Updarte the PRD with the work that was done.
-4. Append your process to the progress.txt file.
-Use this to leave a note for the next person working in the codebase.
-5. make a git commit of the feature.
-ONLY WORK ON A SINGLE FEATURE.
-If, while implementing the feature, you notice the PRD is complete, output <promise>COMPLETE</promise>
-`;
+        const prompt = [
+            '@plans/prd.json @progress.txt',
+            '1. Find the highest-priority feature to work on and work only on that feature.',
+            'This should be the one YOU decide has the highest priority - not necessarily the first in the list.',
+            '2. Check that the types check via npm typecheck and that the tests pass via npm test.',
+            '3. Update the PRD with the work that was done.',
+            '4. Append your process to the progress.txt file.',
+            'Use this to leave a note for the next person working in the codebase.',
+            '5. make a git commit of the feature.',
+            'ONLY WORK ON A SINGLE FEATURE.',
+            'If, while implementing the feature, you notice the PRD is complete, output <promise>COMPLETE</promise>'
+        ].join(' ');
 
-        const prompt = this.codingStyle
-            ? `${basePrompt}\n<coding-style>\n${this.codingStyle}\n</coding-style>`
-            : basePrompt;
+        const finalPrompt = this.codingStyle
+            ? `${prompt} <coding-style>${this.codingStyle}</coding-style>`
+            : prompt;
 
         const args = [...this.extraArgs];
 
@@ -80,10 +81,10 @@ If, while implementing the feature, you notice the PRD is complete, output <prom
             args.push('--model', this.model);
         }
 
-        args.push('--permission-mode', this.permissionMode, '--print', prompt);
+        args.push('--permission-mode', this.permissionMode, '--print', finalPrompt);
 
         const describeInvocation = () => {
-            return `${this.bin} ${args.map(a => a === prompt ? '[prompt omitted]' : a).join(' ')}`.trim();
+            return `${this.bin} ${args.map(a => a === finalPrompt ? '[prompt omitted]' : a).join(' ')}`.trim();
         };
 
         await appendSandboxLog([
@@ -91,8 +92,10 @@ If, while implementing the feature, you notice the PRD is complete, output <prom
             `Command: ${describeInvocation()}`,
         ]);
 
-        const result = await runCommand(this.bin, args, sandboxDir, { shell: true });
+        const result = await runCommand(this.bin, args, sandboxDir, { shell: false });
         const combinedOutput = `${result.stdout}${result.stderr ? `\n${result.stderr}` : ''}`.trim();
+
+        await appendSandboxLog(`Claude execution finished with code ${result.code}. Output length: ${combinedOutput.length}`);
 
         return { output: combinedOutput, exitCode: result.code ?? 0 };
     }
@@ -130,7 +133,7 @@ export class OpenCodeAgent extends Agent {
             `Command: ${describeInvocation()}`,
         ]);
 
-        const result = await runCommand(this.bin, args, sandboxDir, { shell: true });
+        const result = await runCommand(this.bin, args, sandboxDir, { shell: false });
         const combinedOutput = `${result.stdout}${result.stderr ? `\n${result.stderr}` : ''}`.trim();
 
         return { output: combinedOutput, exitCode: result.code ?? 0 };

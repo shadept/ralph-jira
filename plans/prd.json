@@ -122,19 +122,58 @@
       "tags": [
         "UX"
       ],
-      "filesTouched": [
-        "src/components/kanban-board.tsx",
-        "src/components/kanban-column.tsx",
-        "src/components/task-card.tsx"
-      ],
+      "filesTouched": [],
       "lastRun": "2026-01-07T22:58:30.511Z"
+    },
+    {
+      "category": "functional",
+      "description": "AI Action to create tasks",
+      "steps": [
+        "New menu button under AI Actions to prompt user",
+        "AI model to interpret user request and create one or more tasks",
+        "New tasks placed in backlog"
+      ],
+      "passes": true,
+      "id": "task-1767886194027",
+      "status": "done",
+      "priority": "high",
+      "estimate": 5,
+      "createdAt": "2026-01-08T15:29:54.027Z",
+      "updatedAt": "2026-01-08T21:15:00.000Z",
+      "tags": [
+        "UX",
+        "AI"
+      ],
+      "filesTouched": [
+        "src/app/board/[id]/page.tsx"
+      ],
+      "lastRun": "2026-01-08T21:15:00.000Z"
+    },
+    {
+      "category": "functional",
+      "description": "Improve Run AI Loop finalize task",
+      "steps": [
+        "Push worktree branch to origin",
+        "Create PR (assuming GitHub)",
+        "Ensure plans/prd.json is properly merged back into main branch",
+        "Delete worktree on success"
+      ],
+      "passes": false,
+      "id": "task-1767886290745",
+      "status": "todo",
+      "priority": "medium",
+      "createdAt": "2026-01-08T15:31:30.745Z",
+      "updatedAt": "2026-01-08T19:36:48.495Z",
+      "tags": [],
+      "filesTouched": [],
+      "lastRun": "2026-01-08T15:46:55.373Z"
     }
   ],
   "createdAt": "2026-01-07T00:00:00.000Z",
-  "updatedAt": "2026-01-08T15:25:20.734Z",
+  "updatedAt": "2026-01-08T19:36:48.509Z",
   "metrics": {
     "velocity": 0,
-    "completed": 1,
-    "total": 3
+    "completed": 5,
+    "total": 6
   }
 }
