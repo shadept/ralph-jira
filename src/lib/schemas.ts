@@ -5,7 +5,7 @@ export const TaskSchema = z.object({
   // Original fields (must be preserved)
   category: z.string(),
   description: z.string(),
-  steps: z.array(z.string()),
+  acceptanceCriteria: z.array(z.string()),
   passes: z.boolean(),
 
   // Extended fields for Kanban/sprints
@@ -267,5 +267,5 @@ export const PrioritizeTasksInputSchema = z.object({
 
 export const ImproveTaskInputSchema = z.object({
   taskId: z.string(),
-  aspect: z.enum(['steps', 'edge-cases', 'estimate', 'files']),
+  aspect: z.enum(['acceptance-criteria', 'edge-cases', 'estimate', 'files']),
 });

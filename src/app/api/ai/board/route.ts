@@ -29,7 +29,7 @@ export async function POST(request: Request) {
               tasks: z.array(z.object({
                 category: z.string(),
                 description: z.string(),
-                steps: z.array(z.string()),
+                acceptanceCriteria: z.array(z.string()),
                 priority: z.enum(['low', 'medium', 'high', 'urgent']),
                 estimate: z.number(),
                 tags: z.array(z.string()),
@@ -159,8 +159,8 @@ Consider:
 Tasks:
 ${board.tasks.slice(0, 10).map(t => `
 Task: ${t.description}
-Current steps:
-${t.steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}
+Current acceptance criteria:
+${t.acceptanceCriteria.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 `).join('\n---\n')}
 
 Provide improved acceptance criteria that are SMART (Specific, Measurable, Achievable, Relevant, Time-bound).`,

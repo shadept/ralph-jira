@@ -49,7 +49,7 @@ model Task {
   id          String   @id
   category    String
   description String
-  stepsJson   String   @map("steps") // JSON array of steps
+  acceptanceCriteriaJson   String   @map("acceptance_criteria") // JSON array of acceptance criteria
   passes      Boolean  @default(false)
   status      String   // backlog, todo, in_progress, review, done
   priority    String   @default("medium") // low, medium, high, urgent

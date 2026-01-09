@@ -141,7 +141,7 @@ export class SQLiteStorageAdapter implements StorageAdapter {
           id: task.id,
           category: task.category,
           description: task.description,
-          stepsJson: JSON.stringify(task.steps),
+          acceptanceCriteriaJson: JSON.stringify(task.acceptanceCriteria),
           passes: task.passes,
           status: task.status,
           priority: task.priority,
@@ -387,7 +387,7 @@ export class SQLiteStorageAdapter implements StorageAdapter {
         id: string;
         category: string;
         description: string;
-        stepsJson: string;
+        acceptanceCriteriaJson: string;
         passes: boolean;
         status: string;
         priority: string;
@@ -412,7 +412,7 @@ export class SQLiteStorageAdapter implements StorageAdapter {
       id: task.id,
       category: task.category,
       description: task.description,
-      steps: JSON.parse(task.stepsJson),
+      acceptanceCriteria: JSON.parse(task.acceptanceCriteriaJson),
       passes: task.passes,
       status: task.status,
       priority: task.priority as Task['priority'],

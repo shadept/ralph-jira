@@ -34,7 +34,7 @@ export function TaskEditorDialog({ task, open, onClose, onSave, onDelete, onAIAc
       if (task) {
         const clonedTask: Task = {
           ...task,
-          steps: [...task.steps],
+          acceptanceCriteria: [...task.acceptanceCriteria],
           tags: [...task.tags],
           filesTouched: [...task.filesTouched],
         };
@@ -87,7 +87,7 @@ export function TaskEditorDialog({ task, open, onClose, onSave, onDelete, onAIAc
     if (newStep.trim()) {
       setEditedTask({
         ...editedTask,
-        steps: [...editedTask.steps, newStep.trim()],
+        acceptanceCriteria: [...editedTask.acceptanceCriteria, newStep.trim()],
       });
       setNewStep('');
     }
@@ -96,7 +96,7 @@ export function TaskEditorDialog({ task, open, onClose, onSave, onDelete, onAIAc
   const removeStep = (index: number) => {
     setEditedTask({
       ...editedTask,
-      steps: editedTask.steps.filter((_, i) => i !== index),
+      acceptanceCriteria: editedTask.acceptanceCriteria.filter((_, i) => i !== index),
     });
   };
 
@@ -189,12 +189,12 @@ export function TaskEditorDialog({ task, open, onClose, onSave, onDelete, onAIAc
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <Label>Acceptance Steps</Label>
+              <Label>Acceptance Criteria</Label>
               {onAIAction && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => onAIAction('improve-steps')}
+                  onClick={() => onAIAction('improve-acceptance-criteria')}
                 >
                   <Sparkle className="w-4 h-4 mr-1" />
                   AI Improve
@@ -202,15 +202,15 @@ export function TaskEditorDialog({ task, open, onClose, onSave, onDelete, onAIAc
               )}
             </div>
             <div className="space-y-2">
-              {editedTask.steps.map((step, idx) => (
+              {editedTask.acceptanceCriteria.map((step, idx) => (
                 <div key={`${editedTask.id}-${step}`} className="flex items-start gap-2">
                   <span className="text-sm text-muted-foreground mt-2 w-6">{idx + 1}.</span>
                   <Input
                     value={step}
                     onChange={(e) => {
-                      const newSteps = [...editedTask.steps];
+                      const newSteps = [...editedTask.acceptanceCriteria];
                       newSteps[idx] = e.target.value;
-                      setEditedTask({ ...editedTask, steps: newSteps });
+                      setEditedTask({ ...editedTask, acceptanceCriteria: newSteps });
                     }}
                     className="flex-1"
                   />
@@ -225,7 +225,7 @@ export function TaskEditorDialog({ task, open, onClose, onSave, onDelete, onAIAc
               ))}
               <div className="flex gap-2">
                 <Input
-                  placeholder="Add acceptance step..."
+                  placeholder="Add acceptance criterion..."
                   value={newStep}
                   onChange={(e) => setNewStep(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && addStep()}

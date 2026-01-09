@@ -263,7 +263,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
       id: `task-${Date.now()}`,
       category: 'functional',
       description: '',
-      steps: [],
+      acceptanceCriteria: [],
       passes: false,
       status: 'backlog',
       priority: 'medium',

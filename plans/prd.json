@@ -35,7 +35,7 @@
     {
       "category": "functional",
       "description": "User can drag and drop tasks between columns",
-      "steps": [
+      "acceptanceCriteria": [
         "Navigate to board with tasks",
         "Drag a task from one column to another",
         "Verify task moves to new column",
@@ -58,7 +58,7 @@
     {
       "category": "functional",
       "description": "Add back button to all non-main pages",
-      "steps": [
+      "acceptanceCriteria": [
         "Every page has a back button"
       ],
       "passes": true,
@@ -85,7 +85,7 @@
     {
       "category": "functional",
       "description": "Add human to mark tasks as passing via UI",
-      "steps": [
+      "acceptanceCriteria": [
         "Clicking the passes circle should togle the passes state"
       ],
       "passes": true,
@@ -104,7 +104,7 @@
     {
       "category": "functional",
       "description": "AI Action to create tasks",
-      "steps": [
+      "acceptanceCriteria": [
         "New menu button under AI Actions to prompt user",
         "AI model to interpret user request and create one or more tasks",
         "New tasks placed in backlog"
@@ -128,7 +128,7 @@
     {
       "category": "functional",
       "description": "Improve Run AI Loop finalize task",
-      "steps": [
+      "acceptanceCriteria": [
         "Push worktree branch to origin",
         "Create PR (assuming GitHub)",
         "Ensure plans/prd.json is properly merged back into main branch",
@@ -151,7 +151,7 @@
     {
       "category": "functional",
       "description": "Add retry button to run view when run has failed",
-      "steps": [
+      "acceptanceCriteria": [
         "When run has fail, rerun button should be available",
         "Clicking rerun button will run retrigger AI loop for that run",
         "Rerunning should not replace @plans/prd.json in worktree if one exists"
@@ -175,7 +175,7 @@
     {
       "category": "functional",
       "description": "Add project context to AI Action/Create Task",
-      "steps": [
+      "acceptanceCriteria": [
         "From project folder read content of README.md and supply as context",
         "Generation should prefer less, high quality tasks (no step by step guides)",
         "Acceptance criteria should not include specific to unknowns"
@@ -200,7 +200,7 @@
     {
       "category": "functional",
       "description": "Allow creation/editing of board properties",
-      "steps": [
+      "acceptanceCriteria": [
         "In board view, there should be a button at top right of nav bar actions that opens board properties modal",
         "Should be able to change most properties, keep columns locked (disabled) for now"
       ],
@@ -222,7 +222,7 @@
     {
       "category": "functional",
       "description": "Unify board creation and editing dialog into a shared modal component",
-      "steps": [
+      "acceptanceCriteria": [
         "Extract existing board edit dialog into a reusable component",
         "Add props/state to support both create and edit modes",
         "Ensure modal initializes fields correctly based on mode"
@@ -247,7 +247,7 @@
     {
       "category": "functional",
       "description": "Enhance board editing with delete capability",
-      "steps": [
+      "acceptanceCriteria": [
         "Add a clearly labeled delete action within the board modal",
         "Display confirmation dialog to prevent accidental deletions",
         "Execute board deletion and refresh UI state appropriately"
@@ -268,7 +268,7 @@
     {
       "category": "functional",
       "description": "Remove non functional AI actions",
-      "steps": [
+      "acceptanceCriteria": [
         "Remove prioritize tasks",
         "Remove improve acceptance criteria",
         "Remove split into sprints",
@@ -292,7 +292,7 @@
     {
       "category": "functional",
       "description": "Convert @plans/prd.json to new board format",
-      "steps": [
+      "acceptanceCriteria": [
         "File renamed to board-1767913506302",
         "@plans/prd.json in worktree is preserved and untouched, this change relates only to @plans/prd.json",
         "When creating a new project plans/prd.json is no longer created, instead a new board is created in its place, using new naming schema"
@@ -313,7 +313,7 @@
     {
       "category": "functional",
       "description": "Abstract backend file accesses in run-loop.mjs for future API mode",
-      "steps": [
+      "acceptanceCriteria": [
         "Create BackendClient interface with LocalBackendClient and HttpBackendClient implementations",
         "Abstract run file, settings, board, and cancellation flag access via backend client",
         "Add PUT /api/runs/[runId] endpoint for updating run records",
@@ -342,7 +342,7 @@
     {
       "category": "functional",
       "description": "Move Setting button on main page to Nav bar",
-      "steps": [
+      "acceptanceCriteria": [
         "Remove old but Settings button",
         "Add new settings Button at top right of nav bar (cog item)",
         "Button but be on the same as New Board button, not next no project selector and profile button"
@@ -366,18 +366,18 @@
     {
       "category": "functional",
       "description": "Implement database for StorageAdapter, start with SqlLiteStorageAdaptor",
-      "steps": [
+      "acceptanceCriteria": [
         "Implement SqlLiteStorageAdaptor",
         "Create migrator from LocalFilesystemAdapter to SqlLiteStorageAdaptor",
         "Use Prisma ORM"
       ],
-      "passes": false,
+      "passes": true,
       "id": "task-1767964868538",
-      "status": "in_progress",
+      "status": "done",
       "priority": "medium",
       "estimate": 5,
       "createdAt": "2026-01-09T13:21:08.538Z",
-      "updatedAt": "2026-01-09T20:30:00.000Z",
+      "updatedAt": "2026-01-09T20:41:49.930Z",
       "tags": [
         "data-management"
       ],
@@ -393,7 +393,7 @@
     }
   ],
   "createdAt": "2026-01-07T00:00:00.000Z",
-  "updatedAt": "2026-01-09T20:25:51.546Z",
+  "updatedAt": "2026-01-09T20:41:49.938Z",
   "metrics": {
     "velocity": 0,
     "completed": 15,

@@ -22,25 +22,25 @@ export async function POST(request: Request) {
     const settings = await storage.readSettings();
 
     switch (action) {
-      case 'improve-steps': {
+      case 'improve-acceptance-criteria': {
         const result = await generateObject({
           model: openai(settings.aiPreferences.defaultModel || 'gpt-4-turbo'),
           schema: z.object({
-            steps: z.array(z.string()),
+            acceptanceCriteria: z.array(z.string()),
             reasoning: z.string(),
           }),
-          prompt: `Improve the acceptance criteria steps for this task to be more comprehensive and testable.
+          prompt: `Improve the acceptance criteria for this task to be more comprehensive and testable.
 
 Task: ${task.description}
 Category: ${task.category}
 
-Current steps:
-${task.steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}
+Current acceptance criteria:
+${task.acceptanceCriteria.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 
 Tech stack: ${settings.techStack.join(', ')}
 Testing approach: ${settings.howToTest.notes}
 
-Provide improved steps that cover:
+Provide improved acceptance criteria that cover:
 - Happy path scenarios
 - Edge cases
 - Error handling
@@ -48,14 +48,14 @@ Provide improved steps that cover:
 - Testing validation`,
         });
 
-        task.steps = result.object.steps;
+        task.acceptanceCriteria = result.object.acceptanceCriteria;
         task.updatedAt = new Date().toISOString();
 
         await storage.writeBoard(board);
 
         return NextResponse.json({
           success: true,
-          steps: result.object.steps,
+          acceptanceCriteria: result.object.acceptanceCriteria,
           reasoning: result.object.reasoning,
         });
       }
@@ -69,7 +69,7 @@ Provide improved steps that cover:
           prompt: `Identify edge cases and additional test scenarios for this task:
 
 Task: ${task.description}
-Steps: ${task.steps.join('; ')}
+Acceptance Criteria: ${task.acceptanceCriteria.join('; ')}
 
 Consider:
 - Boundary conditions
@@ -80,8 +80,8 @@ Consider:
 - Performance under load`,
         });
 
-        // Append edge cases to steps
-        task.steps.push(...result.object.edgeCases.map(ec => `[Edge case] ${ec}`));
+        // Append edge cases to acceptance criteria
+        task.acceptanceCriteria.push(...result.object.edgeCases.map(ec => `[Edge case] ${ec}`));
         task.updatedAt = new Date().toISOString();
 
         await storage.writeBoard(board);
@@ -106,7 +106,7 @@ Consider:
           prompt: `Estimate the effort for this task in story points (Fibonacci: 1, 2, 3, 5, 8, 13).
 
 Task: ${task.description}
-Steps: ${task.steps.length} acceptance criteria
+Acceptance Criteria: ${task.acceptanceCriteria.length} items
 Tech stack: ${settings.techStack.join(', ')}
 
 Consider:
@@ -144,7 +144,7 @@ Provide a detailed breakdown.`,
           prompt: `Suggest which files would need to be modified to implement this task:
 
 Task: ${task.description}
-Steps: ${task.steps.join('; ')}
+Acceptance Criteria: ${task.acceptanceCriteria.join('; ')}
 
 Project structure (conventions):
 ${JSON.stringify(settings.repoConventions, null, 2)}
@@ -166,7 +166,7 @@ Provide specific file paths and what changes would be needed.`,
           prompt: `Convert this task into automated test cases using the project's testing approach.
 
 Task: ${task.description}
-Steps: ${task.steps.join('\n')}
+Acceptance Criteria: ${task.acceptanceCriteria.join('\n')}
 
 Testing framework: ${settings.howToTest.commands.join(', ')}
 Testing notes: ${settings.howToTest.notes}
