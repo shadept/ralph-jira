@@ -9,7 +9,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "npm run lint",
-    "verify": "node scripts/verify-setup.mjs"
+    "verify": "node scripts/verify-setup.mjs",
+    "migrate-to-sqlite": "tsx src/lib/storage/migrate-to-sqlite.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.7",

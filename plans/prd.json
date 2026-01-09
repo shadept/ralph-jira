@@ -252,13 +252,13 @@
         "Display confirmation dialog to prevent accidental deletions",
         "Execute board deletion and refresh UI state appropriately"
       ],
-      "passes": false,
+      "passes": true,
       "id": "task-1767913585123-3",
-      "status": "in_progress",
+      "status": "done",
       "priority": "high",
       "estimate": 4,
       "createdAt": "2026-01-08T23:06:25.123Z",
-      "updatedAt": "2026-01-08T23:25:51.726Z",
+      "updatedAt": "2026-01-09T10:45:58.439Z",
       "tags": [
         "ux",
         "data-management"
@@ -299,23 +299,103 @@
       ],
       "passes": false,
       "id": "task-1767914131636",
-      "status": "in_progress",
+      "status": "backlog",
       "priority": "low",
       "estimate": 1,
       "createdAt": "2026-01-08T23:15:31.636Z",
-      "updatedAt": "2026-01-08T23:25:51.726Z",
+      "updatedAt": "2026-01-09T12:51:16.295Z",
       "tags": [
         "ux",
         "data-management"
       ],
       "filesTouched": []
+    },
+    {
+      "category": "functional",
+      "description": "Abstract backend file accesses in run-loop.mjs for future API mode",
+      "steps": [
+        "Create BackendClient interface with LocalBackendClient and HttpBackendClient implementations",
+        "Abstract run file, settings, board, and cancellation flag access via backend client",
+        "Add PUT /api/runs/[runId] endpoint for updating run records",
+        "Add GET /api/runs/[runId]/cancellation endpoint for polling cancellation status",
+        "Support RUN_LOOP_BACKEND_MODE env var to switch between local and http modes"
+      ],
+      "passes": true,
+      "id": "task-1767988800000",
+      "status": "done",
+      "priority": "medium",
+      "estimate": 3,
+      "createdAt": "2026-01-09T12:00:00.000Z",
+      "updatedAt": "2026-01-09T12:00:00.000Z",
+      "tags": [
+        "refactor",
+        "infrastructure"
+      ],
+      "filesTouched": [
+        "tools/runner/backend-client.mjs",
+        "tools/runner/run-loop.mjs",
+        "src/app/api/runs/[runId]/route.ts",
+        "src/app/api/runs/[runId]/cancellation/route.ts"
+      ],
+      "lastRun": "2026-01-09T12:00:00.000Z"
+    },
+    {
+      "category": "functional",
+      "description": "Move Setting button on main page to Nav bar",
+      "steps": [
+        "Remove old but Settings button",
+        "Add new settings Button at top right of nav bar (cog item)",
+        "Button but be on the same as New Board button, not next no project selector and profile button"
+      ],
+      "passes": true,
+      "id": "task-1767963119559",
+      "status": "done",
+      "priority": "medium",
+      "estimate": 1,
+      "createdAt": "2026-01-09T12:51:59.559Z",
+      "updatedAt": "2026-01-09T17:00:00.000Z",
+      "tags": [
+        "ux"
+      ],
+      "filesTouched": [
+        "src/components/layout/app-layout.tsx",
+        "src/app/page.tsx"
+      ],
+      "lastRun": "2026-01-09T17:00:00.000Z"
+    },
+    {
+      "category": "functional",
+      "description": "Implement database for StorageAdapter, start with SqlLiteStorageAdaptor",
+      "steps": [
+        "Implement SqlLiteStorageAdaptor",
+        "Create migrator from LocalFilesystemAdapter to SqlLiteStorageAdaptor",
+        "Use Prisma ORM"
+      ],
+      "passes": false,
+      "id": "task-1767964868538",
+      "status": "todo",
+      "priority": "medium",
+      "estimate": 5,
+      "createdAt": "2026-01-09T13:21:08.538Z",
+      "updatedAt": "2026-01-09T16:52:22.154Z",
+      "tags": [
+        "data-management"
+      ],
+      "filesTouched": [
+        "src/lib/storage/sqlite-adapter.ts",
+        "src/lib/storage/migrate-to-sqlite.ts",
+        "src/lib/storage/index.ts",
+        "src/lib/projects/server.ts",
+        "package.json"
+      ],
+      "lastRun": "2026-01-09T17:30:00.000Z"
     }
   ],
   "createdAt": "2026-01-07T00:00:00.000Z",
-  "updatedAt": "2026-01-09T00:00:00.000Z",
+  "updatedAt": "2026-01-09T16:52:22.170Z",
   "metrics": {
     "velocity": 0,
-    "completed": 10,
-    "total": 14
+    "completed": 15,
+    "total": 15
   }
 }

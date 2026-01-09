@@ -14,8 +14,11 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
  * @typedef {Object} RunContext
  * @property {string} sandboxDir - The directory where the agent should run.
  * @property {(command: string, args: string[], cwd: string, options?: object) => Promise<{stdout: string, stderr: string, code: number}>} runCommand - Function to execute shell commands.
+ * @property {(commandRecord: object) => Promise<void>} addCommand - Function to add a command record to the run's command list.
  * @property {(text: string) => Promise<void>} appendSandboxLog - Function to append to the iteration log.
  * @property {() => Promise<void>} flushSandboxLog - Function to flush remaining log buffer.
+ * @property {(data: object) => Promise<any>} updateRun - Function to update run state.
+ * @property {() => Promise<void>} checkCancellation - Function to check for cancellation. Throws if canceled.
  * @property {number} iteration - The current iteration number.
  */
 
@@ -60,7 +63,7 @@ export class ClaudeAgent extends Agent {
      * @param {RunContext} context
      * @returns {Promise<{ output: string, exitCode: number }>}
      */
-    async run({ sandboxDir, appendSandboxLog, flushSandboxLog, iteration }) {
+    async run({ sandboxDir, addCommand, appendSandboxLog, flushSandboxLog, checkCancellation, iteration }) {
         const promptLines = [
             '@plans/prd.json @progress.txt',
             '1. Find the highest-priority feature to work on and work only on that feature.',
@@ -79,7 +82,21 @@ export class ClaudeAgent extends Agent {
             prompt += `\n\n<coding-style>\n${this.codingStyle}\n</coding-style>`;
         }
 
-        await appendSandboxLog(`\n[${new Date().toISOString()}] Starting claude iteration ${iteration}\n`);
+        const startedAt = new Date().toISOString();
+        const commandRecord = {
+            command: 'claude-agent-sdk',
+            args: [`query (iteration ${iteration})`],
+            cwd: sandboxDir,
+            startedAt,
+        };
+
+        await appendSandboxLog(`\n[${startedAt}] Starting claude iteration ${iteration}\n`);
+
+        await addCommand(commandRecord);
+
+        // Change to sandbox directory since the SDK doesn't support setting workingDirectory
+        const originalCwd = process.cwd();
+        process.chdir(sandboxDir);
 
         let fullContent = '';
         try {
@@ -88,10 +105,10 @@ export class ClaudeAgent extends Agent {
                 options: {
                     tools: { type: 'preset', preset: 'claude_code' },
                     permissionMode: this.permissionMode,
-                    workingDirectory: sandboxDir,
                     model: this.model || undefined,
                 }
             })) {
+                await checkCancellation();
                 if (message.type === 'assistant' && message.message?.content) {
                     for (const block of message.message.content) {
                         if ('text' in block) {
@@ -99,14 +116,18 @@ export class ClaudeAgent extends Agent {
                             fullContent += block.text;
                         } else if ('name' in block) {
                             // Cyan for tool names
-                            const prefix = fullContent.endsWith('\n') ? '' : '\n'
-                            await appendSandboxLog(`${prefix}\x1b[36m| ${block.name}\x1b[0m\n`);
+                            let details = '';
+                            if (block.input && typeof block.input === 'object') {
+                                details = Object.entries(block.input)
+                                    .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
+                                    .join(' ');
+                            }
+                            await appendSandboxLog(`\x1b[36m| ${block.name}${details ? ' ' + details : ''}\x1b[0m\n`);
                         }
                     }
                 } else if (message.type === 'result') {
                     // Green for results
-                    const prefix = fullContent.endsWith('\n') ? '' : '\n'
-                    await appendSandboxLog(`${prefix}\x1b[32m[Result] ${message.subtype}\x1b[0m\n`);
+                    await appendSandboxLog(`\x1b[32m[Result] ${message.subtype}\x1b[0m\n`);
                 } else if (message.type === 'error') {
                     // Red for errors in the stream
                     await appendSandboxLog(`\x1b[31m[Stream Error] ${message.message}\x1b[0m\n`);
@@ -114,15 +135,30 @@ export class ClaudeAgent extends Agent {
                 }
             }
         } catch (error) {
+            if (error.name === 'CancellationSignal' || error.message?.includes('Run canceled by user')) {
+                commandRecord.exitCode = -1;
+                commandRecord.finishedAt = new Date().toISOString();
+                process.chdir(originalCwd);
+                throw error;
+            }
             const usageLimitRegex = /usage limit|Rate Exceeded|Too Many Requests|429|out of extra usage|resets \d+(am|pm)/i;
             const isUsageLimit = usageLimitRegex.test(error.message || '') || usageLimitRegex.test(fullContent);
+            const exitCode = isUsageLimit ? 2 : 1;
             // Red for errors
             await appendSandboxLog(`\x1b[31m[Error] ${error.message}\x1b[0m\n`);
             await flushSandboxLog();
-            return { output: fullContent, exitCode: isUsageLimit ? 2 : 1 };
+            commandRecord.exitCode = exitCode;
+            commandRecord.finishedAt = new Date().toISOString();
+            await addCommand(commandRecord);
+            process.chdir(originalCwd);
+            return { output: fullContent, exitCode };
         }
 
         await flushSandboxLog();
+        commandRecord.exitCode = 0;
+        commandRecord.finishedAt = new Date().toISOString();
+        await addCommand(commandRecord);
+        process.chdir(originalCwd);
         return { output: fullContent, exitCode: 0 };
     }
 }

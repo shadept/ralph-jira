@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { Plus, FolderOpen, Sparkle } from '@phosphor-icons/react';
+import { Plus, FolderOpen, Sparkle, GearSix } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 
 import { Board } from '@/lib/schemas';
@@ -81,12 +81,20 @@ export default function DashboardPage() {
     }
   };
 
-  const actions = currentProject ? (
-    <Button onClick={() => setCreateDialogOpen(true)}>
-      <Plus className="w-4 h-4 mr-2" />
-      New Board
-    </Button>
-  ) : undefined;
+  const actions = (
+    <>
+      {currentProject && (
+        <Button onClick={() => setCreateDialogOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          New Board
+        </Button>
+      )}
+      <Button variant="ghost" size="icon" onClick={() => router.push('/settings')}>
+        <GearSix className="w-5 h-5" />
+        <span className="sr-only">Settings</span>
+      </Button>
+    </>
+  );
 
   const activeBoard = useMemo(
     () => boards.find(b => b.id === 'prd' || b.id === 'initial-sprint'),

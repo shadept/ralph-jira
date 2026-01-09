@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ZodError } from 'zod';
-import { LocalFilesystemAdapter } from '@/lib/storage/local-filesystem';
+import { createStorage } from '@/lib/storage';
 import { projectRegistry, ProjectNotFoundError } from './registry';
 import type { ProjectMetadata } from './types';
 
@@ -14,7 +14,7 @@ export async function resolveProjectFromRequest(request: Request): Promise<Proje
 
 export async function getProjectStorage(request: Request) {
   const project = await resolveProjectFromRequest(request);
-  const storage = new LocalFilesystemAdapter(project.path);
+  const storage = createStorage(project.path);
   return { project, storage };
 }
 

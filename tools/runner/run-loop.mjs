@@ -50,7 +50,7 @@ function parseCommandString(command) {
 /**
  * Signal used to stop the loop when cancellation is detected.
  */
-class CancellationSignal extends Error { }
+export class CancellationSignal extends Error { }
 
 /**
  * Reads a JSON file and parses its content.
@@ -221,7 +221,7 @@ class RunLoop {
 
   /**
    * Persists a patch to the run state.
-   * @param {Partial<object>} patch
+   * @param {Partial<RunRecord>} patch
    * @returns {Promise<void>}
    */
   async updateRun(patch) {
@@ -912,6 +912,17 @@ class RunLoop {
   }
 
   /**
+   * Checks for cancellation and throws if detected.
+   * @throws {CancellationSignal}
+   * @returns {Promise<void>}
+   */
+  async checkCancellationSignal() {
+    if (await this.verifyCancellation()) {
+      throw new CancellationSignal('Run canceled by user');
+    }
+  }
+
+  /**
    * Invokes the agent for a single iteration.
    * @param {number} iteration
    * @returns {Promise<{output: string, exitCode: number}>}
@@ -921,12 +932,35 @@ class RunLoop {
       throw new Error('Agent not initialized');
     }
 
+    /**
+     * Adds or updates a command record in the run's command list.
+     * @param {object} commandRecord - The command record to add or update
+     * @returns {Promise<void>}
+     */
+    const addCommand = async (commandRecord) => {
+      if (!Array.isArray(this.run.commands)) {
+        this.run.commands = [];
+      }
+      if (!this.run.commands.includes(commandRecord)) {
+        this.run.commands.push(commandRecord);
+      }
+      const cmdString = [commandRecord.command, ...(commandRecord.args || [])].join(' ');
+      await this.updateRun({
+        commands: this.run.commands,
+        lastCommand: cmdString,
+        lastCommandExitCode: commandRecord.exitCode,
+      });
+    };
+
     const { output, exitCode } = await this.agent.run({
       iteration,
       sandboxDir: this.sandboxDir,
       runCommand: this.runCommand.bind(this),
+      addCommand,
       appendSandboxLog: this.appendSandboxLog.bind(this),
       flushSandboxLog: this.flushSandboxLog.bind(this),
+      updateRun: this.updateRun.bind(this),
+      checkCancellation: this.checkCancellationSignal.bind(this),
     });
 
     if (!output) {
@@ -1072,8 +1106,6 @@ class RunLoop {
 
     for (let iteration = 1; iteration <= this.run.maxIterations; iteration += 1) {
       if (await this.verifyCancellation()) {
-        this.reason = 'canceled';
-        this.status = 'canceled';
         break;
       }
 
@@ -1083,7 +1115,20 @@ class RunLoop {
         lastMessage: `Iteration ${iteration}: running ${this.agentName}`,
       });
 
-      const { output, exitCode } = await this.runAgentIteration(iteration);
+      let result;
+      try {
+        result = await this.runAgentIteration(iteration);
+      } catch (error) {
+        if (error instanceof CancellationSignal) {
+          this.status = 'canceled';
+          this.reason = 'canceled';
+          await this.appendSandboxLog('Run canceled during agent execution.');
+          break;
+        }
+        throw error;
+      }
+
+      const { output, exitCode } = result;
 
       if (exitCode !== 0) {
         if (exitCode === 2) {

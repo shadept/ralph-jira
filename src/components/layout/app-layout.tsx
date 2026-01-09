@@ -1,10 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
-import Link from 'next/link';
-import { GearSix } from '@phosphor-icons/react';
 import { ProjectSwitcher } from '@/components/projects/project-switcher';
-import { Button } from '@/components/ui/button';
 import { BackButton } from './back-button';
 import { UserMenu } from './user-menu';
 
@@ -46,12 +43,6 @@ export function AppLayout({ title, description, actions, children, fluid = false
           </div>
           <div className="flex items-center gap-2 self-stretch md:self-auto">
             <ProjectSwitcher />
-            <Button variant="ghost" size="icon" asChild>
-              <Link href="/settings">
-                <GearSix className="h-5 w-5" />
-                <span className="sr-only">Settings</span>
-              </Link>
-            </Button>
             <UserMenu />
           </div>
         </div>
