@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
-import { existsSync, promises as fs } from 'node:fs';
+import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 import { createAgent } from './agents.mjs';
 import { initBackendClient, getBackendClient } from './backend-client.mjs';
+import { WorkspaceManager } from './workspace-manager.mjs';
 
-
-const PENDING_STATUSES = new Set(['todo', 'in_progress']);
 const MAX_LOG_SNIPPET = 1200;
 const DEFAULT_SETUP = Object.freeze([]);
 const DEFAULT_AGENT_NAME = 'claude';
@@ -24,30 +23,6 @@ function normalizeStringArray(value) {
 }
 
 /**
- * Parses a command string into an array of arguments, respecting double quotes.
- * @param {string} command 
- * @returns {string[]}
- */
-function parseCommandString(command) {
-  const parts = [];
-  let current = '';
-  let inQuotes = false;
-  for (let i = 0; i < command.length; i++) {
-    const char = command[i];
-    if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === ' ' && !inQuotes) {
-      if (current) parts.push(current);
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  if (current) parts.push(current);
-  return parts;
-}
-
-/**
  * Signal used to stop the loop when cancellation is detected.
  */
 export class CancellationSignal extends Error { }
@@ -60,32 +35,6 @@ export class CancellationSignal extends Error { }
 async function readJson(filePath) {
   const buffer = await fs.readFile(filePath, 'utf-8');
   return JSON.parse(buffer);
-}
-
-/**
- * Writes a payload to a JSON file atomically using a temp file.
- * @param {string} filePath
- * @param {any} payload
- * @returns {Promise<void>}
- */
-async function writeJson(filePath, payload) {
-  const tmp = `${filePath}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(payload, null, 2), 'utf-8');
-  await fs.rename(tmp, filePath);
-}
-
-/**
- * Checks if a file exists at the given path.
- * @param {string} filePath
- * @returns {Promise<boolean>}
- */
-async function fileExists(filePath) {
-  try {
-    await fs.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 /**
@@ -145,7 +94,7 @@ function parseAgentExtraArgs() {
 
 /**
  * Manages the execution loop for an autonomous coding agent.
- * Handles setup, worktree management, iterations, and cleanup.
+ * Handles iterations and delegates workspace management to WorkspaceManager.
  */
 class RunLoop {
   /**
@@ -166,13 +115,10 @@ class RunLoop {
     this.cancelFlagPath = null;
     this.settings = null;
     this.setupCommands = DEFAULT_SETUP;
-    this.worktreeAdded = false;
-    this.worktreeBranch = null;
-    this.passed = 0;
-    this.failed = 0;
     this.reason = 'completed';
     this.status = 'completed';
     this.agent = null;
+    this.workspace = null; // WorkspaceManager instance
     const envAgentName = process.env.RUN_LOOP_AGENT || DEFAULT_AGENT_NAME;
     this.agentName = envAgentName.toLowerCase();
     this.agentBin = process.env.RUN_LOOP_AGENT_BIN || this.agentName;
@@ -182,7 +128,7 @@ class RunLoop {
       'RUN_LOOP_AGENT_EXTRA_ARGS',
     );
     this.agentExtraArgs = parseAgentExtraArgs();
-    this.claudePermissionMode = process.env.RUN_LOOP_CLAUDE_PERMISSION_MODE || 'acceptEdits';
+    this.claudePermissionMode = process.env.RUN_LOOP_CLAUDE_PERMISSION_MODE || 'bypassPermissions';
     this.updateQueue = Promise.resolve();
     this.logBuffer = '';
     this.sandboxReady = false;
@@ -197,6 +143,7 @@ class RunLoop {
     this.run = await this.backend.readRun(this.runId);
     this.sandboxDir = path.join(this.projectPath, this.run.sandboxPath);
     this.sandboxBoardPath = path.join(this.sandboxDir, 'plans', 'prd.json');
+    this.sandboxSettingsPath = path.join(this.sandboxDir, 'plans', 'settings.json');
     this.rootBoardPath = path.join(this.projectPath, this.run.boardSourcePath);
     this.sandboxLogPath = path.join(
       this.projectPath,
@@ -211,12 +158,28 @@ class RunLoop {
       typeof this.run.sandboxBranch === 'string' && this.run.sandboxBranch.trim().length
         ? this.run.sandboxBranch.trim()
         : `run-${this.runId}`;
-    this.worktreeBranch = configuredBranch;
     if (this.run.sandboxBranch !== configuredBranch) {
       await this.updateRun({ sandboxBranch: configuredBranch });
     }
     this.settings = await this.backend.readSettings();
     this.applyAutomationSettings();
+
+    // Create WorkspaceManager instance
+    this.workspace = new WorkspaceManager({
+      runId: this.runId,
+      projectPath: this.projectPath,
+      sandboxDir: this.sandboxDir,
+      sandboxBoardPath: this.sandboxBoardPath,
+      sandboxLogPath: this.sandboxLogPath,
+      sandboxSettingsPath: this.sandboxSettingsPath,
+      runCommand: this.runCommand.bind(this),
+      appendLog: this.appendSandboxLog.bind(this),
+      markSandboxReady: this.markSandboxReady.bind(this),
+      backend: this.backend,
+      settings: this.settings,
+      agentName: this.agentName,
+    });
+    this.workspace.setBranchName(configuredBranch);
   }
 
   /**
@@ -307,384 +270,6 @@ class RunLoop {
   }
 
   /**
-   * Ensures the parent directory for the sandbox exists.
-   * @returns {Promise<void>}
-   */
-  async ensureSandboxParent() {
-    await fs.mkdir(path.dirname(this.sandboxDir), { recursive: true });
-  }
-
-  /**
-   * Gets the branch name intended for the worktree.
-   * @returns {string}
-   */
-  getEffectiveBranchName() {
-    if (this.worktreeBranch?.trim().length) {
-      return this.worktreeBranch.trim();
-    }
-    if (this.run?.sandboxBranch?.trim().length) {
-      return this.run.sandboxBranch.trim();
-    }
-    return `run-${this.runId}`;
-  }
-
-  /**
-   * Checks if a git branch exists.
-   * @param {string} branchName
-   * @returns {Promise<boolean>}
-   */
-  async branchExists(branchName) {
-    const result = await this.runCommand('git', ['rev-parse', '--verify', branchName], this.projectPath);
-    return result.code === 0;
-  }
-
-  /**
-   * Creates a git worktree for the sandbox.
-   * @returns {Promise<void>}
-   */
-  async checkoutWorkspace() {
-    await this.ensureSandboxParent();
-    await this.removeWorktree({ silent: true });
-    const branchName = this.getEffectiveBranchName();
-    this.worktreeBranch = branchName;
-    const branchExists = await this.branchExists(branchName);
-    const args = branchExists
-      ? ['worktree', 'add', '--force', this.sandboxDir, branchName]
-      : ['worktree', 'add', '--force', '-b', branchName, this.sandboxDir];
-    const result = await this.runCommand('git', args, this.projectPath);
-    if (result.code !== 0) {
-      const snippet = limitOutput(result.stderr || result.stdout || '');
-      throw new Error(`git worktree add failed (code ${result.code}). ${snippet}`.trim());
-    }
-    if (!this.run?.sandboxBranch || this.run.sandboxBranch !== branchName) {
-      await this.updateRun({ sandboxBranch: branchName });
-    }
-    this.worktreeAdded = true;
-  }
-
-  /**
-   * Removes the git worktree and deletes the sandbox directory.
-   * @param {object} [options]
-   * @param {boolean} [options.silent] - If true, suppressed error logging.
-   * @returns {Promise<void>}
-   */
-  async removeWorktree(options = {}) {
-    const { silent = false } = options;
-    try {
-      const result = await this.runCommand(
-        'git',
-        ['worktree', 'remove', '--force', this.sandboxDir],
-        this.projectPath,
-      );
-      if (result.code !== 0 && !silent) {
-        const snippet = limitOutput(result.stderr || result.stdout || '');
-        console.warn(`git worktree remove failed (code ${result.code}). ${snippet}`.trim());
-      }
-    } catch (error) {
-      if (!silent) {
-        console.warn('Unable to execute git worktree remove', error);
-      }
-    }
-
-    this.worktreeAdded = false;
-    try {
-      await fs.rm(this.sandboxDir, { recursive: true, force: true });
-    } catch (error) {
-      if (!silent && error.code !== 'ENOENT') {
-        console.warn('Unable to delete sandbox directory', error);
-      }
-    }
-
-    // Keep the branch around for review/merge; just clear local reference
-    this.worktreeBranch = null;
-  }
-
-  /**
-   * Executes sandbox cleanup if it is safe.
-   * @returns {Promise<void>}
-   */
-  async cleanupSandbox() {
-    if (!this.worktreeAdded && !(await fileExists(this.sandboxDir))) {
-      return;
-    }
-    const safeToDelete = await this.ensureWorktreeSafeToDelete();
-    if (!safeToDelete) {
-      const branchName = this.getEffectiveBranchName();
-      await this.appendSandboxLog(
-        `Skipping sandbox cleanup for branch ${branchName} due to uncommitted or unpushed work. Push commits to origin before rerunning cleanup.`,
-      );
-      return;
-    }
-    await this.removeWorktree({ silent: false });
-  }
-
-  /**
-   * Verifies if the worktree has no uncommitted changes and no unpushed commits.
-   * @returns {Promise<boolean>}
-   */
-  async ensureWorktreeSafeToDelete() {
-    if (!this.worktreeAdded) {
-      return true;
-    }
-
-    const branchName = this.getEffectiveBranchName();
-    if (!branchName) {
-      return true;
-    }
-
-    const statusResult = await this.runCommand('git', ['status', '--porcelain'], this.sandboxDir);
-    if (statusResult.code !== 0) {
-      console.warn('Unable to inspect sandbox status before cleanup');
-      return false;
-    }
-    if (statusResult.stdout.trim().length > 0) {
-      console.warn('Sandbox has uncommitted changes; leaving worktree in place.');
-      return false;
-    }
-
-    const remoteCheck = await this.runCommand('git', ['ls-remote', '--heads', 'origin', branchName], this.projectPath);
-    if (remoteCheck.code !== 0 || !remoteCheck.stdout.trim()) {
-      // Branch not on origin; keep local branch but safe to remove worktree if clean
-      return true;
-    }
-
-    const fetchResult = await this.runCommand('git', ['fetch', 'origin', branchName], this.projectPath);
-    if (fetchResult.code !== 0) {
-      console.warn(`Unable to fetch origin/${branchName}. Leaving worktree for safety.`);
-      return false;
-    }
-
-    const aheadResult = await this.runCommand(
-      'git',
-      ['rev-list', '--count', `origin/${branchName}..${branchName}`],
-      this.projectPath,
-    );
-    if (aheadResult.code !== 0) {
-      console.warn('Unable to determine push status for sandbox branch.');
-      return false;
-    }
-    const ahead = parseInt(aheadResult.stdout.trim(), 10);
-    if (Number.isNaN(ahead)) {
-      console.warn('Unexpected response while checking push status.');
-      return false;
-    }
-    if (ahead > 0) {
-      console.warn(`Branch ${branchName} has ${ahead} unpushed commits.`);
-      return false;
-    }
-
-    return true;
-  }
-
-  /**
-   * Checks if the worktree branch has any commits ahead of main.
-   * @returns {Promise<number>} Number of commits ahead of main
-   */
-  async getCommitCount() {
-    const branchName = this.getEffectiveBranchName();
-    if (!branchName) return 0;
-
-    const result = await this.runCommand(
-      'git',
-      ['rev-list', '--count', `main..${branchName}`],
-      this.sandboxDir,
-    );
-    if (result.code !== 0) {
-      console.warn('Unable to determine commit count for branch');
-      return -1;
-    }
-    const count = parseInt(result.stdout.trim(), 10);
-    return Number.isNaN(count) ? -1 : count;
-  }
-
-  /**
-   * Pushes the worktree branch to origin.
-   * @returns {Promise<boolean>} True if push succeeded
-   */
-  async pushBranch() {
-    const branchName = this.getEffectiveBranchName();
-    if (!branchName) return false;
-
-    await this.appendSandboxLog(`Pushing branch ${branchName} to origin...`);
-    const result = await this.runCommand(
-      'git',
-      ['push', '-u', 'origin', branchName],
-      this.sandboxDir,
-    );
-    if (result.code !== 0) {
-      const snippet = limitOutput(result.stderr || result.stdout || '');
-      await this.appendSandboxLog(`Failed to push branch: ${snippet}`);
-      return false;
-    }
-    await this.appendSandboxLog(`Successfully pushed branch ${branchName} to origin`);
-    return true;
-  }
-
-  /**
-   * Creates a pull request for the worktree branch using GitHub CLI.
-   * @returns {Promise<string|null>} PR URL if created, null otherwise
-   */
-  async createPullRequest() {
-    const branchName = this.getEffectiveBranchName();
-    if (!branchName) return null;
-
-    // Check if gh CLI is available
-    try {
-      const ghCheck = await this.runCommand('gh', ['--version'], this.sandboxDir);
-      if (ghCheck.code !== 0) {
-        await this.appendSandboxLog('GitHub CLI (gh) not available (exit code != 0). Skipping PR creation.');
-        return null;
-      }
-
-      // Check if authenticated
-      const authCheck = await this.runCommand('gh', ['auth', 'status'], this.sandboxDir);
-      if (authCheck.code !== 0) {
-        await this.appendSandboxLog('GitHub CLI not authenticated. Skipping PR creation.');
-        return null;
-      }
-    } catch (err) {
-      await this.appendSandboxLog(`GitHub CLI check failed: ${err.message}. Skipping PR creation.`);
-      return null;
-    }
-
-    // Get board name for PR title
-    const board = await readJson(this.sandboxBoardPath).catch(() => null);
-    const boardName = board?.name || 'AI Loop Run';
-    const title = `[AI Loop] ${boardName}`;
-    const body = [
-      `## Summary`,
-      `Automated PR from AI loop run \`${this.runId}\``,
-      ``,
-      `**Branch:** ${branchName}`,
-      `**Agent:** ${this.agentName}`,
-      `**Passed:** ${this.passed}`,
-      `**Failed:** ${this.failed}`,
-      ``,
-      `---`,
-      `🤖 Generated by ralph-jira AI loop`,
-    ].join('\n');
-
-    await this.appendSandboxLog(`Creating pull request for branch ${branchName}...`);
-    try {
-      const result = await this.runCommand(
-        'gh',
-        ['pr', 'create', '--title', title, '--body', body, '--base', 'main', '--head', branchName],
-        this.sandboxDir,
-      );
-
-      if (result.code !== 0) {
-        // Check if PR already exists
-        if (result.stderr?.includes('already exists') || result.stdout?.includes('already exists')) {
-          await this.appendSandboxLog('Pull request already exists for this branch');
-          // Try to get existing PR URL
-          const viewResult = await this.runCommand(
-            'gh',
-            ['pr', 'view', branchName, '--json', 'url', '-q', '.url'],
-            this.sandboxDir,
-          );
-          if (viewResult.code === 0 && viewResult.stdout.trim()) {
-            return viewResult.stdout.trim();
-          }
-          return null;
-        }
-        const snippet = limitOutput(result.stderr || result.stdout || '');
-        await this.appendSandboxLog(`Failed to create PR: ${snippet}`);
-        return null;
-      }
-
-      const prUrl = result.stdout.trim();
-      await this.appendSandboxLog(`Created pull request: ${prUrl}`);
-      return prUrl;
-    } catch (err) {
-      await this.appendSandboxLog(`Unable to create PR: ${err.message}`);
-      return null;
-    }
-  }
-
-  /**
-   * Deletes the local worktree branch.
-   * @returns {Promise<boolean>} True if deletion succeeded
-   */
-  async deleteLocalBranch() {
-    const branchName = this.getEffectiveBranchName();
-    if (!branchName) return false;
-
-    const result = await this.runCommand(
-      'git',
-      ['branch', '-D', branchName],
-      this.projectPath,
-    );
-    if (result.code !== 0) {
-      const snippet = limitOutput(result.stderr || result.stdout || '');
-      await this.appendSandboxLog(`Failed to delete local branch: ${snippet}`);
-      return false;
-    }
-    await this.appendSandboxLog(`Deleted local branch ${branchName}`);
-    return true;
-  }
-
-  /**
-   * Deletes the remote worktree branch.
-   * @returns {Promise<boolean>} True if deletion succeeded
-   */
-  async deleteRemoteBranch() {
-    const branchName = this.getEffectiveBranchName();
-    if (!branchName) return false;
-
-    const result = await this.runCommand(
-      'git',
-      ['push', 'origin', '--delete', branchName],
-      this.projectPath,
-    );
-    if (result.code !== 0) {
-      // Branch might not exist on remote - that's ok
-      return false;
-    }
-    await this.appendSandboxLog(`Deleted remote branch origin/${branchName}`);
-    return true;
-  }
-
-  /**
-   * Prepares the sandbox plan by filtering the PRD tasks and copying settings.
-   * @returns {Promise<void>}
-   */
-  async prepareSandboxPlan() {
-    if (!(await fileExists(this.sandboxBoardPath))) {
-      const boardId = this.run.boardId || 'prd';
-      const board = await this.backend.readBoard(boardId);
-      const filteredTasks = board.tasks.filter(task => PENDING_STATUSES.has(task.status));
-      const sandboxBoard = { ...board, tasks: filteredTasks };
-      await fs.mkdir(path.dirname(this.sandboxBoardPath), { recursive: true });
-      await writeJson(this.sandboxBoardPath, sandboxBoard);
-    }
-
-    this.sandboxSettingsPath = path.join(this.sandboxDir, 'plans', 'settings.json');
-    if (!(await fileExists(this.sandboxSettingsPath))) {
-      await fs.mkdir(path.dirname(this.sandboxSettingsPath), { recursive: true });
-      // Write settings from memory (already loaded via backend) to sandbox
-      await writeJson(this.sandboxSettingsPath, this.settings);
-    }
-
-    if (!(await fileExists(this.sandboxLogPath))) {
-      await fs.writeFile(this.sandboxLogPath, `# Run ${this.runId} progress\n`, 'utf-8');
-    } else {
-      await fs.appendFile(this.sandboxLogPath, `\n# Run ${this.runId} resumed\n`, 'utf-8');
-    }
-
-    // Sandbox log is now ready - flush any buffered early logs
-    await this.markSandboxReady();
-
-    // Decouple PRD, settings, and logs from git tracking in the sandbox to avoid conflicts
-    await this.runCommand('git', ['update-index', '--skip-worktree', 'plans/prd.json'], this.sandboxDir);
-    await this.runCommand('git', ['update-index', '--skip-worktree', 'plans/settings.json'], this.sandboxDir);
-
-    // Also skip-worktree for progress.txt if it exists in the sandbox
-    await this.runCommand('git', ['update-index', '--skip-worktree', 'progress.txt'], this.sandboxDir);
-
-    await this.loadSettingsFrom(this.sandboxSettingsPath);
-  }
-
-  /**
    * Loads global or sandbox settings from a file.
    * @param {string} filePath
    * @returns {Promise<void>}
@@ -692,6 +277,9 @@ class RunLoop {
   async loadSettingsFrom(filePath) {
     this.settings = await readJson(filePath);
     this.applyAutomationSettings();
+    if (this.workspace) {
+      this.workspace.setSettings(this.settings);
+    }
   }
 
   /**
@@ -733,7 +321,7 @@ class RunLoop {
         : undefined;
 
     this.claudePermissionMode =
-      envPermission || normalizedPermission || this.claudePermissionMode || 'acceptEdits';
+      envPermission || normalizedPermission || this.claudePermissionMode || 'bypassPermissions';
 
     this.agent = createAgent(this.agentName, {
       bin: this.agentBin,
@@ -742,14 +330,6 @@ class RunLoop {
       permissionMode: this.claudePermissionMode,
       codingStyle: (this.settings?.automation?.codingStyle || '').trim(),
     });
-  }
-
-  /**
-   * Returns a copy of the setup commands.
-   * @returns {string[]}
-   */
-  getSetupCommands() {
-    return Array.isArray(this.setupCommands) ? [...this.setupCommands] : [];
   }
 
   /**
@@ -969,33 +549,6 @@ class RunLoop {
     return { output, exitCode };
   }
 
-  /**
-   * Runs the configured setup commands in the sandbox.
-   * @returns {Promise<void>}
-   */
-  async runSetup() {
-    const commands = this.getSetupCommands();
-    if (!commands.length) {
-      await this.appendSandboxLog('No setup commands configured. Skipping setup step.');
-      return;
-    }
-    for (const command of commands) {
-      await this.appendSandboxLog(`Running setup command: ${command}`);
-
-      const parts = parseCommandString(command);
-      const [cmd, ...args] = parts;
-      if (!cmd) continue;
-
-      const result = await this.runCommand(cmd, args, this.sandboxDir, { shell: true, timeout: 120000 });
-      await this.appendSandboxLog(limitOutput(result.stdout || result.stderr));
-      if (await this.verifyCancellation()) {
-        throw new CancellationSignal('Cancellation during setup');
-      }
-      if (result.code !== 0) {
-        throw new Error(`Setup command failed: ${command}`);
-      }
-    }
-  }
 
   /**
    * Synchronizes changes from the sandbox PRD back to the root PRD.
@@ -1043,28 +596,6 @@ class RunLoop {
     await this.backend.writeBoard(rootBoard);
   }
 
-  /**
-   * Copies sandbox logs to the persisted run log location.
-   * @returns {Promise<void>}
-   */
-  async copyLogs() {
-    await fs.mkdir(path.dirname(this.persistedLogPath), { recursive: true });
-    await fs.copyFile(this.sandboxLogPath, this.persistedLogPath);
-  }
-
-  /**
-   * Updates internal stats based on the final state of the sandbox board.
-   * @returns {Promise<void>}
-   */
-  async captureSandboxStats() {
-    try {
-      const board = await readJson(this.sandboxBoardPath);
-      this.passed = board.tasks.filter(task => task.passes === true).length;
-      this.failed = board.tasks.filter(task => task.passes !== true).length;
-    } catch (error) {
-      console.warn('Unable to compute sandbox stats', error.message || error);
-    }
-  }
 
   /**
    * The main iteration loop.
@@ -1073,18 +604,25 @@ class RunLoop {
   async runLoop() {
     this.status = 'running';
     this.reason = 'completed';
-    this.passed = 0;
-    this.failed = 0;
     await this.updateRun({
       status: 'running',
       startedAt: new Date().toISOString(),
       lastMessage: 'Preparing sandbox…',
     });
 
-    await this.checkoutWorkspace();
-    await this.prepareSandboxPlan();
-    const sandboxBoard = await readJson(this.sandboxBoardPath);
-    if (!sandboxBoard.tasks.length) {
+    // Checkout workspace and prepare sandbox plan via WorkspaceManager
+    const branchName = await this.workspace.checkoutWorkspace();
+    if (branchName && this.run.sandboxBranch !== branchName) {
+      await this.updateRun({ sandboxBranch: branchName });
+    }
+    const boardId = this.run.boardId || 'prd';
+    await this.workspace.prepareSandboxPlan(boardId);
+
+    // Reload settings from sandbox after prepareSandboxPlan
+    await this.loadSettingsFrom(this.sandboxSettingsPath);
+
+    const sandboxBoard = await this.workspace.readSandboxBoard();
+    if (!sandboxBoard?.tasks?.length) {
       this.status = 'completed';
       this.reason = 'completed';
       await this.updateRun({ status: 'completed', lastMessage: 'No todo/in-progress tasks found', currentIteration: 0 });
@@ -1093,9 +631,9 @@ class RunLoop {
     }
 
     try {
-      await this.runSetup();
+      await this.workspace.runSetup(this.setupCommands, this.verifyCancellation.bind(this));
     } catch (error) {
-      if (error instanceof CancellationSignal) {
+      if (error instanceof CancellationSignal || error.message?.includes('Cancellation')) {
         this.status = 'canceled';
         this.reason = 'canceled';
         await this.updateRun({ lastMessage: 'Setup canceled' });
@@ -1161,18 +699,15 @@ class RunLoop {
   /**
    * Performs final cleanup and persists the final run state.
    * Implements the finalize workflow:
-   * 1. Push worktree branch to origin
-   * 2. Create PR (if GitHub)
-   * 3. Sync PRD back to main
-   * 4. Delete worktree on success
-   * 5. Delete branch if no commits
+   * 1. Auto-save any uncommitted changes
+   * 2. Push worktree branch to origin
+   * 3. Create PR (if GitHub)
+   * 4. Sync PRD back to main
+   * 5. Delete worktree if push succeeded, otherwise leave for human review
    * @param {Error} [error] - The error that caused the loop to fail, if any.
    * @returns {Promise<void>}
    */
   async finalize(error) {
-    const branchName = this.getEffectiveBranchName();
-    let prUrl = null;
-
     try {
       await this.syncBackToRoot();
     } catch (syncError) {
@@ -1180,42 +715,16 @@ class RunLoop {
     }
 
     try {
-      await this.copyLogs();
+      await this.workspace.copyLogs(this.persistedLogPath);
     } catch (copyError) {
       console.error('Unable to archive sandbox log', copyError);
     }
 
-    await this.captureSandboxStats();
+    // Capture stats and update workspace
+    const stats = await this.workspace.captureSandboxStats();
 
-    // Check if branch has any commits
-    const commitCount = await this.getCommitCount();
-
-    if (commitCount === 0) {
-      // No commits on branch - delete it without push/PR
-      await this.appendSandboxLog(`Branch ${branchName} has no commits. Cleaning up.`);
-      try {
-        await this.removeWorktree({ silent: false });
-        await this.deleteLocalBranch();
-      } catch (cleanupError) {
-        console.warn('Unable to clean up empty branch', cleanupError);
-      }
-    } else if (commitCount > 0) {
-      // Branch has commits - push and create PR
-      const pushSuccess = await this.pushBranch();
-      if (pushSuccess) {
-        prUrl = await this.createPullRequest();
-      }
-
-      // Cleanup sandbox after successful push
-      try {
-        await this.cleanupSandbox();
-      } catch (cleanupError) {
-        console.warn('Unable to clean up sandbox workspace', cleanupError);
-      }
-    } else {
-      // Error determining commit count - leave worktree for manual review
-      await this.appendSandboxLog(`Could not determine commit status for ${branchName}. Leaving worktree in place.`);
-    }
+    // Run workspace finalization (auto-save, push, PR, cleanup)
+    const { prUrl } = await this.workspace.finalize();
 
     const finishedAt = new Date().toISOString();
     const existingErrors = Array.isArray(this.run.errors) ? this.run.errors : [];
@@ -1241,7 +750,7 @@ class RunLoop {
     const summaryLines = [
       `Run ${this.runId} finished with status ${this.status} (${this.reason}).`,
       `Agent: ${this.agentName}.`,
-      `Passed: ${this.passed}, Failed: ${this.failed}.`,
+      `Passed: ${stats.passed}, Failed: ${stats.failed}.`,
     ];
     if (prUrl) {
       summaryLines.push(`PR: ${prUrl}`);

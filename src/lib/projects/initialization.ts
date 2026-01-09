@@ -69,7 +69,7 @@ export async function initializeProjectStructure(projectPath: string) {
       agent: {
         name: 'claude',
         model: 'opus-4.5',
-        permissionMode: 'acceptEdits',
+        permissionMode: 'bypassPermissions',
         extraArgs: [],
       },
     },

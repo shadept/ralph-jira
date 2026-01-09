@@ -56,7 +56,7 @@ export class ClaudeAgent extends Agent {
      */
     constructor(options) {
         super(options);
-        this.permissionMode = options.permissionMode || 'acceptEdits';
+        this.permissionMode = options.permissionMode || 'bypassPermissions';
     }
 
     /**
@@ -69,7 +69,7 @@ export class ClaudeAgent extends Agent {
             '1. Find the highest-priority feature to work on and work only on that feature.',
             'This should be the one YOU decide has the highest priority - not necessarily the first in the list.',
             '2. Check that the types check via npm typecheck and that the tests pass via npm test.',
-            '3. Update the PRD with the work that was done.',
+            '3. Update the PRD with the work that was done (never mark status as `done`, prefer `review`).',
             '4. Append your process to the progress.txt file.',
             'Use this to leave a note for the next person working in the codebase.',
             '5. make a git commit of the feature.',
@@ -94,20 +94,25 @@ export class ClaudeAgent extends Agent {
 
         await addCommand(commandRecord);
 
-        // Change to sandbox directory since the SDK doesn't support setting workingDirectory
-        const originalCwd = process.cwd();
-        process.chdir(sandboxDir);
-
         let fullContent = '';
         try {
-            for await (const message of query({
-                prompt,
-                options: {
-                    tools: { type: 'preset', preset: 'claude_code' },
-                    permissionMode: this.permissionMode,
-                    model: this.model || undefined,
-                }
-            })) {
+            const options = {
+                tools: { type: 'preset', preset: 'claude_code' },
+                permissionMode: this.permissionMode,
+                model: this.model || undefined,
+                cwd: sandboxDir,
+                // Explicitly allow all tools to avoid permission prompts
+                allowedTools: [
+                    'Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep',
+                    'Task', 'TodoWrite', 'WebFetch', 'WebSearch'
+                ],
+            };
+            // bypassPermissions requires allowDangerouslySkipPermissions flag
+            if (this.permissionMode === 'bypassPermissions') {
+                options.allowDangerouslySkipPermissions = true;
+            }
+
+            for await (const message of query({ prompt, options })) {
                 await checkCancellation();
                 if (message.type === 'assistant' && message.message?.content) {
                     for (const block of message.message.content) {
@@ -118,7 +123,14 @@ export class ClaudeAgent extends Agent {
                             // Cyan for tool names
                             let details = '';
                             if (block.input && typeof block.input === 'object') {
+                                // Filter out verbose params for certain commands
+                                const verboseParams = {
+                                    Edit: ['old_string', 'new_string'],
+                                    Write: ['content'],
+                                };
+                                const skipKeys = verboseParams[block.name] || [];
                                 details = Object.entries(block.input)
+                                    .filter(([k]) => !skipKeys.includes(k))
                                     .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
                                     .join(' ');
                             }
@@ -138,7 +150,6 @@ export class ClaudeAgent extends Agent {
             if (error.name === 'CancellationSignal' || error.message?.includes('Run canceled by user')) {
                 commandRecord.exitCode = -1;
                 commandRecord.finishedAt = new Date().toISOString();
-                process.chdir(originalCwd);
                 throw error;
             }
             const usageLimitRegex = /usage limit|Rate Exceeded|Too Many Requests|429|out of extra usage|resets \d+(am|pm)/i;
@@ -150,7 +161,6 @@ export class ClaudeAgent extends Agent {
             commandRecord.exitCode = exitCode;
             commandRecord.finishedAt = new Date().toISOString();
             await addCommand(commandRecord);
-            process.chdir(originalCwd);
             return { output: fullContent, exitCode };
         }
 
@@ -158,7 +168,6 @@ export class ClaudeAgent extends Agent {
         commandRecord.exitCode = 0;
         commandRecord.finishedAt = new Date().toISOString();
         await addCommand(commandRecord);
-        process.chdir(originalCwd);
         return { output: fullContent, exitCode: 0 };
     }
 }

@@ -373,11 +373,11 @@
       ],
       "passes": false,
       "id": "task-1767964868538",
-      "status": "todo",
+      "status": "in_progress",
       "priority": "medium",
       "estimate": 5,
       "createdAt": "2026-01-09T13:21:08.538Z",
-      "updatedAt": "2026-01-09T16:52:22.154Z",
+      "updatedAt": "2026-01-09T20:30:00.000Z",
       "tags": [
         "data-management"
       ],
@@ -385,14 +385,15 @@
         "src/lib/storage/sqlite-adapter.ts",
         "src/lib/storage/migrate-to-sqlite.ts",
         "src/lib/storage/index.ts",
-        "src/lib/projects/server.ts",
-        "package.json"
+        "prisma/schema.prisma",
+        "package.json",
+        ".env.example"
       ],
-      "lastRun": "2026-01-09T17:30:00.000Z"
+      "lastRun": "2026-01-09T20:30:00.000Z"
     }
   ],
   "createdAt": "2026-01-07T00:00:00.000Z",
-  "updatedAt": "2026-01-09T16:52:22.170Z",
+  "updatedAt": "2026-01-09T20:25:51.546Z",
   "metrics": {
     "velocity": 0,
     "completed": 15,

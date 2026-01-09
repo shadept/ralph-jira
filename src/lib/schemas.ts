@@ -64,7 +64,7 @@ export const CLAUDE_PERMISSION_MODES = [
   'plan',
 ] as const;
 export const DEFAULT_CLAUDE_MODEL = CLAUDE_MODELS[0];
-export const DEFAULT_CLAUDE_PERMISSION_MODE = 'acceptEdits';
+export const DEFAULT_CLAUDE_PERMISSION_MODE = 'bypassPermissions';
 
 const AgentAutomationSchema = z.object({
   name: z.enum(['claude', 'opencode']).default('claude'),

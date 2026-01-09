@@ -52,7 +52,7 @@
     "agent": {
       "name": "claude",
       "model": "opus",
-      "permissionMode": "acceptEdits",
+      "permissionMode": "bypassPermissions",
       "extraArgs": []
     },
     "codingStyle": "Clean, typed TypeScript with functional patterns. Use async/await. Prefer composition over inheritance. Keep functions small and focused."

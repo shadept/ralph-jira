@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useCallback, useEffect, useState } from 'react';
+import { use, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
@@ -53,6 +53,7 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
   const [logLines, setLogLines] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const logEndRef = useRef<HTMLDivElement>(null);
 
   const loadRun = useCallback(async () => {
     if (!currentProject) {
@@ -79,6 +80,20 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
   useEffect(() => {
     loadRun();
   }, [loadRun]);
+
+  // Auto-refresh when run is active
+  useEffect(() => {
+    if (!run || !['running', 'queued'].includes(run.status)) return;
+    const interval = setInterval(loadRun, 5000);
+    return () => clearInterval(interval);
+  }, [run?.status, loadRun]);
+
+  // Scroll log to bottom after data loads
+  useEffect(() => {
+    if (logLines.length > 0 && logEndRef.current) {
+      logEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [logLines]);
 
   const handleCancel = async () => {
     if (!run) return;
@@ -289,7 +304,10 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
           <CardContent>
             <ScrollArea className="h-96 rounded-md border bg-muted/30 p-4">
               {logLines.length ? (
-                <AnsiLog content={logLines} className="text-xs" />
+                <>
+                  <AnsiLog content={logLines} className="text-xs" />
+                  <div ref={logEndRef} />
+                </>
               ) : (
                 <p className="text-sm text-muted-foreground">No log output recorded.</p>
               )}
