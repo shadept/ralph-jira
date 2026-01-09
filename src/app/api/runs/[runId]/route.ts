@@ -3,7 +3,8 @@ import path from 'node:path';
 import { NextResponse } from 'next/server';
 
 import { getProjectStorage, handleProjectRouteError } from '@/lib/projects/server';
-import { readRun, tailLog } from '@/lib/runs/store';
+import { readRun, writeRun, tailLog } from '@/lib/runs/store';
+import { RunRecordSchema } from '@/lib/schemas';
 
 export async function GET(
   request: Request,
@@ -32,6 +33,27 @@ export async function GET(
     return NextResponse.json({ run, log: logLines });
   } catch (error) {
     console.error('Failed to fetch run details', error);
+    return handleProjectRouteError(error);
+  }
+}
+
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ runId: string }> }
+) {
+  try {
+    const { runId } = await params;
+    const { project } = await getProjectStorage(request);
+    const body = await request.json();
+
+    // Validate the run record
+    const run = RunRecordSchema.parse({ ...body, runId });
+
+    await writeRun(project.path, run);
+
+    return NextResponse.json({ run });
+  } catch (error) {
+    console.error('Failed to update run', error);
     return handleProjectRouteError(error);
   }
 }

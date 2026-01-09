@@ -150,7 +150,7 @@ export function createInitialRunRecord(params: {
     currentIteration: 0,
     selectedTaskIds: params.selectedTaskIds,
     lastTaskId: undefined,
-    lastMessage: 'Preparing sandbox…',
+    lastMessage: undefined,
     lastCommand: undefined,
     lastCommandExitCode: undefined,
     errors: [],
@@ -168,4 +168,27 @@ export async function upsertRun(projectPath: string, run: RunRecord, patch: Part
   const updated: RunRecord = { ...run, ...patch };
   await writeRun(projectPath, updated);
   return updated;
+}
+
+export function resolveRunnerCommand(params: {
+  mode: 'local' | 'docker';
+  projectPath: string;
+  runId: string;
+}) {
+  const scriptArgs = ['tools/runner/run-loop.mjs', '--runId', params.runId];
+  if (params.mode === 'local') {
+    scriptArgs.push('--projectPath', params.projectPath);
+    return {
+      command: 'node',
+      args: scriptArgs,
+      cwd: params.projectPath,
+    } as const;
+  }
+
+  scriptArgs.push('--projectPath', '/workspace');
+  return {
+    command: 'docker',
+    args: ['compose', 'run', '--rm', 'runner', 'node', ...scriptArgs],
+    cwd: params.projectPath,
+  } as const;
 }

@@ -183,7 +183,7 @@ export function withAutomationDefaults(settings: ProjectSettings): ProjectSettin
 }
 
 export const RunStatusSchema = z.enum(['queued', 'running', 'stopped', 'completed', 'failed', 'canceled']);
-export const RunReasonSchema = z.enum(['completed', 'max_iterations', 'canceled', 'error']);
+export const RunReasonSchema = z.enum(['completed', 'max_iterations', 'canceled', 'error', 'usage_limit']);
 
 export const CommandRecordSchema = z.object({
   command: z.string(),

@@ -1,5 +1,4 @@
-import path from 'node:path';
-import { existsSync } from 'node:fs';
+import { query } from '@anthropic-ai/claude-agent-sdk';
 
 /**
  * @typedef {Object} AgentOptions
@@ -15,7 +14,8 @@ import { existsSync } from 'node:fs';
  * @typedef {Object} RunContext
  * @property {string} sandboxDir - The directory where the agent should run.
  * @property {(command: string, args: string[], cwd: string, options?: object) => Promise<{stdout: string, stderr: string, code: number}>} runCommand - Function to execute shell commands.
- * @property {(lines: string | string[]) => Promise<void>} appendSandboxLog - Function to append to the iteration log.
+ * @property {(text: string) => Promise<void>} appendSandboxLog - Function to append to the iteration log.
+ * @property {() => Promise<void>} flushSandboxLog - Function to flush remaining log buffer.
  * @property {number} iteration - The current iteration number.
  */
 
@@ -60,7 +60,7 @@ export class ClaudeAgent extends Agent {
      * @param {RunContext} context
      * @returns {Promise<{ output: string, exitCode: number }>}
      */
-    async run({ sandboxDir, runCommand, appendSandboxLog, iteration }) {
+    async run({ sandboxDir, appendSandboxLog, flushSandboxLog, iteration }) {
         const promptLines = [
             '@plans/prd.json @progress.txt',
             '1. Find the highest-priority feature to work on and work only on that feature.',
@@ -74,82 +74,56 @@ export class ClaudeAgent extends Agent {
             'If, while implementing the feature, you notice the PRD is complete, output <promise>COMPLETE</promise>'
         ];
 
-        let finalPrompt = promptLines.join('\n');
-
+        let prompt = promptLines.join('\n');
         if (this.codingStyle) {
-            finalPrompt += `\n\n<coding-style>\n${this.codingStyle}\n</coding-style>`;
+            prompt += `\n\n<coding-style>\n${this.codingStyle}\n</coding-style>`;
         }
 
-        const args = [...this.extraArgs];
+        await appendSandboxLog(`\n[${new Date().toISOString()}] Starting claude iteration ${iteration}\n`);
 
-        if (!args.includes('--model') && this.model) {
-            args.push('--model', this.model);
-        }
-
-        args.push(
-            '--permission-mode', this.permissionMode,
-            '--verbose',
-            '--output-format', 'stream-json',
-            '--include-partial-messages',
-            '--print',
-            finalPrompt
-        );
-
-        const describeInvocation = () => {
-            const displayArgs = args.map(a => a === finalPrompt ? '[prompt omitted]' : a);
-            return `${this.bin} ${displayArgs.join(' ')}`.trim();
-        };
-
-        await appendSandboxLog([
-            `Running claude (iteration ${iteration})`,
-            `Command: ${describeInvocation()}`,
-        ]);
-
-        let bin = this.bin;
-        if (process.platform === 'win32' && bin === 'claude') {
-            const userProfile = process.env.USERPROFILE || '';
-            const possibleLocalBin = path.join(userProfile, '.local', 'bin', 'claude.exe');
-            if (existsSync(possibleLocalBin)) {
-                bin = possibleLocalBin;
-            }
-        }
-
-        let stdoutBuffer = '';
         let fullContent = '';
-
-        const onStdout = (chunk) => {
-            stdoutBuffer += chunk.toString('utf-8');
-            const lines = stdoutBuffer.split('\n');
-            stdoutBuffer = lines.pop(); // Keep partial line
-
-            for (const line of lines) {
-                if (!line.trim()) continue;
-                try {
-                    const data = JSON.parse(line);
-                    if (data.type === 'text' && data.text) {
-                        appendSandboxLog(data.text).catch(() => { });
-                        fullContent += data.text;
-                    } else if (data.type === 'progress' && data.message) {
-                        appendSandboxLog(`[Progress] ${data.message}`).catch(() => { });
-                    } else if (data.type === 'error' && data.message) {
-                        appendSandboxLog(`[Error] ${data.message}`).catch(() => { });
+        try {
+            for await (const message of query({
+                prompt,
+                options: {
+                    tools: { type: 'preset', preset: 'claude_code' },
+                    permissionMode: this.permissionMode,
+                    workingDirectory: sandboxDir,
+                    model: this.model || undefined,
+                }
+            })) {
+                if (message.type === 'assistant' && message.message?.content) {
+                    for (const block of message.message.content) {
+                        if ('text' in block) {
+                            await appendSandboxLog(block.text);
+                            fullContent += block.text;
+                        } else if ('name' in block) {
+                            // Cyan for tool names
+                            const prefix = fullContent.endsWith('\n') ? '' : '\n'
+                            await appendSandboxLog(`${prefix}\x1b[36m| ${block.name}\x1b[0m\n`);
+                        }
                     }
-                } catch (e) {
-                    // Not JSON or partial, just log as-is
-                    appendSandboxLog(line).catch(() => { });
+                } else if (message.type === 'result') {
+                    // Green for results
+                    const prefix = fullContent.endsWith('\n') ? '' : '\n'
+                    await appendSandboxLog(`${prefix}\x1b[32m[Result] ${message.subtype}\x1b[0m\n`);
+                } else if (message.type === 'error') {
+                    // Red for errors in the stream
+                    await appendSandboxLog(`\x1b[31m[Stream Error] ${message.message}\x1b[0m\n`);
+                    fullContent += `\n[Stream Error] ${message.message}\n`;
                 }
             }
-        };
+        } catch (error) {
+            const usageLimitRegex = /usage limit|Rate Exceeded|Too Many Requests|429|out of extra usage|resets \d+(am|pm)/i;
+            const isUsageLimit = usageLimitRegex.test(error.message || '') || usageLimitRegex.test(fullContent);
+            // Red for errors
+            await appendSandboxLog(`\x1b[31m[Error] ${error.message}\x1b[0m\n`);
+            await flushSandboxLog();
+            return { output: fullContent, exitCode: isUsageLimit ? 2 : 1 };
+        }
 
-        const result = await runCommand(bin, args, sandboxDir, { onStdout, timeout: 1800000 });
-
-        // Final cleanup of content if needed, though stream-json should give us everything
-        const finalOutput = fullContent || result.stdout;
-        const combinedOutput = `${finalOutput}${result.stderr ? `\n${result.stderr}` : ''}`.trim();
-
-        await appendSandboxLog(`Claude execution finished with code ${result.code}. Output length: ${combinedOutput.length}`);
-
-        return { output: combinedOutput, exitCode: result.code ?? 0 };
+        await flushSandboxLog();
+        return { output: fullContent, exitCode: 0 };
     }
 }
 

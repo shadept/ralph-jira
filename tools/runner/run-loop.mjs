@@ -4,6 +4,7 @@ import { existsSync, promises as fs } from 'node:fs';
 import path from 'node:path';
 
 import { createAgent } from './agents.mjs';
+import { initBackendClient, getBackendClient } from './backend-client.mjs';
 
 
 const PENDING_STATUSES = new Set(['todo', 'in_progress']);
@@ -153,9 +154,8 @@ class RunLoop {
   constructor({ runId, projectPath }) {
     this.runId = runId;
     this.projectPath = projectPath;
-    this.runFile = path.join(projectPath, 'plans', 'runs', `${runId}.json`);
+    this.backend = getBackendClient();
     this.rootProgressFile = path.join(projectPath, 'progress.txt');
-    this.settingsPath = path.join(projectPath, 'plans', 'settings.json');
     this.sandboxSettingsPath = null;
     this.run = null;
     this.sandboxDir = null;
@@ -184,7 +184,9 @@ class RunLoop {
     this.agentExtraArgs = parseAgentExtraArgs();
     this.claudePermissionMode = process.env.RUN_LOOP_CLAUDE_PERMISSION_MODE || 'acceptEdits';
     this.updateQueue = Promise.resolve();
-    this.lastProgressUpdateAt = 0;
+    this.logBuffer = '';
+    this.sandboxReady = false;
+    this.earlyLogBuffer = [];
   }
 
   /**
@@ -192,7 +194,7 @@ class RunLoop {
    * @returns {Promise<void>}
    */
   async init() {
-    this.run = await readJson(this.runFile);
+    this.run = await this.backend.readRun(this.runId);
     this.sandboxDir = path.join(this.projectPath, this.run.sandboxPath);
     this.sandboxBoardPath = path.join(this.sandboxDir, 'plans', 'prd.json');
     this.rootBoardPath = path.join(this.projectPath, this.run.boardSourcePath);
@@ -213,7 +215,8 @@ class RunLoop {
     if (this.run.sandboxBranch !== configuredBranch) {
       await this.updateRun({ sandboxBranch: configuredBranch });
     }
-    await this.loadSettingsFrom(this.settingsPath);
+    this.settings = await this.backend.readSettings();
+    this.applyAutomationSettings();
   }
 
   /**
@@ -227,7 +230,7 @@ class RunLoop {
     // Chain update to queue to avoid concurrent writes/atomic rename issues on Windows
     this.updateQueue = this.updateQueue.then(async () => {
       try {
-        await writeJson(this.runFile, this.run);
+        await this.backend.writeRun(this.run);
       } catch (error) {
         console.error('Unable to persist run update', error);
       }
@@ -237,21 +240,58 @@ class RunLoop {
   }
 
   /**
-   * Appends lines to the sandbox iteration log.
-   * @param {string | string[]} lines
+   * Single write point for sandbox log - enables stdout redirection later.
+   * Buffers logs until sandbox is ready.
+   * @param {string} text
    * @returns {Promise<void>}
    */
-  async appendSandboxLog(lines) {
-    const payload = Array.isArray(lines) ? lines.join('\n') : lines;
-    const now = Date.now();
-    const timestamp = new Date(now).toISOString();
-    await fs.appendFile(this.sandboxLogPath, `\n[${timestamp}]\n${payload}\n`, 'utf-8');
-
-    // Throttle UI progress update to once every 2 seconds to avoid file lock spam
-    if (now - this.lastProgressUpdateAt > 2000) {
-      this.lastProgressUpdateAt = now;
-      await this.updateRun({ lastProgressAt: timestamp });
+  async writeLog(text) {
+    if (!this.sandboxLogPath) return;
+    if (!this.sandboxReady) {
+      this.earlyLogBuffer.push(text);
+      return;
     }
+    await fs.appendFile(this.sandboxLogPath, text, 'utf-8');
+  }
+
+  /**
+   * Marks the sandbox as ready and flushes any buffered early logs.
+   * @returns {Promise<void>}
+   */
+  async markSandboxReady() {
+    this.sandboxReady = true;
+    if (this.earlyLogBuffer.length > 0) {
+      const buffered = this.earlyLogBuffer.join('');
+      this.earlyLogBuffer = [];
+      await fs.appendFile(this.sandboxLogPath, buffered, 'utf-8');
+    }
+  }
+
+  /**
+   * Appends text to the sandbox log buffer. Flushes complete lines.
+   * @param {string} text
+   * @returns {Promise<void>}
+   */
+  async appendSandboxLog(text) {
+    this.logBuffer += text;
+    const lastNewline = this.logBuffer.lastIndexOf('\n');
+    if (lastNewline !== -1) {
+      const toFlush = this.logBuffer.slice(0, lastNewline + 1);
+      this.logBuffer = this.logBuffer.slice(lastNewline + 1);
+      await this.writeLog(toFlush);
+      await this.updateRun({ lastProgressAt: new Date().toISOString() });
+    }
+  }
+
+  /**
+   * Force flushes any remaining content in the log buffer.
+   * @returns {Promise<void>}
+   */
+  async flushSandboxLog() {
+    if (!this.logBuffer) return;
+    await this.writeLog(this.logBuffer);
+    this.logBuffer = '';
+    await this.updateRun({ lastProgressAt: new Date().toISOString() });
   }
 
   /**
@@ -610,7 +650,8 @@ class RunLoop {
    */
   async prepareSandboxPlan() {
     if (!(await fileExists(this.sandboxBoardPath))) {
-      const board = await readJson(this.rootBoardPath);
+      const boardId = this.run.boardId || 'prd';
+      const board = await this.backend.readBoard(boardId);
       const filteredTasks = board.tasks.filter(task => PENDING_STATUSES.has(task.status));
       const sandboxBoard = { ...board, tasks: filteredTasks };
       await fs.mkdir(path.dirname(this.sandboxBoardPath), { recursive: true });
@@ -620,7 +661,8 @@ class RunLoop {
     this.sandboxSettingsPath = path.join(this.sandboxDir, 'plans', 'settings.json');
     if (!(await fileExists(this.sandboxSettingsPath))) {
       await fs.mkdir(path.dirname(this.sandboxSettingsPath), { recursive: true });
-      await fs.copyFile(this.settingsPath, this.sandboxSettingsPath);
+      // Write settings from memory (already loaded via backend) to sandbox
+      await writeJson(this.sandboxSettingsPath, this.settings);
     }
 
     if (!(await fileExists(this.sandboxLogPath))) {
@@ -628,6 +670,9 @@ class RunLoop {
     } else {
       await fs.appendFile(this.sandboxLogPath, `\n# Run ${this.runId} resumed\n`, 'utf-8');
     }
+
+    // Sandbox log is now ready - flush any buffered early logs
+    await this.markSandboxReady();
 
     // Decouple PRD, settings, and logs from git tracking in the sandbox to avoid conflicts
     await this.runCommand('git', ['update-index', '--skip-worktree', 'plans/prd.json'], this.sandboxDir);
@@ -746,6 +791,10 @@ class RunLoop {
     this.run.commands.push(commandRecord);
 
     const cmdString = [command, ...args].map(escapeForDisplay).join(' ');
+
+    // Log timestamp and command to sandbox log
+    await this.appendSandboxLog(`\n[${startedAt}] ${cmdString}\n`);
+
     await this.updateRun({
       lastCommand: cmdString,
       lastCommandExitCode: undefined,
@@ -848,8 +897,8 @@ class RunLoop {
    * @returns {Promise<boolean>}
    */
   async verifyCancellation() {
-    if (!this.cancelFlagPath) return false;
-    if (existsSync(this.cancelFlagPath)) {
+    const canceled = await this.backend.checkCancellation(this.runId);
+    if (canceled) {
       this.status = 'canceled';
       this.reason = 'canceled';
       await this.updateRun({
@@ -877,6 +926,7 @@ class RunLoop {
       sandboxDir: this.sandboxDir,
       runCommand: this.runCommand.bind(this),
       appendSandboxLog: this.appendSandboxLog.bind(this),
+      flushSandboxLog: this.flushSandboxLog.bind(this),
     });
 
     if (!output) {
@@ -918,9 +968,13 @@ class RunLoop {
    * @returns {Promise<void>}
    */
   async syncBackToRoot() {
+    // Sandbox board is local filesystem
     const sandboxBoard = await readJson(this.sandboxBoardPath).catch(() => null);
     if (!sandboxBoard) return;
-    const rootBoard = await readJson(this.rootBoardPath).catch(() => null);
+
+    // Root board via backend
+    const boardId = this.run.boardId || 'prd';
+    const rootBoard = await this.backend.readBoard(boardId).catch(() => null);
     if (!rootBoard) return;
 
     const sandboxMap = new Map();
@@ -952,7 +1006,7 @@ class RunLoop {
     });
 
     rootBoard.updatedAt = now;
-    await writeJson(this.rootBoardPath, rootBoard);
+    await this.backend.writeBoard(rootBoard);
   }
 
   /**
@@ -1032,9 +1086,15 @@ class RunLoop {
       const { output, exitCode } = await this.runAgentIteration(iteration);
 
       if (exitCode !== 0) {
-        this.status = 'failed';
-        this.reason = 'error';
-        await this.appendSandboxLog(`Agent exited with code ${exitCode}. Stopping run.`);
+        if (exitCode === 2) {
+          this.status = 'stopped';
+          this.reason = 'usage_limit';
+          await this.appendSandboxLog('Agent stopped: Usage limit reached. Stopping run.');
+        } else {
+          this.status = 'failed';
+          this.reason = 'error';
+          await this.appendSandboxLog(`Agent exited with code ${exitCode}. Stopping run.`);
+        }
         break;
       }
 
@@ -1154,6 +1214,22 @@ class RunLoop {
  */
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+
+  // Initialize backend client singleton before creating RunLoop
+  const backendMode = process.env.RUN_LOOP_BACKEND_MODE || 'local';
+  if (backendMode === 'http') {
+    initBackendClient({
+      mode: 'http',
+      baseUrl: process.env.RUN_LOOP_API_URL || 'http://localhost:3000',
+      projectId: process.env.RUN_LOOP_PROJECT_ID,
+    });
+  } else {
+    initBackendClient({
+      mode: 'local',
+      projectPath: args.projectPath,
+    });
+  }
+
   const runner = new RunLoop(args);
   let finalized = false;
 

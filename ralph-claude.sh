@@ -9,7 +9,8 @@ fi
 for ((i=1; i<=$1; i++)); do
     echo "Iteration $i"
     echo "--------------------------------"
-    result=$(claude --permission-mode acceptEdits --print "@plans/prd.json @progress.txt \
+    result=$(claude --permission-mode acceptEdits --permission-mode acceptEdits --verbose --output-format stream-json --include-partial-messages \
+     --print "@plans/prd.json @progress.txt \
 1. Find the highest-priority feature to work on and work only on that feature. \
 This should be the one YOU decide has the highest priority - not necessarily the first in the list. \
 2. Check that the types check via npm typecheck and that the tests pass via npm test. \

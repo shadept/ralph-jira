@@ -46,7 +46,7 @@ Project Context:
 - Description: ${settings.projectDescription || 'Not provided'}${readmeContext}
 
 IMPORTANT Guidelines:
-- Generate FEWER tasks (prefer 1-3) that are meaningful and well-scoped
+- Generate FEWER tasks (prefer 1-3) with more Acceptance Criteria that are meaningful and well-scoped
 - Each task should represent a coherent unit of work, NOT a step-by-step guide
 - Combine related work into single tasks rather than splitting unnecessarily
 - Task descriptions should be concise and outcome-focused

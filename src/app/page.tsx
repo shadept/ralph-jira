@@ -209,14 +209,7 @@ export default function DashboardPage() {
         </section>
 
         <section>
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card className="cursor-pointer transition-shadow hover:shadow-lg" onClick={() => router.push('/settings')}>
-              <CardHeader>
-                <CardTitle className="text-lg">Settings</CardTitle>
-                <CardDescription>Configure project settings and AI preferences</CardDescription>
-              </CardHeader>
-            </Card>
-
+          <div className="grid gap-4 md:grid-cols-2">
             <Card className="cursor-pointer transition-shadow hover:shadow-lg" onClick={() => router.push('/files')}>
               <CardHeader>
                 <CardTitle className="text-lg">Files</CardTitle>

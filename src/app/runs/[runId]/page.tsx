@@ -194,6 +194,10 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
                 <p className="font-medium capitalize">{run.executorMode}</p>
               </div>
               <div>
+                <p className="text-muted-foreground">PID</p>
+                <p className="font-medium font-mono">{run.pid ?? '—'}</p>
+              </div>
+              <div>
                 <p className="text-muted-foreground">Branch</p>
                 <p className="font-medium break-words">{run.sandboxBranch || '—'}</p>
               </div>

@@ -8,6 +8,7 @@ import { Board } from '@/lib/schemas';
 import {
   createInitialRunRecord,
   defaultMaxIterations,
+  resolveRunnerCommand,
   upsertRun,
   writeRun,
 } from '@/lib/runs/store';
@@ -46,29 +47,6 @@ function isValidBranchName(name: string) {
     return false;
   }
   return /^[A-Za-z0-9._\/-]+$/.test(name);
-}
-
-function resolveRunnerCommand(params: {
-  mode: 'local' | 'docker';
-  projectPath: string;
-  runId: string;
-}) {
-  const scriptArgs = ['tools/runner/run-loop.mjs', '--runId', params.runId];
-  if (params.mode === 'local') {
-    scriptArgs.push('--projectPath', params.projectPath);
-    return {
-      command: 'node',
-      args: scriptArgs,
-      cwd: params.projectPath,
-    } as const;
-  }
-
-  scriptArgs.push('--projectPath', '/workspace');
-  return {
-    command: 'docker',
-    args: ['compose', 'run', '--rm', 'runner', 'node', ...scriptArgs],
-    cwd: params.projectPath,
-  } as const;
 }
 
 export async function POST(request: Request) {

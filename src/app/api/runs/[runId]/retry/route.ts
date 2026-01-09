@@ -1,30 +1,8 @@
 import { spawn } from 'node:child_process';
+import { promises as fs } from 'node:fs';
 import { NextResponse } from 'next/server';
 import { getProjectStorage, handleProjectRouteError } from '@/lib/projects/server';
-import { readRun, upsertRun } from '@/lib/runs/store';
-
-function resolveRunnerCommand(params: {
-    mode: 'local' | 'docker';
-    projectPath: string;
-    runId: string;
-}) {
-    const scriptArgs = ['tools/runner/run-loop.mjs', '--runId', params.runId];
-    if (params.mode === 'local') {
-        scriptArgs.push('--projectPath', params.projectPath);
-        return {
-            command: 'node',
-            args: scriptArgs,
-            cwd: params.projectPath,
-        } as const;
-    }
-
-    scriptArgs.push('--projectPath', '/workspace');
-    return {
-        command: 'docker',
-        args: ['compose', 'run', '--rm', 'runner', 'node', ...scriptArgs],
-        cwd: params.projectPath,
-    } as const;
-}
+import { cancelFlagPath, readRun, resolveRunnerCommand, upsertRun } from '@/lib/runs/store';
 
 export async function POST(
     request: Request,
@@ -43,6 +21,13 @@ export async function POST(
                 { error: `Cannot retry a run in status: ${run.status}` },
                 { status: 400 }
             );
+        }
+
+        // Delete cancel flag if it exists from previous run
+        try {
+            await fs.unlink(cancelFlagPath(project.path, runId));
+        } catch {
+            // Ignore if file doesn't exist
         }
 
         // Reset run state for retry
