@@ -1,4 +1,5 @@
 import { LocalFilesystemAdapter } from './local-filesystem';
+import { SQLiteStorageAdapter } from './sqlite-adapter';
 import { StorageAdapter } from './interface';
 
 export type StorageType = 'filesystem' | 'sqlite';
@@ -20,13 +21,21 @@ function getStorageTypeFromEnv(): StorageType {
  * Defaults to 'filesystem' for backwards compatibility.
  *
  * Set RALPH_STORAGE_TYPE=sqlite to use SQLite storage.
+ *
+ * @param projectPath - The root path of the project
+ * @param type - Storage type override (optional, defaults to env var or 'filesystem')
+ * @param databaseUrl - Database URL for SQLite (optional, defaults to plans/ralph.db)
  */
-export function createStorage(projectPath: string, type?: StorageType): StorageAdapter {
+export function createStorage(
+  projectPath: string,
+  type?: StorageType,
+  databaseUrl?: string
+): StorageAdapter {
   const effectiveType = type ?? getStorageTypeFromEnv();
 
   switch (effectiveType) {
     case 'sqlite':
-      throw new Error("Not yet implemented")
+      return new SQLiteStorageAdapter(projectPath, databaseUrl);
     case 'filesystem':
     default:
       return new LocalFilesystemAdapter(projectPath);
@@ -35,3 +44,4 @@ export function createStorage(projectPath: string, type?: StorageType): StorageA
 
 export type { StorageAdapter } from './interface';
 export { LocalFilesystemAdapter } from './local-filesystem';
+export { SQLiteStorageAdapter } from './sqlite-adapter';

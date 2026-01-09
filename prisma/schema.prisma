@@ -1,0 +1,107 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Board model - represents a Kanban board/sprint
+model Board {
+  id        String   @id
+  name      String
+  goal      String
+  deadline  DateTime
+  status    String   // planned, active, completed, archived
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Metrics as JSON since they're optional and simple
+  metricsJson String? @map("metrics")
+
+  // Relations
+  columns   Column[]
+  tasks     Task[]
+
+  @@map("boards")
+}
+
+// Column model - represents a board column
+model Column {
+  id      String @id @default(cuid())
+  columnId String  // The logical column ID (backlog, todo, etc.)
+  name    String
+  order   Int
+
+  boardId String
+  board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, columnId])
+  @@map("columns")
+}
+
+// Task model - represents a task/issue
+model Task {
+  id          String   @id
+  category    String
+  description String
+  stepsJson   String   @map("steps") // JSON array of steps
+  passes      Boolean  @default(false)
+  status      String   // backlog, todo, in_progress, review, done
+  priority    String   @default("medium") // low, medium, high, urgent
+  estimate    Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tagsJson    String   @default("[]") @map("tags") // JSON array of tags
+  assignee    String?
+  filesTouchedJson String @default("[]") @map("files_touched") // JSON array
+  lastRun     DateTime?
+  failureNotes String?
+
+  boardId     String
+  board       Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@map("tasks")
+}
+
+// Settings model - project settings
+model Settings {
+  id                    String @id @default("default")
+  projectName           String
+  projectDescription    String
+  techStackJson         String @map("tech_stack") // JSON array
+  howToTestJson         String @map("how_to_test") // JSON object
+  howToRunJson          String @map("how_to_run") // JSON object
+  aiPreferencesJson     String @map("ai_preferences") // JSON object
+  repoConventionsJson   String @map("repo_conventions") // JSON object
+  automationJson        String? @map("automation") // JSON object, optional
+
+  @@map("settings")
+}
+
+// RunLog model - stores run execution logs
+model RunLog {
+  id              String   @id @default(cuid())
+  runId           String   @unique
+  boardId         String
+  startTime       DateTime
+  endTime         DateTime?
+  tasksAttemptedJson String @map("tasks_attempted") // JSON array
+  status          String   // running, completed, failed, cancelled
+  environmentJson String?  @map("environment") // JSON object
+
+  @@map("run_logs")
+}
+
+// Progress model - stores progress log entries
+model Progress {
+  id        String   @id @default(cuid())
+  entry     String
+  createdAt DateTime @default(now())
+
+  @@map("progress")
+}
