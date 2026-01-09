@@ -1,24 +1,18 @@
 #!/usr/bin/env node
-import { existsSync, promises as fs } from 'node:fs';
-import path from 'node:path';
 
 /**
  * @typedef {Object} RunRecord
  * @property {string} runId
  * @property {string} [projectId]
- * @property {string} boardId
- * @property {string} [boardName]
+ * @property {string} sprintId
+ * @property {string} [sprintName]
  * @property {string} createdAt
  * @property {string|null} startedAt
  * @property {string|null} finishedAt
  * @property {string} status
  * @property {string} [reason]
- * @property {string} boardSourcePath
  * @property {string} sandboxPath
  * @property {string} [sandboxBranch]
- * @property {string} cancelFlagPath
- * @property {string} logPath
- * @property {string} sandboxLogPath
  * @property {number} maxIterations
  * @property {number} currentIteration
  * @property {string[]} selectedTaskIds
@@ -32,10 +26,11 @@ import path from 'node:path';
  * @property {number} [pid]
  * @property {object[]} [commands]
  * @property {string} [cancellationRequestedAt]
+ * @property {string} [prUrl]
  */
 
 /**
- * @typedef {Object} Board
+ * @typedef {Object} Sprint
  * @property {string} id
  * @property {string} name
  * @property {object[]} tasks
@@ -48,129 +43,22 @@ import path from 'node:path';
  */
 
 /**
- * @typedef {Object} BackendClient
+ * @typedef {Object} BackendClientInterface
  * @property {(runId: string) => Promise<RunRecord>} readRun
  * @property {(run: RunRecord) => Promise<void>} writeRun
  * @property {() => Promise<ProjectSettings>} readSettings
- * @property {(boardId: string) => Promise<Board>} readBoard
- * @property {(board: Board) => Promise<void>} writeBoard
+ * @property {(sprintId: string) => Promise<Sprint>} readSprint
+ * @property {(sprint: Sprint) => Promise<void>} writeSprint
  * @property {(runId: string) => Promise<boolean>} checkCancellation
+ * @property {(runId: string, entry: string) => Promise<void>} appendLog
  */
 
 /**
- * Writes a payload to a JSON file atomically using a temp file.
- * @param {string} filePath
- * @param {any} payload
- * @returns {Promise<void>}
+ * HTTP API implementation of BackendClient.
+ * This is the only client going forward - local mode is deprecated.
+ * @implements {BackendClientInterface}
  */
-async function atomicWriteJson(filePath, payload) {
-  const tmp = `${filePath}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(payload, null, 2), 'utf-8');
-  await fs.rename(tmp, filePath);
-}
-
-/**
- * Reads and parses a JSON file.
- * @param {string} filePath
- * @returns {Promise<any>}
- */
-async function readJson(filePath) {
-  const buffer = await fs.readFile(filePath, 'utf-8');
-  return JSON.parse(buffer);
-}
-
-/**
- * Gets the file path for a board given its ID.
- * @param {string} plansDir
- * @param {string} boardId
- * @returns {string}
- */
-function boardFilePath(plansDir, boardId) {
-  const isActiveBoard = boardId === 'prd' || boardId === 'active' || boardId === 'initial-sprint';
-  return isActiveBoard
-    ? path.join(plansDir, 'prd.json')
-    : path.join(plansDir, `${boardId}.json`);
-}
-
-/**
- * Local filesystem implementation of BackendClient.
- * @implements {BackendClient}
- */
-export class LocalBackendClient {
-  /**
-   * @param {string} projectPath
-   */
-  constructor(projectPath) {
-    this.projectPath = projectPath;
-    this.runsDir = path.join(projectPath, 'plans', 'runs');
-    this.plansDir = path.join(projectPath, 'plans');
-  }
-
-  /**
-   * Reads a run record from the filesystem.
-   * @param {string} runId
-   * @returns {Promise<RunRecord>}
-   */
-  async readRun(runId) {
-    const filePath = path.join(this.runsDir, `${runId}.json`);
-    return readJson(filePath);
-  }
-
-  /**
-   * Writes a run record to the filesystem atomically.
-   * @param {RunRecord} run
-   * @returns {Promise<void>}
-   */
-  async writeRun(run) {
-    const filePath = path.join(this.runsDir, `${run.runId}.json`);
-    await atomicWriteJson(filePath, run);
-  }
-
-  /**
-   * Reads project settings from the filesystem.
-   * @returns {Promise<ProjectSettings>}
-   */
-  async readSettings() {
-    const filePath = path.join(this.plansDir, 'settings.json');
-    return readJson(filePath);
-  }
-
-  /**
-   * Reads a board from the filesystem.
-   * @param {string} boardId
-   * @returns {Promise<Board>}
-   */
-  async readBoard(boardId) {
-    const filePath = boardFilePath(this.plansDir, boardId);
-    return readJson(filePath);
-  }
-
-  /**
-   * Writes a board to the filesystem atomically.
-   * @param {Board} board
-   * @returns {Promise<void>}
-   */
-  async writeBoard(board) {
-    const filePath = boardFilePath(this.plansDir, board.id);
-    await atomicWriteJson(filePath, board);
-  }
-
-  /**
-   * Checks if a cancellation flag exists for the given run.
-   * @param {string} runId
-   * @returns {Promise<boolean>}
-   */
-  async checkCancellation(runId) {
-    const cancelPath = path.join(this.runsDir, `${runId}.cancel`);
-    return existsSync(cancelPath);
-  }
-}
-
-/**
- * HTTP API implementation of BackendClient (stub for future use).
- * @implements {BackendClient}
- */
-export class HttpBackendClient {
+export class BackendClient {
   /**
    * @param {string} baseUrl
    * @param {string} projectId
@@ -218,7 +106,7 @@ export class HttpBackendClient {
    */
   async readSettings() {
     const response = await fetch(
-      `${this.baseUrl}/api/settings?projectId=${this.projectId}`
+      `${this.baseUrl}/api/projects/${this.projectId}/settings`
     );
     if (!response.ok) {
       throw new Error(`Failed to read settings: ${response.status}`);
@@ -227,34 +115,34 @@ export class HttpBackendClient {
   }
 
   /**
-   * @param {string} boardId
-   * @returns {Promise<Board>}
+   * @param {string} sprintId
+   * @returns {Promise<Sprint>}
    */
-  async readBoard(boardId) {
+  async readSprint(sprintId) {
     const response = await fetch(
-      `${this.baseUrl}/api/boards/${boardId}?projectId=${this.projectId}`
+      `${this.baseUrl}/api/sprints/${sprintId}?projectId=${this.projectId}`
     );
     if (!response.ok) {
-      throw new Error(`Failed to read board ${boardId}: ${response.status}`);
+      throw new Error(`Failed to read sprint ${sprintId}: ${response.status}`);
     }
     return response.json();
   }
 
   /**
-   * @param {Board} board
+   * @param {Sprint} sprint
    * @returns {Promise<void>}
    */
-  async writeBoard(board) {
+  async writeSprint(sprint) {
     const response = await fetch(
-      `${this.baseUrl}/api/boards/${board.id}?projectId=${this.projectId}`,
+      `${this.baseUrl}/api/sprints/${sprint.id}?projectId=${this.projectId}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(board),
+        body: JSON.stringify(sprint),
       }
     );
     if (!response.ok) {
-      throw new Error(`Failed to write board ${board.id}: ${response.status}`);
+      throw new Error(`Failed to write sprint ${sprint.id}: ${response.status}`);
     }
   }
 
@@ -272,6 +160,46 @@ export class HttpBackendClient {
     const { canceled } = await response.json();
     return canceled;
   }
+
+  /**
+   * Appends a log entry for a run.
+   * @param {string} runId
+   * @param {string} entry
+   * @returns {Promise<void>}
+   */
+  async appendLog(runId, entry) {
+    const response = await fetch(
+      `${this.baseUrl}/api/runs/${runId}/logs?projectId=${this.projectId}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entry }),
+      }
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to append log for ${runId}: ${response.status}`);
+    }
+  }
+
+  // Legacy compatibility methods - map board to sprint
+
+  /**
+   * @deprecated Use readSprint instead
+   * @param {string} boardId
+   * @returns {Promise<Sprint>}
+   */
+  async readBoard(boardId) {
+    return this.readSprint(boardId);
+  }
+
+  /**
+   * @deprecated Use writeSprint instead
+   * @param {Sprint} board
+   * @returns {Promise<void>}
+   */
+  async writeBoard(board) {
+    return this.writeSprint(board);
+  }
 }
 
 /** @type {BackendClient|null} */
@@ -279,24 +207,18 @@ let _backendClient = null;
 
 /**
  * Initializes the global backend client singleton.
- * @param {{mode: 'local'|'http', projectPath?: string, baseUrl?: string, projectId?: string}} options
+ * Only HTTP mode is supported - local mode is deprecated.
+ * @param {{baseUrl: string, projectId: string}} options
  * @returns {BackendClient}
  */
 export function initBackendClient(options) {
-  if (options.mode === 'http') {
-    if (!options.baseUrl) {
-      throw new Error('HttpBackendClient requires baseUrl');
-    }
-    if (!options.projectId) {
-      throw new Error('HttpBackendClient requires projectId');
-    }
-    _backendClient = new HttpBackendClient(options.baseUrl, options.projectId);
-  } else {
-    if (!options.projectPath) {
-      throw new Error('LocalBackendClient requires projectPath');
-    }
-    _backendClient = new LocalBackendClient(options.projectPath);
+  if (!options.baseUrl) {
+    throw new Error('BackendClient requires baseUrl');
   }
+  if (!options.projectId) {
+    throw new Error('BackendClient requires projectId');
+  }
+  _backendClient = new BackendClient(options.baseUrl, options.projectId);
   return _backendClient;
 }
 

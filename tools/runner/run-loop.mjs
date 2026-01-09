@@ -112,7 +112,6 @@ class RunLoop {
     this.rootBoardPath = null;
     this.sandboxLogPath = null;
     this.persistedLogPath = null;
-    this.cancelFlagPath = null;
     this.settings = null;
     this.setupCommands = DEFAULT_SETUP;
     this.reason = 'completed';
@@ -136,7 +135,7 @@ class RunLoop {
   }
 
   /**
-   * Initializes the run state by reading configuration files.
+   * Initializes the run state by reading configuration from the API.
    * @returns {Promise<void>}
    */
   async init() {
@@ -144,16 +143,13 @@ class RunLoop {
     this.sandboxDir = path.join(this.projectPath, this.run.sandboxPath);
     this.sandboxBoardPath = path.join(this.sandboxDir, 'plans', 'prd.json');
     this.sandboxSettingsPath = path.join(this.sandboxDir, 'plans', 'settings.json');
-    this.rootBoardPath = path.join(this.projectPath, this.run.boardSourcePath);
-    this.sandboxLogPath = path.join(
-      this.projectPath,
-      this.run.sandboxLogPath || path.join(this.run.sandboxPath, 'progress.txt'),
-    );
+    this.sandboxLogPath = path.join(this.sandboxDir, 'progress.txt');
     this.persistedLogPath = path.join(
       this.projectPath,
-      this.run.logPath || path.join('plans', 'runs', `${this.runId}.progress.txt`),
+      'plans',
+      'runs',
+      `${this.runId}.progress.txt`,
     );
-    this.cancelFlagPath = path.join(this.projectPath, this.run.cancelFlagPath);
     const configuredBranch =
       typeof this.run.sandboxBranch === 'string' && this.run.sandboxBranch.trim().length
         ? this.run.sandboxBranch.trim()
@@ -183,14 +179,14 @@ class RunLoop {
   }
 
   /**
-   * Persists a patch to the run state.
+   * Persists a patch to the run state via API.
    * @param {Partial<RunRecord>} patch
    * @returns {Promise<void>}
    */
   async updateRun(patch) {
     this.run = { ...this.run, ...patch };
 
-    // Chain update to queue to avoid concurrent writes/atomic rename issues on Windows
+    // Chain update to queue to avoid concurrent writes
     this.updateQueue = this.updateQueue.then(async () => {
       try {
         await this.backend.writeRun(this.run);
@@ -232,6 +228,7 @@ class RunLoop {
 
   /**
    * Appends text to the sandbox log buffer. Flushes complete lines.
+   * Also sends logs to the backend API.
    * @param {string} text
    * @returns {Promise<void>}
    */
@@ -242,6 +239,14 @@ class RunLoop {
       const toFlush = this.logBuffer.slice(0, lastNewline + 1);
       this.logBuffer = this.logBuffer.slice(lastNewline + 1);
       await this.writeLog(toFlush);
+
+      // Send log to API
+      try {
+        await this.backend.appendLog(this.runId, toFlush);
+      } catch (error) {
+        console.warn('Unable to send log to API', error.message);
+      }
+
       await this.updateRun({ lastProgressAt: new Date().toISOString() });
     }
   }
@@ -253,6 +258,14 @@ class RunLoop {
   async flushSandboxLog() {
     if (!this.logBuffer) return;
     await this.writeLog(this.logBuffer);
+
+    // Send remaining log to API
+    try {
+      await this.backend.appendLog(this.runId, this.logBuffer);
+    } catch (error) {
+      console.warn('Unable to send final log to API', error.message);
+    }
+
     this.logBuffer = '';
     await this.updateRun({ lastProgressAt: new Date().toISOString() });
   }
@@ -263,9 +276,7 @@ class RunLoop {
    * @returns {Promise<void>}
    */
   async appendRootProgress(summary) {
-    // const timestamp = new Date().toISOString();
-    // const block = `\n[${timestamp}]\n${summary.trim()}\n`;
-    const block = summary
+    const block = summary;
     await fs.appendFile(this.rootProgressFile, block, 'utf-8');
   }
 
@@ -473,7 +484,7 @@ class RunLoop {
   }
 
   /**
-   * Checks if a cancellation flag file exists on disk.
+   * Checks if cancellation has been requested via the API.
    * @returns {Promise<boolean>}
    */
   async verifyCancellation() {
@@ -551,7 +562,7 @@ class RunLoop {
 
 
   /**
-   * Synchronizes changes from the sandbox PRD back to the root PRD.
+   * Synchronizes changes from the sandbox PRD back to the root PRD via API.
    * @returns {Promise<void>}
    */
   async syncBackToRoot() {
@@ -559,9 +570,9 @@ class RunLoop {
     const sandboxBoard = await readJson(this.sandboxBoardPath).catch(() => null);
     if (!sandboxBoard) return;
 
-    // Root board via backend
-    const boardId = this.run.boardId || 'prd';
-    const rootBoard = await this.backend.readBoard(boardId).catch(() => null);
+    // Root board via backend API (using sprint terminology)
+    const sprintId = this.run.sprintId || this.run.boardId || 'prd';
+    const rootBoard = await this.backend.readSprint(sprintId).catch(() => null);
     if (!rootBoard) return;
 
     const sandboxMap = new Map();
@@ -593,7 +604,7 @@ class RunLoop {
     });
 
     rootBoard.updatedAt = now;
-    await this.backend.writeBoard(rootBoard);
+    await this.backend.writeSprint(rootBoard);
   }
 
 
@@ -615,8 +626,8 @@ class RunLoop {
     if (branchName && this.run.sandboxBranch !== branchName) {
       await this.updateRun({ sandboxBranch: branchName });
     }
-    const boardId = this.run.boardId || 'prd';
-    await this.workspace.prepareSandboxPlan(boardId);
+    const sprintId = this.run.sprintId || this.run.boardId || 'prd';
+    await this.workspace.prepareSandboxPlan(sprintId);
 
     // Reload settings from sandbox after prepareSandboxPlan
     await this.loadSettingsFrom(this.sandboxSettingsPath);
@@ -769,20 +780,11 @@ class RunLoop {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
 
-  // Initialize backend client singleton before creating RunLoop
-  const backendMode = process.env.RUN_LOOP_BACKEND_MODE || 'local';
-  if (backendMode === 'http') {
-    initBackendClient({
-      mode: 'http',
-      baseUrl: process.env.RUN_LOOP_API_URL || 'http://localhost:3000',
-      projectId: process.env.RUN_LOOP_PROJECT_ID,
-    });
-  } else {
-    initBackendClient({
-      mode: 'local',
-      projectPath: args.projectPath,
-    });
-  }
+  // Initialize backend client singleton - HTTP mode only
+  initBackendClient({
+    baseUrl: process.env.RUN_LOOP_API_URL || 'http://localhost:3000',
+    projectId: process.env.RUN_LOOP_PROJECT_ID,
+  });
 
   const runner = new RunLoop(args);
   let finalized = false;

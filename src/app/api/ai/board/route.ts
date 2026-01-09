@@ -1,49 +1,54 @@
-import { NextResponse } from 'next/server';
-import { openai } from '@ai-sdk/openai';
-import { generateObject, generateText, Output } from 'ai';
-import { z } from 'zod';
-import { getProjectStorage, handleProjectRouteError } from '@/lib/projects/server';
+import { NextResponse } from "next/server";
+import { openai } from "@ai-sdk/openai";
+import { generateObject, generateText, Output } from "ai";
+import { z } from "zod";
+import {
+	getProjectStorage,
+	handleProjectRouteError,
+} from "@/lib/projects/server";
 
 export async function POST(request: Request) {
-  try {
-    const { storage } = await getProjectStorage(request);
-    const { action, boardId, data } = await request.json();
+	try {
+		const { storage } = await getProjectStorage(request);
+		const { action, boardId, data } = await request.json();
 
-    const board = await storage.readBoard(boardId);
-    const settings = await storage.readSettings();
+		const board = await storage.readBoard(boardId);
+		const settings = await storage.readSettings();
 
-    switch (action) {
-      case 'generate-tasks': {
-        const { description, count = 3, category = 'functional' } = data;
+		switch (action) {
+			case "generate-tasks": {
+				const { description, count = 3, category = "functional" } = data;
 
-        // Read project README for context
-        const readme = await storage.readProjectReadme();
-        const readmeContext = readme
-          ? `\n\nProject README (for context):\n${readme.slice(0, 2000)}${readme.length > 2000 ? '\n...(truncated)' : ''}`
-          : '';
+				// Read project README for context
+				const readme = await storage.readProjectReadme();
+				const readmeContext = readme
+					? `\n\nProject README (for context):\n${readme.slice(0, 2000)}${readme.length > 2000 ? "\n...(truncated)" : ""}`
+					: "";
 
-        const result = await generateText({
-          model: openai(settings.aiPreferences.defaultModel || 'gpt-4-turbo'),
-          output: Output.object({
-            schema: z.object({
-              tasks: z.array(z.object({
-                category: z.string(),
-                description: z.string(),
-                acceptanceCriteria: z.array(z.string()),
-                priority: z.enum(['low', 'medium', 'high', 'urgent']),
-                estimate: z.number(),
-                tags: z.array(z.string()),
-              })),
-            }),
-          }),
-          prompt: `Generate ${count} high-quality, focused tasks for the following feature or requirement:
+				const result = await generateText({
+					model: openai(settings.aiPreferences.defaultModel || "gpt-4-turbo"),
+					output: Output.object({
+						schema: z.object({
+							tasks: z.array(
+								z.object({
+									category: z.string(),
+									description: z.string(),
+									acceptanceCriteria: z.array(z.string()),
+									priority: z.enum(["low", "medium", "high", "urgent"]),
+									estimate: z.number(),
+									tags: z.array(z.string()),
+								}),
+							),
+						}),
+					}),
+					prompt: `Generate ${count} high-quality, focused tasks for the following feature or requirement:
 
 "${description}"
 
 Project Context:
 - Project: ${settings.projectName}
-- Tech Stack: ${settings.techStack.join(', ')}
-- Description: ${settings.projectDescription || 'Not provided'}${readmeContext}
+- Tech Stack: ${settings.techStack.join(", ")}
+- Description: ${settings.projectDescription || "Not provided"}${readmeContext}
 
 IMPORTANT Guidelines:
 - Generate FEWER tasks (prefer 1-3) with more Acceptance Criteria that are meaningful and well-scoped
@@ -59,127 +64,133 @@ Acceptance Criteria Guidelines:
 - Keep criteria testable but not prescriptive
 
 Category: ${category}`,
-        });
+				});
 
-        // Convert to full task objects
-        const now = new Date().toISOString();
-        const newTasks = result.output.tasks.map((t, idx) => ({
-          ...t,
-          id: `task-${Date.now()}-${idx}`,
-          passes: false,
-          status: 'backlog' as const,
-          createdAt: now,
-          updatedAt: now,
-          filesTouched: [],
-        }));
+				// Convert to full task objects
+				const now = new Date().toISOString();
+				const newTasks = result.output.tasks.map((t, idx) => ({
+					...t,
+					id: `task-${Date.now()}-${idx}`,
+					passes: false,
+					status: "backlog" as const,
+					createdAt: now,
+					updatedAt: now,
+					filesTouched: [],
+				}));
 
-        // Add to board
-        board.tasks.push(...newTasks);
-        board.updatedAt = now;
-        if (board.metrics) {
-          board.metrics.total = board.tasks.length;
-        }
+				// Add to board
+				board.tasks.push(...newTasks);
+				board.updatedAt = now;
+				if (board.metrics) {
+					board.metrics.total = board.tasks.length;
+				}
 
-        await storage.writeBoard(board);
+				await storage.writeBoard(board);
 
-        return NextResponse.json({ success: true, tasks: newTasks });
-      }
+				return NextResponse.json({ success: true, tasks: newTasks });
+			}
 
-      case 'prioritize': {
-        const { criteria } = data;
+			case "prioritize": {
+				const { criteria } = data;
 
-        const result = await generateObject({
-          model: openai(settings.aiPreferences.defaultModel || 'gpt-4-turbo'),
-          schema: z.object({
-            prioritized: z.array(z.object({
-              taskId: z.string(),
-              priority: z.enum(['low', 'medium', 'high', 'urgent']),
-              reasoning: z.string(),
-            })),
-          }),
-          prompt: `Prioritize these tasks based on: ${criteria || 'business value, dependencies, and risk'}
+				const result = await generateObject({
+					model: openai(settings.aiPreferences.defaultModel || "gpt-4-turbo"),
+					schema: z.object({
+						prioritized: z.array(
+							z.object({
+								taskId: z.string(),
+								priority: z.enum(["low", "medium", "high", "urgent"]),
+								reasoning: z.string(),
+							}),
+						),
+					}),
+					prompt: `Prioritize these tasks based on: ${criteria || "business value, dependencies, and risk"}
 
 Tasks:
-${board.tasks.map(t => `- [${t.id}] ${t.description} (current: ${t.priority})`).join('\n')}
+${board.tasks.map((t) => `- [${t.id}] ${t.description} (current: ${t.priority})`).join("\n")}
 
 Project context: ${settings.projectDescription}`,
-        });
+				});
 
-        // Update task priorities
-        result.object.prioritized.forEach(({ taskId, priority }) => {
-          const task = board.tasks.find(t => t.id === taskId);
-          if (task) {
-            task.priority = priority;
-            task.updatedAt = new Date().toISOString();
-          }
-        });
+				// Update task priorities
+				result.object.prioritized.forEach(({ taskId, priority }) => {
+					const task = board.tasks.find((t) => t.id === taskId);
+					if (task) {
+						task.priority = priority;
+						task.updatedAt = new Date().toISOString();
+					}
+				});
 
-        await storage.writeBoard(board);
+				await storage.writeBoard(board);
 
-        return NextResponse.json({
-          success: true,
-          prioritized: result.object.prioritized
-        });
-      }
+				return NextResponse.json({
+					success: true,
+					prioritized: result.object.prioritized,
+				});
+			}
 
-      case 'split-sprints': {
-        const result = await generateObject({
-          model: openai(settings.aiPreferences.defaultModel || 'gpt-4-turbo'),
-          schema: z.object({
-            sprints: z.array(z.object({
-              name: z.string(),
-              goal: z.string(),
-              taskIds: z.array(z.string()),
-              durationWeeks: z.number(),
-            })),
-          }),
-          prompt: `Split these ${board.tasks.length} tasks into logical sprints (2-3 week iterations).
+			case "split-sprints": {
+				const result = await generateObject({
+					model: openai(settings.aiPreferences.defaultModel || "gpt-4-turbo"),
+					schema: z.object({
+						sprints: z.array(
+							z.object({
+								name: z.string(),
+								goal: z.string(),
+								taskIds: z.array(z.string()),
+								durationWeeks: z.number(),
+							}),
+						),
+					}),
+					prompt: `Split these ${board.tasks.length} tasks into logical sprints (2-3 week iterations).
 
 Tasks:
-${board.tasks.map(t => `- [${t.id}] ${t.description} (${t.priority}, ${t.estimate || '?'} pts)`).join('\n')}
+${board.tasks.map((t) => `- [${t.id}] ${t.description} (${t.priority}, ${t.estimate || "?"} pts)`).join("\n")}
 
 Consider:
 - Dependencies between tasks
 - Priority and risk
 - Team velocity (assume ~20-30 pts per sprint)
 - Logical groupings`,
-        });
+				});
 
-        return NextResponse.json({
-          success: true,
-          sprints: result.object.sprints
-        });
-      }
+				return NextResponse.json({
+					success: true,
+					sprints: result.object.sprints,
+				});
+			}
 
-      case 'improve-acceptance': {
-        const result = await generateText({
-          model: openai(settings.aiPreferences.defaultModel || 'gpt-4-turbo'),
-          prompt: `Review and improve the acceptance criteria for these tasks. Make them more specific, testable, and comprehensive.
+			case "improve-acceptance": {
+				const result = await generateText({
+					model: openai(settings.aiPreferences.defaultModel || "gpt-4-turbo"),
+					prompt: `Review and improve the acceptance criteria for these tasks. Make them more specific, testable, and comprehensive.
 
 Tasks:
-${board.tasks.slice(0, 10).map(t => `
+${board.tasks
+	.slice(0, 10)
+	.map(
+		(t) => `
 Task: ${t.description}
 Current acceptance criteria:
-${t.acceptanceCriteria.map((s, i) => `${i + 1}. ${s}`).join('\n')}
-`).join('\n---\n')}
+${t.acceptanceCriteria.map((s, i) => `${i + 1}. ${s}`).join("\n")}
+`,
+	)
+	.join("\n---\n")}
 
 Provide improved acceptance criteria that are SMART (Specific, Measurable, Achievable, Relevant, Time-bound).`,
-        });
+				});
 
-        return NextResponse.json({
-          success: true,
-          improvements: result.text
-        });
-      }
+				return NextResponse.json({
+					success: true,
+					improvements: result.text,
+				});
+			}
 
-      default:
-        return NextResponse.json(
-          { error: 'Unknown action' },
-          { status: 400 }
-        );
-    }
-  } catch (error) {
-    console.error('AI board action error:', error);
-    return handleProjectRouteError(error);
-  }
+			default:
+				return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+		}
+	} catch (error) {
+		console.error("AI board action error:", error);
+		return handleProjectRouteError(error);
+	}
 }

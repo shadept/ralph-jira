@@ -2,106 +2,500 @@
 // Learn more: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
+  output     = "../generated/prisma"
+  engineType = "client"
 }
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
 }
 
-// Board model - represents a Kanban board/sprint
-model Board {
-  id        String   @id
-  name      String
-  goal      String
-  deadline  DateTime
-  status    String   // planned, active, completed, archived
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+// Note: SQLite doesn't support native enums, so we use String with validation
+// in application code. These comments document the valid values.
+
+// OrganizationRole: owner, admin, member
+// SubscriptionStatus: active, past_due, canceled, trialing, paused
+// BillingPeriod: monthly, yearly
+// SprintStatus: planning, active, completed, archived
+// TaskStatus: backlog, todo, in_progress, review, done
+// TaskPriority: low, medium, high, urgent
+// RunStatus: queued, running, stopped, completed, failed, canceled
+// RunReason: completed, max_iterations, canceled, error, usage_limit
+// ExecutorMode: local, docker, cloud
+// ApiKeyProvider: anthropic, openai
+
+// ============================================================================
+// USER & AUTH MODELS
+// ============================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  avatarUrl     String?
+  passwordHash  String?   // null for OAuth users
+  emailVerified Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+  deletedAt     DateTime? // Soft delete
+
+  memberships   OrganizationMember[]
+  sessions      Session[]
+  apiKeys       UserApiKey[]
+  runsTriggered Run[]     @relation("RunTriggeredBy")
+  tasksAssigned Task[]    @relation("TaskAssignee")
+  tasksCreated  Task[]    @relation("TaskCreator")
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-  // Metrics as JSON since they're optional and simple
-  metricsJson String? @map("metrics")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Relations
-  columns   Column[]
-  tasks     Task[]
-
-  @@map("boards")
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
 }
 
-// Column model - represents a board column
-model Column {
-  id      String @id @default(cuid())
-  columnId String  // The logical column ID (backlog, todo, etc.)
-  name    String
-  order   Int
+// ============================================================================
+// ORGANIZATION & MEMBERSHIP
+// ============================================================================
 
-  boardId String
-  board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+model Organization {
+  id           String   @id @default(cuid())
+  name         String
+  slug         String   @unique  // URL-friendly identifier
+  logoUrl      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
 
-  @@unique([boardId, columnId])
-  @@map("columns")
+  members      OrganizationMember[]
+  subscription Subscription?
+  projects     Project[]
+  apiKeys      OrganizationApiKey[]
+  usageRecords UsageRecord[]
+  invitations  Invitation[]
+
+  @@index([slug])
+  @@map("organizations")
 }
 
-// Task model - represents a task/issue
-model Task {
-  id          String   @id
-  category    String
-  description String
-  acceptanceCriteriaJson   String   @map("acceptance_criteria") // JSON array of acceptance criteria
-  passes      Boolean  @default(false)
-  status      String   // backlog, todo, in_progress, review, done
-  priority    String   @default("medium") // low, medium, high, urgent
-  estimate    Int?
+model OrganizationMember {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  role           String   @default("member") // owner, admin, member
+  joinedAt       DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("organization_members")
+}
+
+model Invitation {
+  id             String    @id @default(cuid())
+  organizationId String
+  email          String
+  role           String    @default("member") // owner, admin, member
+  token          String    @unique
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([organizationId])
+  @@map("invitations")
+}
+
+// ============================================================================
+// BILLING MODELS
+// ============================================================================
+
+model Plan {
+  id                  String   @id @default(cuid())
+  name                String   @unique  // "free", "pro", "enterprise"
+  displayName         String            // "Free", "Pro", "Enterprise"
+  description         String?
+
+  // Limits (null = unlimited)
+  maxUsers            Int?
+  maxProjects         Int?
+  maxAiRunsPerWeek    Int?
+  maxIterationsPerRun Int      @default(5)
+
+  // Pricing (in cents)
+  monthlyPriceCents   Int      @default(0)
+  yearlyPriceCents    Int      @default(0)
+
+  // Features & Add-ons as JSON
+  featuresJson        String   @default("{}")
+
+  // Stripe integration
+  stripeMonthlyPriceId String?
+  stripeYearlyPriceId  String?
+
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  subscriptions       Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id                   String   @id @default(cuid())
+  organizationId       String   @unique
+  planId               String
+  status               String   @default("active") // active, past_due, canceled, trialing, paused
+  billingPeriod        String   @default("monthly") // monthly, yearly
+
+  // Billing cycle
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  trialEndsAt          DateTime?
+
+  // Feature overrides (add-ons purchased on top of plan)
+  featureOverridesJson String   @default("{}")
+
+  // Stripe integration
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+
+  // Cancellation
+  cancelAtPeriodEnd    Boolean  @default(false)
+  canceledAt           DateTime?
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  organization         Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan                 Plan         @relation(fields: [planId], references: [id])
+
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model UsageRecord {
+  id              String       @id @default(cuid())
+  organizationId  String
+  periodStart     DateTime
+  periodEnd       DateTime
+  aiRunsCount     Int          @default(0)
+  iterationsCount Int          @default(0)
+  overageRunsCount Int         @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, periodStart])
+  @@index([periodEnd])
+  @@map("usage_records")
+}
+
+// ============================================================================
+// API KEY STORAGE (Encrypted)
+// ============================================================================
+
+model UserApiKey {
+  id           String   @id @default(cuid())
+  userId       String
+  provider     String   // anthropic, openai
+  name         String   // "My Anthropic Key"
+
+  // Encrypted storage
+  encryptedKey String
+  keyIv        String
+  keyHash      String   // For lookup without decryption
+
+  // Usage tracking
+  lastUsedAt   DateTime?
+  usageCount   Int      @default(0)
+
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  deletedAt    DateTime?
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider])
+  @@index([keyHash])
+  @@map("user_api_keys")
+}
+
+model OrganizationApiKey {
+  id             String   @id @default(cuid())
+  organizationId String
+  provider       String   // anthropic, openai
+  name           String
+
+  encryptedKey   String
+  keyIv          String
+  keyHash        String
+
+  lastUsedAt     DateTime?
+  usageCount     Int      @default(0)
+
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  deletedAt      DateTime?
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, provider])
+  @@map("organization_api_keys")
+}
+
+// ============================================================================
+// PROJECT MODEL
+// ============================================================================
+
+model Project {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String   // URL-friendly, unique within org
+  description    String?
+
+  // Repository (supports both remote URLs and local paths)
+  repoUrl        String?
+  repoBranch     String?  @default("main")
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  archivedAt     DateTime?
+  deletedAt      DateTime?
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  settings       ProjectSettings?
+  tasks          Task[]          // Tasks belong to project
+  sprints        Sprint[]        // Sprints organize tasks
+  runs           Run[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@map("projects")
+}
+
+model ProjectSettings {
+  id                  String   @id @default(cuid())
+  projectId           String   @unique
+
+  projectName         String
+  projectDescription  String
+  techStackJson       String   // ["typescript", "react", "prisma"]
+  howToTestJson       String   // { "commands": ["npm test"], "notes": "..." }
+  howToRunJson        String   // { "commands": ["npm run dev"], "notes": "..." }
+  aiPreferencesJson   String   // { "defaultModel": "claude-opus", ... }
+  repoConventionsJson String   // { "folders": {...}, "naming": "..." }
+  automationJson      String?  // { "setup": ["npm ci"], "maxIterations": 5 }
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  project             Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_settings")
+}
+
+// ============================================================================
+// SPRINT & TASK MODELS
+// ============================================================================
+
+// Key change: Tasks belong to Projects, not Sprints. Tasks are assigned to Sprints.
+
+model Sprint {
+  id          String   @id @default(cuid())
+  projectId   String
+  name        String
+  goal        String?
+  deadline    DateTime
+  status      String   @default("planning") // planning, active, completed, archived
+  metricsJson String?  // { velocity: 0, completed: 0, total: 0 }
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  tagsJson    String   @default("[]") @map("tags") // JSON array of tags
-  assignee    String?
-  filesTouchedJson String @default("[]") @map("files_touched") // JSON array
-  lastRun     DateTime?
-  failureNotes String?
+  archivedAt  DateTime?
 
-  boardId     String
-  board       Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks       Task[]   // Tasks assigned to this sprint
+  runs        Run[]
+  columns     SprintColumn[]
 
+  @@index([projectId])
+  @@index([status])
+  @@map("sprints")
+}
+
+model SprintColumn {
+  id        String @id @default(cuid())
+  sprintId  String
+  columnId  String // Logical ID: backlog, todo, in_progress, review, done
+  name      String
+  order     Int
+
+  sprint    Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+
+  @@unique([sprintId, columnId])
+  @@map("sprint_columns")
+}
+
+model Task {
+  id                     String    @id @default(cuid())
+  projectId              String    // Tasks belong to project
+  sprintId               String?   // Optional: assigned to sprint
+
+  // Core fields
+  category               String
+  title                  String?   // Short title
+  description            String    // Full description
+  acceptanceCriteriaJson String    // JSON array
+
+  // Status & tracking
+  status                 String    @default("backlog") // backlog, todo, in_progress, review, done
+  priority               String    @default("medium")  // low, medium, high, urgent
+  passes                 Boolean   @default(false)
+  estimate               Int?      // Story points or hours
+  deadline               DateTime? // Task-level deadline
+
+  // Metadata
+  tagsJson               String    @default("[]")
+  filesTouchedJson       String    @default("[]")
+
+  // Assignment
+  assigneeId             String?
+  createdById            String?
+
+  // Run tracking
+  lastRun                DateTime?
+  failureNotes           String?
+
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  project                Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sprint                 Sprint?   @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+  assignee               User?     @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  createdBy              User?     @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([sprintId])
+  @@index([status])
+  @@index([assigneeId])
   @@map("tasks")
 }
 
-// Settings model - project settings
-model Settings {
-  id                    String @id @default("default")
-  projectName           String
-  projectDescription    String
-  techStackJson         String @map("tech_stack") // JSON array
-  howToTestJson         String @map("how_to_test") // JSON object
-  howToRunJson          String @map("how_to_run") // JSON object
-  aiPreferencesJson     String @map("ai_preferences") // JSON object
-  repoConventionsJson   String @map("repo_conventions") // JSON object
-  automationJson        String? @map("automation") // JSON object, optional
+// ============================================================================
+// RUN MODEL (Replaces File-Based Runs)
+// ============================================================================
 
-  @@map("settings")
+model Run {
+  id                      String    @id @default(cuid())
+  runId                   String    @unique  // External ID (run-uuid format)
+  projectId               String
+  sprintId                String
+
+  // Status
+  status                  String    @default("queued") // queued, running, stopped, completed, failed, canceled
+  reason                  String?   // completed, max_iterations, canceled, error, usage_limit
+
+  // Timing
+  createdAt               DateTime  @default(now())
+  startedAt               DateTime?
+  finishedAt              DateTime?
+  lastProgressAt          DateTime?
+
+  // Configuration
+  maxIterations           Int
+  currentIteration        Int       @default(0)
+  executorMode            String    @default("local") // local, docker, cloud
+
+  // Sandbox info
+  sandboxPath             String
+  sandboxBranch           String?
+
+  // Task selection
+  selectedTaskIdsJson     String    // JSON array
+  lastTaskId              String?
+
+  // Execution details
+  lastMessage             String?
+  lastCommand             String?
+  lastCommandExitCode     Int?
+  errorsJson              String    @default("[]")
+
+  // Process tracking
+  pid                     Int?
+
+  // Result
+  prUrl                   String?
+
+  // Cancellation
+  cancellationRequestedAt DateTime?
+
+  // Who triggered
+  triggeredById           String?
+
+  project                 Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sprint                  Sprint    @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+  triggeredBy             User?     @relation("RunTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull)
+  commands                RunCommand[]
+  logs                    RunLog[]  // Progress logs belong to runs
+
+  @@index([projectId])
+  @@index([sprintId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("runs")
 }
 
-// RunLog model - stores run execution logs
+model RunCommand {
+  id         String    @id @default(cuid())
+  runId      String
+  command    String
+  argsJson   String    // JSON array
+  cwd        String
+  exitCode   Int?
+  startedAt  DateTime
+  finishedAt DateTime?
+
+  run        Run       @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@map("run_commands")
+}
+
 model RunLog {
-  id              String   @id @default(cuid())
-  runId           String   @unique
-  boardId         String
-  startTime       DateTime
-  endTime         DateTime?
-  tasksAttemptedJson String @map("tasks_attempted") // JSON array
-  status          String   // running, completed, failed, cancelled
-  environmentJson String?  @map("environment") // JSON object
-
-  @@map("run_logs")
-}
-
-// Progress model - stores progress log entries
-model Progress {
   id        String   @id @default(cuid())
+  runId     String   // Logs belong to runs
   entry     String
   createdAt DateTime @default(now())
 
-  @@map("progress")
+  run       Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([createdAt])
+  @@map("run_logs")
 }

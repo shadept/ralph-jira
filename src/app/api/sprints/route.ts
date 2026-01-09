@@ -7,14 +7,15 @@ import {
 export async function GET(request: Request) {
 	try {
 		const { storage } = await getProjectStorage(request);
+		// For now, use boards as sprints (backwards compatible)
 		const boardIds = await storage.listBoards();
-		const boards = await Promise.all(
+		const sprints = await Promise.all(
 			boardIds.map((id) => storage.readBoard(id)),
 		);
 
-		return NextResponse.json({ boards });
+		return NextResponse.json({ sprints });
 	} catch (error) {
-		console.error("Error fetching boards:", error);
+		console.error("Error fetching sprints:", error);
 		return handleProjectRouteError(error);
 	}
 }
@@ -22,17 +23,18 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
 	try {
 		const { storage } = await getProjectStorage(request);
-		const board = await request.json();
+		const sprint = await request.json();
 
 		const now = new Date().toISOString();
-		board.createdAt = board.createdAt || now;
-		board.updatedAt = now;
+		sprint.createdAt = sprint.createdAt || now;
+		sprint.updatedAt = now;
 
-		await storage.writeBoard(board);
+		// For now, use boards as sprints (backwards compatible)
+		await storage.writeBoard(sprint);
 
-		return NextResponse.json({ success: true, board });
+		return NextResponse.json({ success: true, sprint });
 	} catch (error) {
-		console.error("Error creating board:", error);
+		console.error("Error creating sprint:", error);
 		return handleProjectRouteError(error);
 	}
 }
