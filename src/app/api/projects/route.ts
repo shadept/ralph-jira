@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 
 export async function GET() {
 	try {
 		const session = await auth();
 		if (!session?.user?.id) {
-			return NextResponse.json(
-				{ error: "Unauthorized" },
-				{ status: 401 }
-			);
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
 		// Get user's organizations
@@ -53,7 +50,7 @@ export async function GET() {
 		console.error("Failed to list projects:", error);
 		return NextResponse.json(
 			{ error: "Failed to list projects" },
-			{ status: 500 }
+			{ status: 500 },
 		);
 	}
 }
@@ -62,19 +59,13 @@ export async function POST(request: Request) {
 	try {
 		const session = await auth();
 		if (!session?.user?.id) {
-			return NextResponse.json(
-				{ error: "Unauthorized" },
-				{ status: 401 }
-			);
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
 		const { name, organizationId, description, repoUrl } = await request.json();
 
 		if (!name) {
-			return NextResponse.json(
-				{ error: "Name is required" },
-				{ status: 400 }
-			);
+			return NextResponse.json({ error: "Name is required" }, { status: 400 });
 		}
 
 		// Verify user has access to the organization
@@ -87,7 +78,7 @@ export async function POST(request: Request) {
 			if (!membership) {
 				return NextResponse.json(
 					{ error: "No organization found" },
-					{ status: 400 }
+					{ status: 400 },
 				);
 			}
 			targetOrgId = membership.organizationId;
@@ -104,7 +95,7 @@ export async function POST(request: Request) {
 			if (!membership) {
 				return NextResponse.json(
 					{ error: "Access denied to organization" },
-					{ status: 403 }
+					{ status: 403 },
 				);
 			}
 		}
@@ -124,9 +115,7 @@ export async function POST(request: Request) {
 			},
 		});
 
-		const finalSlug = existingProject
-			? `${slug}-${Date.now()}`
-			: slug;
+		const finalSlug = existingProject ? `${slug}-${Date.now()}` : slug;
 
 		// Create project
 		const project = await prisma.project.create({
@@ -172,7 +161,7 @@ export async function POST(request: Request) {
 				error:
 					error instanceof Error ? error.message : "Failed to create project",
 			},
-			{ status: 400 }
+			{ status: 400 },
 		);
 	}
 }

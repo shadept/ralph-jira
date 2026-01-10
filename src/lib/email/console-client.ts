@@ -1,9 +1,9 @@
-import {
+import type {
 	EmailClient,
+	EmailTemplate,
 	SendEmailOptions,
 	SendEmailResult,
 	SendTemplateOptions,
-	EmailTemplate,
 } from "./interface";
 
 /**
@@ -13,7 +13,7 @@ import {
 export class ConsoleEmailClient implements EmailClient {
 	private getTemplateContent(
 		template: EmailTemplate,
-		variables: Record<string, string>
+		variables: Record<string, string>,
 	): { subject: string; html: string; text: string } {
 		switch (template) {
 			case "invitation":
@@ -151,7 +151,10 @@ If you didn't create an account, you can safely ignore this email.
 	}
 
 	async sendTemplate(options: SendTemplateOptions): Promise<SendEmailResult> {
-		const content = this.getTemplateContent(options.template, options.variables);
+		const content = this.getTemplateContent(
+			options.template,
+			options.variables,
+		);
 
 		return this.send({
 			to: options.to,

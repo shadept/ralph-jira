@@ -1,8 +1,17 @@
 "use client";
 
+import {
+	Buildings,
+	CaretDown,
+	GearSix,
+	Monitor,
+	Moon,
+	SignOut as SignOutIcon,
+	Sun,
+} from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
+import { signOut, useSession } from "next-auth/react";
 import { useTheme } from "next-themes";
-import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -15,18 +24,11 @@ import {
 	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-	CaretDown,
-	GearSix,
-	SignOut as SignOutIcon,
-	Buildings,
-	UserCircle,
-	Sun,
-	Moon,
-	Monitor,
-} from "@phosphor-icons/react";
 
-function getInitials(name: string | null | undefined, email: string | null | undefined): string {
+function getInitials(
+	name: string | null | undefined,
+	email: string | null | undefined,
+): string {
 	if (name) {
 		const parts = name.split(" ");
 		if (parts.length >= 2) {

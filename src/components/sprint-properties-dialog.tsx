@@ -1,30 +1,28 @@
 "use client";
 
-import { startTransition, useEffect, useState } from "react";
 import { useForm, useStore } from "@tanstack/react-form";
-import { Board } from "@/lib/schemas";
-
+import { startTransition, useEffect, useState } from "react";
+import type { Sprint } from "@/lib/schemas";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "./ui/alert-dialog";
+import { Button } from "./ui/button";
 import {
 	Dialog,
 	DialogContent,
+	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-	DialogFooter,
 } from "./ui/dialog";
-import {
-	AlertDialog,
-	AlertDialogContent,
-	AlertDialogHeader,
-	AlertDialogTitle,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogCancel,
-	AlertDialogAction,
-} from "./ui/alert-dialog";
-import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Textarea } from "./ui/textarea";
 import {
 	Select,
 	SelectContent,
@@ -32,16 +30,17 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "./ui/select";
+import { Textarea } from "./ui/textarea";
 
-export type BoardDialogMode = "create" | "edit";
+export type SprintDialogMode = "create" | "edit";
 
-interface BoardPropertiesDialogProps {
-	board: Board | null;
+interface SprintPropertiesDialogProps {
+	sprint: Sprint | null;
 	open: boolean;
 	onClose: () => void;
-	onSave: (board: Board) => Promise<void>;
-	onDelete?: (boardId: string) => Promise<void>;
-	mode?: BoardDialogMode;
+	onSave: (sprint: Sprint) => Promise<void>;
+	onDelete?: (sprintId: string) => Promise<void>;
+	mode?: SprintDialogMode;
 }
 
 const DEFAULT_COLUMNS = [
@@ -56,17 +55,17 @@ type FormValues = {
 	name: string;
 	goal: string;
 	deadline: string;
-	status: Board["status"];
+	status: Sprint["status"];
 };
 
-function createDefaultBoard(): Board {
+function createDefaultSprint(): Sprint {
 	const now = new Date().toISOString();
 	return {
-		id: `board-${Date.now()}`,
+		id: `sprint-${Date.now()}`,
 		name: "New Sprint",
 		goal: "",
 		deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-		status: "planned",
+		status: "planning",
 		columns: DEFAULT_COLUMNS,
 		tasks: [],
 		createdAt: now,
@@ -82,17 +81,17 @@ function formatDateForInput(isoString: string) {
 	}
 }
 
-function BoardForm({
-	board,
+function SprintForm({
+	sprint,
 	onSave,
 	onClose,
 	onDelete,
 	isCreateMode,
 }: {
-	board: Board;
-	onSave: (board: Board) => Promise<void>;
+	sprint: Sprint;
+	onSave: (sprint: Sprint) => Promise<void>;
 	onClose: () => void;
-	onDelete?: (boardId: string) => Promise<void>;
+	onDelete?: (sprintId: string) => Promise<void>;
 	isCreateMode: boolean;
 }) {
 	const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
@@ -102,10 +101,10 @@ function BoardForm({
 
 	const form = useForm({
 		defaultValues: {
-			name: board.name,
-			goal: board.goal,
-			deadline: formatDateForInput(board.deadline),
-			status: board.status,
+			name: sprint.name,
+			goal: sprint.goal || "",
+			deadline: formatDateForInput(sprint.deadline),
+			status: sprint.status,
 		} as FormValues,
 		onSubmit: async ({ value }) => {
 			setSaving(true);
@@ -113,15 +112,15 @@ function BoardForm({
 				const date = new Date(value.deadline);
 				date.setUTCHours(0, 0, 0, 0);
 
-				const updatedBoard: Board = {
-					...board,
+				const updatedSprint: Sprint = {
+					...sprint,
 					name: value.name,
 					goal: value.goal,
 					deadline: date.toISOString(),
 					status: value.status,
 					updatedAt: new Date().toISOString(),
 				};
-				await onSave(updatedBoard);
+				await onSave(updatedSprint);
 				onClose();
 			} finally {
 				setSaving(false);
@@ -132,20 +131,20 @@ function BoardForm({
 	const isDirty = useStore(form.store, (state) => {
 		const values = state.values;
 		return (
-			values.name !== board.name ||
-			values.goal !== board.goal ||
-			values.deadline !== formatDateForInput(board.deadline) ||
-			values.status !== board.status
+			values.name !== sprint.name ||
+			values.goal !== (sprint.goal || "") ||
+			values.deadline !== formatDateForInput(sprint.deadline) ||
+			values.status !== sprint.status
 		);
 	});
 
 	const canSave = useStore(form.store, (state) => {
 		if (isCreateMode) return Boolean(state.values.name.trim());
 		return (
-			state.values.name !== board.name ||
-			state.values.goal !== board.goal ||
-			state.values.deadline !== formatDateForInput(board.deadline) ||
-			state.values.status !== board.status
+			state.values.name !== sprint.name ||
+			state.values.goal !== (sprint.goal || "") ||
+			state.values.deadline !== formatDateForInput(sprint.deadline) ||
+			state.values.status !== sprint.status
 		);
 	});
 
@@ -166,7 +165,7 @@ function BoardForm({
 		if (!onDelete) return;
 		setDeleting(true);
 		try {
-			await onDelete(board.id);
+			await onDelete(sprint.id);
 			onClose();
 		} finally {
 			setDeleting(false);
@@ -174,7 +173,7 @@ function BoardForm({
 		}
 	};
 
-	const isProtectedBoard = board.id === "prd" || board.id === "active";
+	const isProtectedSprint = sprint.id === "prd" || sprint.id === "active";
 
 	return (
 		<>
@@ -189,7 +188,7 @@ function BoardForm({
 				<DialogContent className="max-w-lg">
 					<DialogHeader>
 						<DialogTitle>
-							{isCreateMode ? "Create Board" : "Board Properties"}
+							{isCreateMode ? "Create Sprint" : "Sprint Properties"}
 						</DialogTitle>
 					</DialogHeader>
 
@@ -252,14 +251,14 @@ function BoardForm({
 										<Select
 											value={field.state.value}
 											onValueChange={(value) =>
-												field.handleChange(value as Board["status"])
+												field.handleChange(value as Sprint["status"])
 											}
 										>
 											<SelectTrigger className="mt-1">
 												<SelectValue />
 											</SelectTrigger>
 											<SelectContent>
-												<SelectItem value="planned">Planned</SelectItem>
+												<SelectItem value="planning">Planning</SelectItem>
 												<SelectItem value="active">Active</SelectItem>
 												<SelectItem value="completed">Completed</SelectItem>
 												<SelectItem value="archived">Archived</SelectItem>
@@ -273,7 +272,7 @@ function BoardForm({
 						<div>
 							<Label>Columns</Label>
 							<div className="mt-1 space-y-1">
-								{board.columns.map((col) => (
+								{(sprint.columns || DEFAULT_COLUMNS).map((col) => (
 									<div
 										key={col.id}
 										className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50 text-sm text-muted-foreground"
@@ -295,9 +294,9 @@ function BoardForm({
 										type="button"
 										variant="destructive"
 										onClick={() => setConfirmDeleteOpen(true)}
-										disabled={saving || deleting || isProtectedBoard}
+										disabled={saving || deleting || isProtectedSprint}
 									>
-										Delete Board
+										Delete Sprint
 									</Button>
 								)}
 							</div>
@@ -316,7 +315,7 @@ function BoardForm({
 											? "Creating..."
 											: "Saving..."
 										: isCreateMode
-											? "Create Board"
+											? "Create Sprint"
 											: "Save Changes"}
 								</Button>
 							</div>
@@ -328,9 +327,9 @@ function BoardForm({
 			<AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Delete this board?</AlertDialogTitle>
+						<AlertDialogTitle>Delete this sprint?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This will permanently delete the board "{board.name}" and all of
+							This will permanently delete the sprint "{sprint.name}" and all of
 							its tasks. This action cannot be undone.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
@@ -344,7 +343,7 @@ function BoardForm({
 							}}
 							disabled={deleting}
 						>
-							{deleting ? "Deleting..." : "Delete Board"}
+							{deleting ? "Deleting..." : "Delete Sprint"}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
@@ -358,7 +357,7 @@ function BoardForm({
 					<AlertDialogHeader>
 						<AlertDialogTitle>Discard changes?</AlertDialogTitle>
 						<AlertDialogDescription>
-							You have unsaved changes to the board properties. If you discard
+							You have unsaved changes to the sprint properties. If you discard
 							now, your changes will be lost.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
@@ -379,39 +378,39 @@ function BoardForm({
 	);
 }
 
-export function BoardPropertiesDialog({
-	board,
+export function SprintPropertiesDialog({
+	sprint,
 	open,
 	onClose,
 	onSave,
 	onDelete,
 	mode = "edit",
-}: BoardPropertiesDialogProps) {
-	const [editedBoard, setEditedBoard] = useState<Board | null>(null);
+}: SprintPropertiesDialogProps) {
+	const [editedSprint, setEditedSprint] = useState<Sprint | null>(null);
 	const isCreateMode = mode === "create";
 
 	useEffect(() => {
 		startTransition(() => {
 			if (isCreateMode && open) {
-				setEditedBoard(createDefaultBoard());
-			} else if (board && open) {
-				setEditedBoard({
-					...board,
-					columns: [...board.columns],
-					tasks: [...board.tasks],
+				setEditedSprint(createDefaultSprint());
+			} else if (sprint && open) {
+				setEditedSprint({
+					...sprint,
+					columns: sprint.columns ? [...sprint.columns] : DEFAULT_COLUMNS,
+					tasks: sprint.tasks ? [...sprint.tasks] : [],
 				});
 			} else {
-				setEditedBoard(null);
+				setEditedSprint(null);
 			}
 		});
-	}, [board, isCreateMode, open]);
+	}, [sprint, isCreateMode, open]);
 
-	if (!open || !editedBoard) return null;
+	if (!open || !editedSprint) return null;
 
 	return (
-		<BoardForm
-			key={editedBoard.id}
-			board={editedBoard}
+		<SprintForm
+			key={editedSprint.id}
+			sprint={editedSprint}
 			onSave={onSave}
 			onClose={onClose}
 			onDelete={onDelete}

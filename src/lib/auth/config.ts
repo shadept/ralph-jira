@@ -1,9 +1,9 @@
+import bcrypt from "bcryptjs";
 import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import GitHub from "next-auth/providers/github";
-import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { prisma } from "@/lib/db";
 
 const loginSchema = z.object({
 	email: z.string().email(),
@@ -67,7 +67,7 @@ export const authConfig: NextAuthConfig = {
 		}),
 	],
 	callbacks: {
-		async signIn({ user, account, profile }) {
+		async signIn({ account, profile }) {
 			try {
 				if (account?.provider === "github" && profile?.email) {
 					// Check if user exists

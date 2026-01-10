@@ -30,7 +30,7 @@ async function runOpencodeModels(): Promise<string[]> {
 			const execError = error as NodeJS.ErrnoException & { stderr?: string };
 			if (execError.code === "ENOENT") {
 				throw new OpencodeModelsError(
-					"opencode CLI is not installed or not on the PATH."
+					"opencode CLI is not installed or not on the PATH.",
 				);
 			}
 			const stderr =

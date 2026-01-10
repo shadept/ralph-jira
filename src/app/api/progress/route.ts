@@ -24,10 +24,15 @@ export async function GET(request: Request) {
 		// Format as progress text
 		const progress = logs
 			.reverse()
-			.map((log) => `[${log.createdAt.toISOString()}] [${log.run.runId}]\n${log.entry}`)
+			.map(
+				(log) =>
+					`[${log.createdAt.toISOString()}] [${log.run.runId}]\n${log.entry}`,
+			)
 			.join("\n\n");
 
-		return NextResponse.json({ progress: progress || "# Project Progress Log\n" });
+		return NextResponse.json({
+			progress: progress || "# Project Progress Log\n",
+		});
 	} catch (error) {
 		console.error("Error fetching progress:", error);
 		return handleProjectRouteError(error);

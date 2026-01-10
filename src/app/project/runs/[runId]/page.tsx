@@ -1,14 +1,13 @@
 "use client";
 
-import { use, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-
+import { AnsiLog } from "@/components/ansi-log";
 import { AppLayout } from "@/components/layout/app-layout";
 import { useProjectContext } from "@/components/projects/project-provider";
-import { RunRecord } from "@/lib/schemas";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AnsiLog } from "@/components/ansi-log";
 import {
 	Card,
 	CardContent,
@@ -16,8 +15,8 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import type { RunRecord } from "@/lib/schemas";
 
 const RUN_STATUS_STYLES: Record<RunRecord["status"], string> = {
 	queued:
@@ -103,7 +102,7 @@ export default function RunDetailPage({
 		if (!run || !["running", "queued"].includes(run.status)) return;
 		const interval = setInterval(loadRun, 5000);
 		return () => clearInterval(interval);
-	}, [run?.status, loadRun]);
+	}, [run?.status, loadRun, run]);
 
 	// Scroll log to bottom after data loads
 	useEffect(() => {

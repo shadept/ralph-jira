@@ -7,7 +7,7 @@ import {
 
 export async function GET(
 	request: Request,
-	{ params }: { params: Promise<{ runId: string }> }
+	{ params }: { params: Promise<{ runId: string }> },
 ) {
 	try {
 		const { runId } = await params;
@@ -51,7 +51,7 @@ export async function GET(
 
 export async function POST(
 	request: Request,
-	{ params }: { params: Promise<{ runId: string }> }
+	{ params }: { params: Promise<{ runId: string }> },
 ) {
 	try {
 		const { runId } = await params;
@@ -61,7 +61,7 @@ export async function POST(
 		if (typeof body.entry !== "string") {
 			return NextResponse.json(
 				{ error: "Missing or invalid entry field" },
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 

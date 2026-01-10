@@ -7,7 +7,7 @@ import {
 
 export async function POST(
 	request: Request,
-	{ params }: { params: Promise<{ runId: string }> }
+	{ params }: { params: Promise<{ runId: string }> },
 ) {
 	try {
 		const { runId } = await params;
@@ -41,8 +41,7 @@ export async function POST(
 			where: { id: run.id },
 			data: {
 				lastMessage,
-				cancellationRequestedAt:
-					run.cancellationRequestedAt || new Date(),
+				cancellationRequestedAt: run.cancellationRequestedAt || new Date(),
 				status: "canceled",
 				reason: "canceled",
 				finishedAt: forceKilled ? new Date() : run.finishedAt,

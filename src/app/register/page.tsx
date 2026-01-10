@@ -1,24 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import {
+	ArrowLeft,
+	ArrowRight,
+	Building,
+	CheckCircle,
+	Envelope,
+	Eye,
+	EyeSlash,
+	Lock,
+	Robot,
+	User,
+} from "@phosphor-icons/react";
+import { useForm } from "@tanstack/react-form";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { useForm } from "@tanstack/react-form";
-import {
-	Robot,
-	Building,
-	User,
-	ArrowRight,
-	ArrowLeft,
-	CheckCircle,
-	Envelope,
-	Lock,
-	Eye,
-	EyeSlash,
-} from "@phosphor-icons/react";
+import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
 	Card,
 	CardContent,
@@ -26,7 +26,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
 
 type FormErrors = Record<string, string[]>;
 
@@ -76,7 +76,7 @@ export default function RegisterPage() {
 
 				if (signInResult?.error) {
 					toast.error(
-						"Account created but couldn't sign in. Please log in manually."
+						"Account created but couldn't sign in. Please log in manually.",
 					);
 					router.push("/login");
 				} else {
@@ -234,7 +234,7 @@ export default function RegisterPage() {
 													field.handleChange(
 														e.target.value
 															.toLowerCase()
-															.replace(/[^a-z0-9-]/g, "")
+															.replace(/[^a-z0-9-]/g, ""),
 													)
 												}
 												className="rounded-l-none"

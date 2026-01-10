@@ -1,5 +1,5 @@
-import crypto from "node:crypto";
 import { spawn } from "node:child_process";
+import crypto from "node:crypto";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
@@ -7,7 +7,7 @@ import {
 	getProjectContextFromParams,
 	handleProjectRouteError,
 } from "@/lib/projects/db-server";
-import { resolveRunnerCommand } from "@/lib/runs/store";
+import { resolveRunnerCommand } from "@/lib/runs/runner-command";
 
 const PRIORITY_STATUSES = new Set(["in_progress", "todo"]);
 
@@ -39,12 +39,12 @@ function isValidBranchName(name: string) {
 	) {
 		return false;
 	}
-	return /^[A-Za-z0-9._\/-]+$/.test(name);
+	return /^[A-Za-z0-9._/-]+$/.test(name);
 }
 
 export async function POST(
 	request: Request,
-	{ params }: { params: Promise<{ id: string }> }
+	{ params }: { params: Promise<{ id: string }> },
 ) {
 	try {
 		const { id } = await params;
@@ -60,11 +60,11 @@ export async function POST(
 					error:
 						"branchName is required and may only include letters, numbers, ., -, _, and / (no spaces).",
 				},
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
-		let sprint;
+		let sprint = null;
 		if (requestedSprintId) {
 			sprint = await prisma.sprint.findFirst({
 				where: {
@@ -88,7 +88,7 @@ export async function POST(
 		if (!sprint) {
 			return NextResponse.json(
 				{ error: "No sprint found for this project" },
-				{ status: 404 }
+				{ status: 404 },
 			);
 		}
 

@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 
 const transferSchema = z.object({
 	newOwnerMemberId: z.string().min(1, "New owner member ID is required"),
@@ -15,14 +15,14 @@ const transferSchema = z.object({
  */
 export async function POST(
 	request: NextRequest,
-	{ params }: { params: Promise<{ orgId: string }> }
+	{ params }: { params: Promise<{ orgId: string }> },
 ) {
 	try {
 		const session = await auth();
 		if (!session?.user?.id) {
 			return NextResponse.json(
 				{ success: false, error: "Unauthorized" },
-				{ status: 401 }
+				{ status: 401 },
 			);
 		}
 
@@ -44,7 +44,7 @@ export async function POST(
 					success: false,
 					error: "Only the organization owner can transfer ownership",
 				},
-				{ status: 403 }
+				{ status: 403 },
 			);
 		}
 
@@ -57,7 +57,7 @@ export async function POST(
 					success: false,
 					errors: parsed.error.flatten().fieldErrors,
 				},
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
@@ -79,7 +79,7 @@ export async function POST(
 					success: false,
 					error: "The selected member is not part of this organization",
 				},
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
@@ -89,7 +89,7 @@ export async function POST(
 					success: false,
 					error: "You cannot transfer ownership to yourself",
 				},
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
@@ -115,7 +115,7 @@ export async function POST(
 		console.error("Error transferring ownership:", error);
 		return NextResponse.json(
 			{ success: false, error: "Failed to transfer ownership" },
-			{ status: 500 }
+			{ status: 500 },
 		);
 	}
 }

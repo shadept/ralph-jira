@@ -1,11 +1,11 @@
 "use client";
 
-import { useDroppable, useDndContext } from "@dnd-kit/core";
+import { useDndContext, useDroppable } from "@dnd-kit/core";
 import {
 	SortableContext,
 	verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Column, Task } from "@/lib/schemas";
+import type { Column, Task } from "@/lib/schemas";
 import { TaskCard } from "./task-card";
 import { Badge } from "./ui/badge";
 

@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useMemo } from "react";
+import type React from "react";
+import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 
 interface AnsiLogProps {
@@ -61,7 +62,7 @@ export function AnsiLog({ content, className }: AnsiLogProps) {
 
 		const parts = fullText.split(ANSI_REGEX);
 		const result: React.ReactNode[] = [];
-		let activeStyles = new Set<string>();
+		const activeStyles = new Set<string>();
 
 		parts.forEach((part, index) => {
 			if (ANSI_REGEX.test(part)) {

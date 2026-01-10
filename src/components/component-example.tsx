@@ -1,7 +1,36 @@
 "use client";
 
+import {
+	BellIcon,
+	BluetoothIcon,
+	CodeIcon,
+	CreditCardIcon,
+	DotsThreeOutlineIcon,
+	DotsThreeVerticalIcon,
+	DownloadIcon,
+	EnvelopeIcon,
+	EyeIcon,
+	FileIcon,
+	FileTextIcon,
+	FloppyDiskIcon,
+	FolderIcon,
+	FolderOpenIcon,
+	GearIcon,
+	KeyboardIcon,
+	LayoutIcon,
+	MagnifyingGlassIcon,
+	MonitorIcon,
+	MoonIcon,
+	PaletteIcon,
+	PlusIcon,
+	QuestionIcon,
+	ShieldIcon,
+	SignOutIcon,
+	SunIcon,
+	TranslateIcon,
+	UserIcon,
+} from "@phosphor-icons/react";
 import * as React from "react";
-
 import { Example, ExampleWrapper } from "@/components/example";
 import {
 	AlertDialog,
@@ -62,36 +91,6 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-	PlusIcon,
-	BluetoothIcon,
-	DotsThreeVerticalIcon,
-	FileIcon,
-	FolderIcon,
-	FolderOpenIcon,
-	CodeIcon,
-	DotsThreeOutlineIcon,
-	MagnifyingGlassIcon,
-	FloppyDiskIcon,
-	DownloadIcon,
-	EyeIcon,
-	LayoutIcon,
-	PaletteIcon,
-	SunIcon,
-	MoonIcon,
-	MonitorIcon,
-	UserIcon,
-	CreditCardIcon,
-	GearIcon,
-	KeyboardIcon,
-	TranslateIcon,
-	BellIcon,
-	EnvelopeIcon,
-	ShieldIcon,
-	QuestionIcon,
-	FileTextIcon,
-	SignOutIcon,
-} from "@phosphor-icons/react";
 
 export function ComponentExample() {
 	return (

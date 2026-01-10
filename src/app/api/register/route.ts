@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/db";
+import { type NextRequest, NextResponse } from "next/server";
 import { orgRegistrationSchema } from "@/lib/auth/registration";
+import { prisma } from "@/lib/db";
 
 /**
  * POST /api/register
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 					success: false,
 					errors: parsed.error.flatten().fieldErrors,
 				},
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 						orgSlug: ["This organization URL is already taken"],
 					},
 				},
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
 						email: ["An account with this email already exists"],
 					},
 				},
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
@@ -150,7 +150,8 @@ export async function POST(request: NextRequest) {
 				data: {
 					projectId: project.id,
 					projectName: "My Project",
-					projectDescription: "Your first project - update this with your project details",
+					projectDescription:
+						"Your first project - update this with your project details",
 					techStackJson: JSON.stringify([]),
 					howToTestJson: JSON.stringify({ commands: [], notes: "" }),
 					howToRunJson: JSON.stringify({ commands: [], notes: "" }),
@@ -198,7 +199,8 @@ export async function POST(request: NextRequest) {
 				{
 					category: "setup",
 					title: "Update Project Settings",
-					description: "Configure your project settings with the correct information",
+					description:
+						"Configure your project settings with the correct information",
 					acceptanceCriteria: [
 						"Add your repository URL",
 						"Define your tech stack",
@@ -265,7 +267,7 @@ export async function POST(request: NextRequest) {
 				success: false,
 				errors: { _form: ["An unexpected error occurred during registration"] },
 			},
-			{ status: 500 }
+			{ status: 500 },
 		);
 	}
 }

@@ -6,8 +6,8 @@ import {
 } from "@/lib/projects/db-server";
 
 export async function GET(
-	request: Request,
-	{ params }: { params: Promise<{ id: string }> }
+	_request: Request,
+	{ params }: { params: Promise<{ id: string }> },
 ) {
 	try {
 		const { id } = await params;

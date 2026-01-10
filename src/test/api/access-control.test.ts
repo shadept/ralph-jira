@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock auth helpers
 const mockCheckOrgAccess = vi.fn();
@@ -11,7 +11,7 @@ const mockUsers = {
 	user2: { id: "user-2", email: "user2@example.com", name: "User Two" },
 };
 
-const mockOrgs = {
+const _mockOrgs = {
 	org1: { id: "org-1", name: "Org One", slug: "org-one" },
 	org2: { id: "org-2", name: "Org Two", slug: "org-two" },
 };
@@ -94,7 +94,7 @@ describe("Cross-Organization Access Prevention", () => {
 			(
 				userId: string,
 				orgId: string,
-				requiredRole?: "owner" | "admin" | "member"
+				requiredRole?: "owner" | "admin" | "member",
 			) => {
 				const membership = mockMemberships[userId]?.[orgId];
 				if (!membership) return null;
@@ -108,7 +108,7 @@ describe("Cross-Organization Access Prevention", () => {
 				if (userRoleLevel < requiredRoleLevel) return null;
 
 				return { organizationId: orgId, role: membership.role };
-			}
+			},
 		);
 
 		mockCheckProjectAccess.mockImplementation(
@@ -124,7 +124,7 @@ describe("Cross-Organization Access Prevention", () => {
 					projectId,
 					role: membership.role,
 				};
-			}
+			},
 		);
 	});
 
@@ -203,7 +203,7 @@ describe("API Endpoint Protection", () => {
 			"/api/plans",
 		];
 		return publicRoutes.some(
-			(route) => path === route || path.startsWith(`${route}/`)
+			(route) => path === route || path.startsWith(`${route}/`),
 		);
 	};
 
@@ -259,8 +259,14 @@ describe("Session Security", () => {
 	});
 
 	it("should validate user exists in session", () => {
-		const sessionWithUser = { user: { id: "user-1" } as { id: string } | null, expires: "" };
-		const sessionWithoutUser = { user: null as { id: string } | null, expires: "" };
+		const sessionWithUser = {
+			user: { id: "user-1" } as { id: string } | null,
+			expires: "",
+		};
+		const sessionWithoutUser = {
+			user: null as { id: string } | null,
+			expires: "",
+		};
 
 		expect(sessionWithUser.user?.id).toBeDefined();
 		expect(sessionWithoutUser.user?.id).toBeUndefined();

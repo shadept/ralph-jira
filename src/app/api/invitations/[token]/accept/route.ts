@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 
@@ -21,8 +21,8 @@ const acceptInviteSchema = z.object({
  * Get invitation details for displaying the accept form
  */
 export async function GET(
-	request: NextRequest,
-	{ params }: { params: Promise<{ token: string }> }
+	_request: NextRequest,
+	{ params }: { params: Promise<{ token: string }> },
 ) {
 	try {
 		const { token } = await params;
@@ -42,21 +42,21 @@ export async function GET(
 		if (!invitation) {
 			return NextResponse.json(
 				{ success: false, error: "Invalid invitation" },
-				{ status: 404 }
+				{ status: 404 },
 			);
 		}
 
 		if (invitation.acceptedAt) {
 			return NextResponse.json(
 				{ success: false, error: "This invitation has already been accepted" },
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
 		if (invitation.expiresAt < new Date()) {
 			return NextResponse.json(
 				{ success: false, error: "This invitation has expired" },
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
@@ -81,7 +81,7 @@ export async function GET(
 		console.error("Error fetching invitation:", error);
 		return NextResponse.json(
 			{ success: false, error: "Failed to fetch invitation" },
-			{ status: 500 }
+			{ status: 500 },
 		);
 	}
 }
@@ -92,7 +92,7 @@ export async function GET(
  */
 export async function POST(
 	request: NextRequest,
-	{ params }: { params: Promise<{ token: string }> }
+	{ params }: { params: Promise<{ token: string }> },
 ) {
 	try {
 		const { token } = await params;
@@ -107,26 +107,26 @@ export async function POST(
 		if (!invitation) {
 			return NextResponse.json(
 				{ success: false, error: "Invalid invitation" },
-				{ status: 404 }
+				{ status: 404 },
 			);
 		}
 
 		if (invitation.acceptedAt) {
 			return NextResponse.json(
 				{ success: false, error: "This invitation has already been accepted" },
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
 		if (invitation.expiresAt < new Date()) {
 			return NextResponse.json(
 				{ success: false, error: "This invitation has expired" },
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
 		// Check if user already exists
-		let user = await prisma.user.findUnique({
+		const user = await prisma.user.findUnique({
 			where: { email: invitation.email },
 		});
 
@@ -165,7 +165,7 @@ export async function POST(
 					success: false,
 					errors: parsed.error.flatten().fieldErrors,
 				},
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
@@ -205,7 +205,7 @@ export async function POST(
 		console.error("Error accepting invitation:", error);
 		return NextResponse.json(
 			{ success: false, error: "Failed to accept invitation" },
-			{ status: 500 }
+			{ status: 500 },
 		);
 	}
 }

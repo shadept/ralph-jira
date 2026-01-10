@@ -1,6 +1,13 @@
-import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import {
+	checkRateLimit,
+	getClientIdentifier,
+	RATE_LIMITS,
+	type RateLimitConfig,
+	rateLimitResponse,
+} from "@/lib/rate-limit";
 
 // Public routes that don't require authentication
 const publicRoutes = [
@@ -17,7 +24,7 @@ const publicRoutes = [
 // Check if a path matches any public route
 function isPublicRoute(path: string): boolean {
 	return publicRoutes.some(
-		(route) => path === route || path.startsWith(`${route}/`)
+		(route) => path === route || path.startsWith(`${route}/`),
 	);
 }
 
@@ -30,6 +37,32 @@ function isStaticAsset(path: string): boolean {
 	);
 }
 
+// Get rate limit config based on path
+function getRateLimitConfig(pathname: string): RateLimitConfig | null {
+	// Skip rate limiting for non-API routes
+	if (!pathname.startsWith("/api/")) {
+		return null;
+	}
+
+	// Strict limits for auth endpoints (unauthenticated)
+	if (
+		pathname === "/api/register" ||
+		pathname.startsWith("/api/register/") ||
+		pathname === "/api/auth/signin" ||
+		pathname === "/api/auth/callback"
+	) {
+		return RATE_LIMITS.auth;
+	}
+
+	// AI endpoints need special limits
+	if (pathname.startsWith("/api/ai/")) {
+		return RATE_LIMITS.ai;
+	}
+
+	// Standard limits for all other API routes
+	return RATE_LIMITS.standard;
+}
+
 export async function proxy(request: NextRequest) {
 	const { pathname } = request.nextUrl;
 
@@ -38,9 +71,23 @@ export async function proxy(request: NextRequest) {
 		return NextResponse.next();
 	}
 
+	// Apply rate limiting for API routes
+	const rateLimitConfig = getRateLimitConfig(pathname);
+	if (rateLimitConfig) {
+		const clientId = getClientIdentifier(request);
+		const rateLimitKey = `${clientId}:${pathname.split("/").slice(0, 4).join("/")}`;
+
+		const result = checkRateLimit(rateLimitKey, rateLimitConfig);
+
+		if (!result.allowed) {
+			return rateLimitResponse(result.resetTime);
+		}
+	}
+
 	// Allow public routes
 	if (isPublicRoute(pathname)) {
-		return NextResponse.next();
+		const response = NextResponse.next();
+		return response;
 	}
 
 	// Check authentication
@@ -50,8 +97,8 @@ export async function proxy(request: NextRequest) {
 		// For API routes, return 401
 		if (pathname.startsWith("/api/")) {
 			return NextResponse.json(
-				{ error: "Unauthorized", message: "Please log in to access this resource" },
-				{ status: 401 }
+				{ error: "Unauthorized", code: "UNAUTHORIZED" },
+				{ status: 401 },
 			);
 		}
 

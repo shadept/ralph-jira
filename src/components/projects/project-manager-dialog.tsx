@@ -1,9 +1,13 @@
 "use client";
 
-import { ChangeEvent, useRef, useState } from "react";
 import { useForm } from "@tanstack/react-form";
+import { type ChangeEvent, useRef, useState } from "react";
 
 const BROWSER_FOLDER_LIMITATION_MESSAGE = `Chrome can't share the exact folder path. After you approve the "Upload folder" prompt, copy the full path from File Explorer (Alt + D → Ctrl + C) or Finder (⌘ + ⌥ + C) and paste it here.`;
+
+import { Trash } from "@phosphor-icons/react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
 	Dialog,
 	DialogContent,
@@ -14,11 +18,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useProjectContext } from "./project-provider";
-import { toast } from "sonner";
-import { Trash } from "@phosphor-icons/react";
 
 interface ProjectManagerDialogProps {
 	open: boolean;
@@ -50,11 +51,14 @@ export function ProjectManagerDialog({
 
 			try {
 				setSubmitting(true);
-				await addProject({ name: value.name.trim(), repoUrl: value.path.trim() });
+				await addProject({
+					name: value.name.trim(),
+					repoUrl: value.path.trim(),
+				});
 				form.reset();
 			} catch (error) {
 				toast.error(
-					error instanceof Error ? error.message : "Failed to create project"
+					error instanceof Error ? error.message : "Failed to create project",
 				);
 			} finally {
 				setSubmitting(false);
@@ -73,7 +77,7 @@ export function ProjectManagerDialog({
 			await removeProject(id);
 		} catch (error) {
 			toast.error(
-				error instanceof Error ? error.message : "Failed to remove project"
+				error instanceof Error ? error.message : "Failed to remove project",
 			);
 		} finally {
 			setRemovingId(null);
@@ -228,11 +232,11 @@ export function ProjectManagerDialog({
 										id="project-path-help"
 										className="text-xs text-muted-foreground mt-2"
 									>
-										Chrome will show an &ldquo;Upload folder&rdquo; prompt because
-										it scans the folder to infer its path. Ralph never uploads your
-										files—everything stays on this device. If the picker only
-										returns the folder name, copy the full path from your file
-										manager and paste it above.
+										Chrome will show an &ldquo;Upload folder&rdquo; prompt
+										because it scans the folder to infer its path. Ralph never
+										uploads your files—everything stays on this device. If the
+										picker only returns the folder name, copy the full path from
+										your file manager and paste it above.
 									</p>
 
 									{needsManualPathEntry && (

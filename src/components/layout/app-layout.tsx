@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
 import { ProjectSwitcher } from "@/components/projects/project-switcher";
 import { BackButton } from "./back-button";
 import { UserMenu } from "./user-menu";

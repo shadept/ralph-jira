@@ -2,10 +2,10 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Task } from "@/lib/schemas";
-import { Card } from "./ui/card";
-import { Badge } from "./ui/badge";
 import { CheckCircle, Circle } from "@phosphor-icons/react";
+import type { Task } from "@/lib/schemas";
+import { Badge } from "./ui/badge";
+import { Card } from "./ui/card";
 
 interface TaskCardProps {
 	task: Task;

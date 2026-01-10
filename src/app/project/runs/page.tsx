@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AppLayout } from "@/components/layout/app-layout";
 import { useProjectContext } from "@/components/projects/project-provider";
-import { RunRecord } from "@/lib/schemas";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -15,7 +15,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import type { RunRecord } from "@/lib/schemas";
 
 const RUN_STATUS_STYLES: Record<RunRecord["status"], string> = {
 	queued:

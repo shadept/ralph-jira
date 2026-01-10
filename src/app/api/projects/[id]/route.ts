@@ -1,18 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 
 export async function GET(
-	request: NextRequest,
-	{ params }: { params: Promise<{ id: string }> }
+	_request: NextRequest,
+	{ params }: { params: Promise<{ id: string }> },
 ) {
 	try {
 		const session = await auth();
 		if (!session?.user?.id) {
-			return NextResponse.json(
-				{ error: "Unauthorized" },
-				{ status: 401 }
-			);
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
 		const { id } = await params;
@@ -28,10 +25,7 @@ export async function GET(
 		});
 
 		if (!project) {
-			return NextResponse.json(
-				{ error: "Project not found" },
-				{ status: 404 }
-			);
+			return NextResponse.json({ error: "Project not found" }, { status: 404 });
 		}
 
 		// Verify user has access to this project's organization
@@ -45,10 +39,7 @@ export async function GET(
 		});
 
 		if (!membership) {
-			return NextResponse.json(
-				{ error: "Access denied" },
-				{ status: 403 }
-			);
+			return NextResponse.json({ error: "Access denied" }, { status: 403 });
 		}
 
 		return NextResponse.json({
@@ -69,22 +60,19 @@ export async function GET(
 		console.error("Failed to get project:", error);
 		return NextResponse.json(
 			{ error: "Failed to get project" },
-			{ status: 500 }
+			{ status: 500 },
 		);
 	}
 }
 
 export async function PUT(
 	request: NextRequest,
-	{ params }: { params: Promise<{ id: string }> }
+	{ params }: { params: Promise<{ id: string }> },
 ) {
 	try {
 		const session = await auth();
 		if (!session?.user?.id) {
-			return NextResponse.json(
-				{ error: "Unauthorized" },
-				{ status: 401 }
-			);
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
 		const { id } = await params;
@@ -95,10 +83,7 @@ export async function PUT(
 		});
 
 		if (!project) {
-			return NextResponse.json(
-				{ error: "Project not found" },
-				{ status: 404 }
-			);
+			return NextResponse.json({ error: "Project not found" }, { status: 404 });
 		}
 
 		// Verify user has access
@@ -112,10 +97,7 @@ export async function PUT(
 		});
 
 		if (!membership) {
-			return NextResponse.json(
-				{ error: "Access denied" },
-				{ status: 403 }
-			);
+			return NextResponse.json({ error: "Access denied" }, { status: 403 });
 		}
 
 		const updatedProject = await prisma.project.update({
@@ -143,22 +125,19 @@ export async function PUT(
 		console.error("Failed to update project:", error);
 		return NextResponse.json(
 			{ error: "Failed to update project" },
-			{ status: 500 }
+			{ status: 500 },
 		);
 	}
 }
 
 export async function DELETE(
-	request: NextRequest,
-	{ params }: { params: Promise<{ id: string }> }
+	_request: NextRequest,
+	{ params }: { params: Promise<{ id: string }> },
 ) {
 	try {
 		const session = await auth();
 		if (!session?.user?.id) {
-			return NextResponse.json(
-				{ error: "Unauthorized" },
-				{ status: 401 }
-			);
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
 		const { id } = await params;
@@ -168,10 +147,7 @@ export async function DELETE(
 		});
 
 		if (!project) {
-			return NextResponse.json(
-				{ error: "Project not found" },
-				{ status: 404 }
-			);
+			return NextResponse.json({ error: "Project not found" }, { status: 404 });
 		}
 
 		// Verify user has admin access
@@ -187,7 +163,7 @@ export async function DELETE(
 		if (!membership || membership.role === "member") {
 			return NextResponse.json(
 				{ error: "Admin access required to delete projects" },
-				{ status: 403 }
+				{ status: 403 },
 			);
 		}
 
@@ -202,7 +178,7 @@ export async function DELETE(
 		console.error("Failed to delete project:", error);
 		return NextResponse.json(
 			{ error: "Failed to delete project" },
-			{ status: 500 }
+			{ status: 500 },
 		);
 	}
 }

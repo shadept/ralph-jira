@@ -1,8 +1,5 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import { toast } from "sonner";
 import {
 	CaretDown,
 	CaretRight,
@@ -11,19 +8,21 @@ import {
 	ListChecks,
 	Plus,
 } from "@phosphor-icons/react";
-
-import { Task } from "@/lib/schemas";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
 import { useProjectContext } from "@/components/projects/project-provider";
 import { TaskEditorDialog } from "@/components/task-editor-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
 	Collapsible,
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import type { Task } from "@/lib/schemas";
 
 type SprintInfo = {
 	id: string;
@@ -103,10 +102,7 @@ function TaskRow({
 						>
 							{statusLabels[task.status] || task.status}
 						</Badge>
-						<Badge
-							variant="outline"
-							className={priorityColors[task.priority]}
-						>
+						<Badge variant="outline" className={priorityColors[task.priority]}>
 							{task.priority}
 						</Badge>
 					</div>
@@ -150,7 +146,8 @@ function TaskGroupSection({
 }) {
 	const [isOpen, setIsOpen] = useState(defaultOpen);
 	const completedCount = group.tasks.filter((t) => t.passes).length;
-	const allDone = group.tasks.length > 0 && completedCount === group.tasks.length;
+	const allDone =
+		group.tasks.length > 0 && completedCount === group.tasks.length;
 
 	return (
 		<Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -297,7 +294,9 @@ export default function AllTasksPage() {
 			handleCloseEditor();
 			await loadTasks();
 		} catch (error) {
-			toast.error(isNewTask ? "Failed to create task" : "Failed to update task");
+			toast.error(
+				isNewTask ? "Failed to create task" : "Failed to update task",
+			);
 			console.error(error);
 		}
 	};

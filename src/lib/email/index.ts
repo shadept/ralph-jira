@@ -1,8 +1,8 @@
-import { EmailClient } from "./interface";
 import { ConsoleEmailClient } from "./console-client";
+import type { EmailClient } from "./interface";
 
-export * from "./interface";
 export * from "./console-client";
+export * from "./interface";
 
 // Factory function to get email client based on environment
 export function getEmailClient(): EmailClient {

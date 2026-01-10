@@ -1,8 +1,8 @@
-import { PrismaClient } from "../../generated/prisma";
+import { execSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import path from "path";
-import fs from "fs";
-import { execSync } from "child_process";
+import { PrismaClient } from "../../generated/prisma";
 
 // Use an in-memory database for testing
 let testPrisma: PrismaClient | null = null;

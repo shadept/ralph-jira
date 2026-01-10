@@ -1,5 +1,5 @@
-import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 
 export interface AuthenticatedUser {
 	id: string;
@@ -35,7 +35,7 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> 
 export async function checkOrgAccess(
 	userId: string,
 	orgId: string,
-	requiredRole?: "owner" | "admin" | "member"
+	requiredRole?: "owner" | "admin" | "member",
 ): Promise<OrgMembership | null> {
 	const membership = await prisma.organizationMember.findUnique({
 		where: {
@@ -52,10 +52,9 @@ export async function checkOrgAccess(
 
 	// Role hierarchy: owner > admin > member
 	const roleHierarchy = { owner: 3, admin: 2, member: 1 };
-	const userRoleLevel = roleHierarchy[membership.role as keyof typeof roleHierarchy] || 0;
-	const requiredRoleLevel = requiredRole
-		? roleHierarchy[requiredRole] || 0
-		: 0;
+	const userRoleLevel =
+		roleHierarchy[membership.role as keyof typeof roleHierarchy] || 0;
+	const requiredRoleLevel = requiredRole ? roleHierarchy[requiredRole] || 0 : 0;
 
 	if (userRoleLevel < requiredRoleLevel) {
 		return null;
@@ -73,7 +72,7 @@ export async function checkOrgAccess(
 export async function checkProjectAccess(
 	userId: string,
 	projectId: string,
-	requiredRole?: "owner" | "admin" | "member"
+	requiredRole?: "owner" | "admin" | "member",
 ): Promise<{ orgId: string; projectId: string; role: string } | null> {
 	const project = await prisma.project.findUnique({
 		where: { id: projectId, deletedAt: null },
@@ -84,7 +83,11 @@ export async function checkProjectAccess(
 		return null;
 	}
 
-	const membership = await checkOrgAccess(userId, project.organizationId, requiredRole);
+	const membership = await checkOrgAccess(
+		userId,
+		project.organizationId,
+		requiredRole,
+	);
 	if (!membership) {
 		return null;
 	}

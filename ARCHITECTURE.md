@@ -2,530 +2,361 @@
 
 ## System Overview
 
-Ralph JIRA is a local-first project management system with autonomous AI task execution. It consists of three main components:
+Ralph is a multi-tenant project management platform with autonomous AI task execution. It consists of three main components:
 
-1. **Next.js Web Application**: User interface for managing boards, tasks, and settings
-2. **AI Integration Layer**: API routes that use Vercel AI SDK v6 for intelligent operations
-3. **Autonomous Runner**: CLI tool that executes tasks automatically
+1. **Next.js Web Application**: User interface for managing sprints, tasks, and settings
+2. **AI Integration Layer**: API routes using Vercel AI SDK for intelligent operations
+3. **Autonomous Runner**: Background process that executes tasks automatically
 
 ## Technology Stack
 
-- **Frontend**: Next.js 16 (App Router), React 19, TypeScript 5
-- **UI Framework**: Tailwind CSS 4, shadcn/ui components
+- **Framework**: Next.js 16 (App Router), React 19, TypeScript 5
+- **Database**: SQLite with Prisma ORM
+- **Authentication**: NextAuth v5 (Credentials + GitHub OAuth)
+- **UI Framework**: Tailwind CSS 4, shadcn/ui components, Radix primitives
 - **Drag & Drop**: @dnd-kit libraries
-- **AI Integration**: Vercel AI SDK v6, @ai-sdk/openai
-- **Validation**: Zod v4
-- **Date Handling**: date-fns
+- **Forms**: TanStack React Form
+- **AI Integration**: Claude Agent SDK, Vercel AI SDK, @ai-sdk/openai
+- **Validation**: Zod
 - **Notifications**: Sonner (toast notifications)
-- **Runtime**: Node.js 20+ with tsx for TypeScript execution
+- **Runtime**: Node.js 20+
 
 ## Directory Structure
 
 ```
 ralph-jira/
-├── plans/                    # Source of truth (JSON files)
-│   ├── prd.json             # Active board
-│   ├── settings.json        # Project configuration
-│   └── runs/                # Execution logs (JSON)
-├── progress.txt             # Append-only text log
+├── prisma/
+│   ├── schema.prisma        # Database schema
+│   ├── ralph.db             # SQLite database
+│   └── seed.ts              # Database seeding
 ├── src/
 │   ├── app/                 # Next.js App Router
 │   │   ├── api/             # API routes
-│   │   │   ├── boards/      # Board CRUD operations
-│   │   │   ├── settings/    # Settings management
-│   │   │   ├── progress/    # Progress log access
-│   │   │   └── ai/          # AI-powered actions
-│   │   │       ├── board/   # Board-level AI actions
-│   │   │       └── task/    # Task-level AI actions
-│   │   ├── board/[id]/      # Dynamic board view
-│   │   ├── settings/        # Settings editor
-│   │   ├── files/           # Artifact viewer
-│   │   ├── assistant/       # AI assistant interface
-│   │   ├── layout.tsx       # Root layout
-│   │   └── page.tsx         # Dashboard
-│   ├── components/          # React components
+│   │   │   ├── auth/        # NextAuth handlers
+│   │   │   ├── projects/    # Project CRUD + nested resources
+│   │   │   │   └── [id]/
+│   │   │   │       ├── sprints/     # Sprint management
+│   │   │   │       ├── tasks/       # Task management
+│   │   │   │       ├── runs/        # Run management
+│   │   │   │       └── settings/    # Project settings
+│   │   │   ├── runs/        # Direct run access
+│   │   │   ├── ai/          # AI-powered actions
+│   │   │   ├── organizations/
+│   │   │   └── register/
+│   │   ├── project/         # Project dashboard pages
+│   │   │   ├── sprints/[id] # Sprint detail view
+│   │   │   └── runs/        # Run history
+│   │   ├── organization/    # Organization management
+│   │   ├── login/           # Auth pages
+│   │   ├── register/
+│   │   └── layout.tsx       # Root layout
+│   ├── components/
 │   │   ├── ui/              # shadcn/ui primitives
+│   │   ├── projects/        # Project-specific components
+│   │   ├── layout/          # Layout components
 │   │   ├── kanban-board.tsx
 │   │   ├── kanban-column.tsx
 │   │   ├── task-card.tsx
-│   │   └── task-editor-dialog.tsx
-│   └── lib/
-│       ├── schemas.ts       # Zod validation schemas
-│       ├── utils.ts         # Utility functions
-│       └── storage/         # Storage abstraction
-│           ├── interface.ts
-│           ├── local-filesystem.ts
-│           └── index.ts
-├── runner/
-│   ├── index.ts             # Autonomous execution engine
-│   └── package.json         # Runner metadata
-├── scripts/
-│   └── setup.sh             # Setup automation
-├── Dockerfile               # Web app container
-├── Dockerfile.runner        # Runner container
-├── docker-compose.yml       # Orchestration
-└── [Next.js config files]
+│   │   ├── task-editor-dialog.tsx
+│   │   └── sprint-properties-dialog.tsx
+│   ├── lib/
+│   │   ├── auth/            # NextAuth configuration
+│   │   ├── projects/        # Project helpers
+│   │   │   ├── db-server.ts # Auth + project context helper
+│   │   │   └── types.ts
+│   │   ├── runs/            # Run utilities
+│   │   ├── schemas.ts       # Zod validation schemas
+│   │   ├── db.ts            # Prisma client
+│   │   ├── rate-limit.ts    # Rate limiting
+│   │   ├── api-response.ts  # Standardized API errors
+│   │   └── utils.ts
+│   └── proxy.ts             # Request proxy (auth + rate limiting)
+├── tools/
+│   └── runner/              # Autonomous execution engine
+├── CLAUDE.md                # AI assistant guidelines
+└── [config files]
 ```
 
 ## Data Layer
 
-### Storage Adapter Pattern
+### Database (Prisma + SQLite)
 
-The storage layer uses an adapter pattern for flexibility and future extensibility.
+All data is stored in SQLite via Prisma ORM. Key models:
 
-**Interface** (`StorageAdapter`):
-- Defines contract for all storage operations
-- Methods for boards, settings, logs, and files
-- All methods return Promises (async)
+#### User & Authentication
+- **User**: Accounts with email, password hash, OAuth support
+- **Session**: JWT-based sessions with 30-day expiration
+- **UserApiKey**: Encrypted API keys per user
 
-**Implementation** (`LocalFilesystemAdapter`):
-- Uses Node.js `fs/promises` for file I/O
-- Implements atomic writes (write to temp → rename)
-- Validates all data with Zod schemas
-- Pretty-prints JSON (2-space indentation)
-- Creates directories as needed
+#### Organization & Access Control
+- **Organization**: Teams/workspaces with slug
+- **OrganizationMember**: Users with roles (owner, admin, member)
+- **Invitation**: Email-based invite tokens
+- **OrganizationApiKey**: Org-level encrypted API keys
 
-**Benefits**:
-- Easy to swap implementations (e.g., cloud storage, database)
-- Testable (mock adapter for unit tests)
-- Type-safe (enforced by TypeScript)
-- Single source of truth for storage logic
+#### Billing
+- **Plan**: Pricing tiers (free, pro, enterprise)
+- **Subscription**: Organization subscriptions
+- **UsageRecord**: Monthly usage tracking
 
-### Data Schemas
+#### Projects & Tasks
+- **Project**: Belongs to organization, contains sprints
+- **ProjectSettings**: JSON configuration (tech stack, AI preferences)
+- **Sprint**: Container for tasks with kanban columns
+- **SprintColumn**: Kanban columns within sprints
+- **Task**: Work items with status, priority, acceptance criteria
 
-All data structures are defined with Zod schemas in `src/lib/schemas.ts`:
+#### Execution
+- **Run**: AI execution records with progress tracking
+- **RunCommand**: Individual commands executed
+- **RunLog**: Progress logs/output
 
-#### Task Schema
-Preserves original required fields and extends with Kanban features:
+### Prisma Client
 
 ```typescript
-{
-  // Original (preserved for compatibility)
-  category: string
-  description: string
-  steps: string[]
-  passes: boolean
+// src/lib/db.ts
+import { PrismaClient } from "@prisma/client";
 
-  // Extended for Kanban
-  id: string
-  status: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done'
-  priority: 'low' | 'medium' | 'high' | 'urgent'
-  estimate?: number
-  createdAt: string (ISO)
-  updatedAt: string (ISO)
-  tags: string[]
-  assignee?: string
-  filesTouched: string[]
-  lastRun?: string (ISO)
-  failureNotes?: string
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+
+export const prisma = globalForPrisma.prisma || new PrismaClient();
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
 }
 ```
 
-#### Board Schema
-```typescript
-{
-  id: string
-  name: string
-  goal: string
-  deadline: string (ISO)
-  status: 'planned' | 'active' | 'completed' | 'archived'
-  columns: Column[]
-  tasks: Task[]
-  createdAt: string (ISO)
-  updatedAt: string (ISO)
-  metrics?: { velocity, completed, total }
-}
-```
+## API Architecture
 
-#### ProjectSettings Schema
+### Authentication Pattern
+
+All project-scoped routes use the standardized helper:
+
 ```typescript
-{
-  projectName: string
-  projectDescription: string
-  techStack: string[]
-  howToTest: { commands: string[], notes: string }
-  howToRun: { commands: string[], notes: string }
-  aiPreferences: {
-    defaultModel: string
-    provider: string
-    temperature?: number
-    maxTokens?: number
-    guardrails: string[]
-  }
-  repoConventions: {
-    folders: Record<string, string>
-    naming: string
-    commitStyle?: string
-  }
-  automation?: {
-    codingStyle?: string
-    setup?: string[]
-    maxIterations?: number
-    sandboxRoot?: string
-    agent?: {
-      name: 'claude' | 'opencode'
-      model?: string
-      permissionMode?: string
-      extraArgs?: string[]
-    }
+import {
+  getProjectContextFromParams,
+  handleProjectRouteError,
+} from "@/lib/projects/db-server";
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const { project, userId } = await getProjectContextFromParams(id);
+
+    // Route logic...
+
+  } catch (error) {
+    return handleProjectRouteError(error);
   }
 }
 ```
 
-## API Routes
+This helper:
+- Validates JWT session
+- Fetches project from database
+- Verifies user has organization membership
+- Returns typed context or throws appropriate error
 
-### Board Management (`/api/boards`)
+### Error Response Format
 
-**GET `/api/boards`**
-- Lists all boards
-- Returns: `{ boards: Board[] }`
+All API errors include a `code` field:
 
-**POST `/api/boards`**
-- Creates new board
-- Body: Board object
-- Returns: `{ success: true, board: Board }`
+```typescript
+{
+  error: "Sprint not found",
+  code: "SPRINT_NOT_FOUND"
+}
+```
 
-**GET `/api/boards/[id]`**
-- Fetches single board
-- Returns: `{ board: Board }`
+Standard error codes:
+- `UNAUTHORIZED` - Not authenticated
+- `ACCESS_DENIED` - No permission
+- `PROJECT_NOT_FOUND` - Project doesn't exist
+- `SPRINT_NOT_FOUND` - Sprint doesn't exist
+- `INVALID_REQUEST` - Bad request data
+- `RATE_LIMIT_EXCEEDED` - Too many requests
+- `INTERNAL_ERROR` - Server error
 
-**PUT `/api/boards/[id]`**
-- Updates board (partial updates supported)
-- Body: Partial<Board>
-- Returns: `{ success: true, board: Board }`
+### Rate Limiting
 
-**DELETE `/api/boards/[id]`**
-- Deletes board (except active board)
-- Returns: `{ success: true }`
+Applied via `src/proxy.ts`:
 
-### Settings (`/api/settings`)
+| Endpoint Type | Limit |
+|--------------|-------|
+| Auth (login, register) | 5 req/min |
+| AI endpoints | 20 req/min |
+| Standard API | 60 req/min |
 
-**GET `/api/settings`**
-- Fetches project settings
-- Returns: `{ settings: ProjectSettings }`
+### API Routes
 
-**PUT `/api/settings`**
-- Updates settings
-- Body: ProjectSettings
-- Returns: `{ success: true, settings: ProjectSettings }`
+#### Projects
+- `GET/POST /api/projects` - List/create projects
+- `GET/PUT/DELETE /api/projects/[id]` - Project CRUD
+- `GET/PUT /api/projects/[id]/settings` - Project settings
 
-### Progress Log (`/api/progress`)
+#### Sprints
+- `GET/POST /api/projects/[id]/sprints` - List/create sprints
+- `GET/PUT/DELETE /api/projects/[id]/sprints/[sprintId]` - Sprint CRUD
 
-**GET `/api/progress`**
-- Reads progress.txt
-- Returns: `{ progress: string }`
+#### Tasks
+- `GET/POST /api/projects/[id]/tasks` - List/create tasks
+- `GET/PUT/DELETE /api/projects/[id]/tasks/[taskId]` - Task CRUD
 
-**POST `/api/progress`**
-- Appends entry
-- Body: `{ entry: string }`
-- Returns: `{ success: true }`
+#### Runs
+- `GET/POST /api/projects/[id]/runs` - List runs
+- `POST /api/projects/[id]/runs/start` - Start new run
+- `GET /api/runs/[runId]` - Run details + logs
+- `POST /api/runs/[runId]/cancel` - Cancel run
+- `POST /api/runs/[runId]/retry` - Retry run
 
-### AI Actions (`/api/ai/board`, `/api/ai/task`)
+#### AI Actions
+- `POST /api/ai/board` - Sprint-level AI (generate tasks, prioritize)
+- `POST /api/ai/task` - Task-level AI (improve criteria, estimate)
 
-**POST `/api/ai/board`**
-- Board-level AI actions
-- Body: `{ action: string, boardId: string, data: any }`
-- Actions:
-  - `generate-tasks`: Create tasks from description
-  - `prioritize`: Reorder by criteria
-  - `split-sprints`: Organize into sprints
-  - `improve-acceptance`: Enhance criteria
+## Request Flow
 
-**POST `/api/ai/task`**
-- Task-level AI actions
-- Body: `{ action: string, boardId: string, taskId: string, data: any }`
-- Actions:
-  - `improve-steps`: Better acceptance criteria
-  - `add-edge-cases`: Identify edge cases
-  - `estimate`: Story point estimation
-  - `suggest-files`: Files to modify
-  - `to-test-cases`: Generate test code
+### Next.js 16 Proxy
 
-All AI endpoints use Vercel AI SDK v6 with structured outputs (`generateObject`, `generateText`).
+Next.js 16 uses `proxy.ts` instead of `middleware.ts`:
+
+```typescript
+// src/proxy.ts
+export async function proxy(request: NextRequest) {
+  // 1. Skip static assets
+  // 2. Apply rate limiting for API routes
+  // 3. Allow public routes (login, register)
+  // 4. Check authentication
+  // 5. Redirect or return 401
+  return NextResponse.next();
+}
+```
+
+### Session Management
+
+Session is fetched server-side in layout and passed to SessionProvider:
+
+```typescript
+// src/app/layout.tsx
+export default async function RootLayout({ children }) {
+  const session = await auth();
+
+  return (
+    <SessionProvider session={session}>
+      {children}
+    </SessionProvider>
+  );
+}
+```
+
+This prevents duplicate `/api/auth/session` requests on the client.
 
 ## UI Components
 
 ### Component Hierarchy
 
 ```
-Dashboard (page.tsx)
-├── Board Cards
-└── Quick Links (Settings, Files, Assistant)
+RootLayout
+├── SessionProvider (with server-side session)
+├── ThemeProvider
+└── ProjectProvider
+    └── Pages...
 
-Board View (board/[id]/page.tsx)
+Project Dashboard (project/page.tsx)
+├── Sprint Cards
+└── Create Sprint Dialog
+
+Sprint View (project/sprints/[id]/page.tsx)
 ├── KanbanBoard
 │   ├── KanbanColumn (x5: backlog, todo, in_progress, review, done)
 │   │   └── TaskCard (draggable)
-│   │       ├── Status indicator
-│   │       ├── Description
-│   │       ├── Priority badge
-│   │       ├── Estimate
-│   │       └── Tags
 │   └── DragOverlay
-└── TaskEditorDialog
-    ├── Form fields
-    ├── Steps editor
-    ├── Tags manager
-    └── AI action buttons
-
-Settings (settings/page.tsx)
-├── Project Info Card
-├── Coding Style Card
-├── Test Config Card
-├── Run Config Card
-└── AI Preferences Card
-
-Files (files/page.tsx)
-└── Tabs (Progress, PRD, Settings)
-
-Assistant (assistant/page.tsx)
-└── Task Generation Form
+├── TaskEditorDialog
+├── SprintPropertiesDialog
+└── Run Drawer (live logs)
 ```
 
-### Drag & Drop Implementation
+### Drag & Drop
 
-Uses `@dnd-kit` libraries:
+Uses `@dnd-kit`:
 - **DndContext**: Provides drag & drop context
 - **SortableContext**: Manages sortable items
 - **useSortable**: Hook for draggable items
-- **useDroppable**: Hook for drop zones
 
 Flow:
 1. User drags TaskCard
 2. `onDragStart`: Set active task
-3. `onDragEnd`: Update task status, call API
-4. Board re-renders with new task positions
+3. `onDragEnd`: Update task status via API
+4. Sprint re-renders with new positions
 
 ## Autonomous Runner
 
 ### Architecture
 
-The background loop now lives in `tools/runner/run-loop.mjs`. Instead of a monolithic CLI it consumes a persisted run record (`plans/runs/<runId>.json`) that is created by the web API whenever the "Run AI Loop" button is pressed. The record stores metadata (board, sandbox path, max iterations, cancellation flag, PID, etc.) and is treated as the source of truth for the UI.
+The runner lives in `tools/runner/run-loop.mjs` and is spawned by the API when "Run AI Loop" is clicked.
 
-At startup the loop performs the following:
+### Execution Flow
 
-1. Create a git worktree on the operator-specified branch (the UI now prompts for it when starting a run, defaulting to `run-<runId>`) in `.pm/sandboxes/<runId>` so each run has an isolated copy without duplicating the repo.
-2. Copy `plans/settings.json` and generate a sandbox `plans/prd.json` that only includes `todo` or `in_progress` tasks from the active board.
-3. Run sandbox setup commands defined in `plans/settings.json.automation.setup` (defaults to `npm ci`).
-4. Iterate up to `maxIterations`, launching the configured CLI agent (`claude` or `opencode`) with the shared loop prompt so it can decide what to build, run whatever commands/tests it needs, update files, and append its own notes to `progress.txt`. The runner captures stdout/stderr for observability and watches for `<promise>COMPLETE</promise>` to know when to stop.
-5. Respect cancellation by checking for `plans/runs/<runId>.cancel` between every major step.
-6. On completion/cancel/error copy the sandbox log to `plans/runs/<runId>.progress.txt`, sync task fields back into the root `plans/prd.json`, append a summary to the root `progress.txt`, and update the run record with final status + reason (`completed`, `max_iterations`, `canceled`, or `error`).
-7. Remove the git worktree once the branch is clean and pushed so `.pm/sandboxes` stays clean and future runs start with a fresh workspace, while keeping the `run-<runId>` branch available for manual review.
+1. Create git worktree on specified branch
+2. Copy settings and generate sandbox sprint with eligible tasks
+3. Run setup commands from settings
+4. Loop up to `maxIterations`:
+   - Pick next task (in_progress → todo priority)
+   - Launch AI agent (Claude or OpenCode CLI)
+   - Capture output, update progress
+   - Check for completion or cancellation
+5. Sync results back to main sprint
+6. Clean up worktree
 
-Two execution modes are supported:
-- **Local** (default): the API spawns `node tools/runner/run-loop.mjs --runId <id> --projectPath <root>` as a detached child process.
-- **Docker**: set `RUN_LOOP_EXECUTOR=docker` and the API will spawn `docker compose run runner node tools/runner/run-loop.mjs --runId <id> --projectPath /workspace`. The compose file mounts the repo so state stays in sync.
+### Execution Modes
 
-### Task Selection & Loop Logic
+- **Local** (default): Spawns as detached child process
+- **Docker**: Uses `docker compose run runner`
 
-- Only `todo` and `in_progress` tasks from the active board are loaded into the sandbox PRD.
-- Each iteration updates the run record with `currentIteration`, `lastTaskId`, `lastMessage`, `lastCommand`, and command exit codes for live UI feedback.
-- Tasks marked `passes=true` in the sandbox are synced back to the root PRD with `status=review`. Remaining selected tasks are forced into `status=in_progress` so reviewers know the loop attempted them.
-- The loop stops when all sandbox tasks pass, the max iteration count is reached, a cancellation file appears, or a fatal error occurs.
+## Security
 
-### Logging & Persistence
+### Implemented
 
-- `.pm/sandboxes/<runId>/progress.txt` receives detailed per-iteration sections (timestamp, task, AI notes, commands, pass/fail results). The tail of this file is streamed into the UI.
-- `plans/runs/<runId>.progress.txt` stores the preserved log once the run finalizes.
-- `plans/runs/<runId>.json` is the authoritative run record used by the UI, history pages, and the runner itself. It includes timestamps, status, reason, executor mode, PID, and any errors.
-- Root `progress.txt` gets a short summary per run so humans have a linear audit log.
+- **Authentication**: NextAuth v5 with JWT sessions
+- **Authorization**: Organization membership checks
+- **Rate Limiting**: Tiered limits in proxy
+- **Input Validation**: Zod schemas on all inputs
+- **Password Hashing**: bcrypt with cost factor 12
+- **Soft Deletes**: `deletedAt` timestamps for recovery
 
-### Safety Guardrails
+### Session Security
 
-- Sandbox-only mutations: root repo is untouched until the post-run sync step.
-- Runner-executed commands are limited to setup steps plus the single agent CLI; all other shell activity happens inside the sandbox under the agent's control.
-- Cancellation flag checked between setup commands, between every agent iteration, and before each loop cycle.
-- Atomic JSON writes for boards, settings, and run files to prevent corruption.
-- Logs never include hidden reasoning; they stay factual for handoff purposes.
+- JWT strategy with 30-day expiration
+- Session data fetched server-side
+- No sensitive data in client-accessible session
 
-## Docker Deployment
+## Performance
 
-### Web Container (`Dockerfile`)
+### Optimizations
 
-Multi-stage build:
-1. **deps**: Install dependencies
-2. **builder**: Build Next.js app
-3. **runner**: Production image with standalone output
+- **Server-side session**: Prevents duplicate auth requests
+- **React Compiler**: Automatic memoization
+- **Standalone output**: Smaller Docker images
+- **Prisma query optimization**: Select only needed fields
 
-Optimizations:
-- Minimal base image (node:20-slim)
-- Non-root user (nextjs:nodejs)
-- Only production files copied
+### Caching Strategy
 
-### Runner Container (`Dockerfile.runner`)
+- Session cached in SessionProvider
+- Project list cached in ProjectProvider
+- No aggressive caching (data freshness prioritized)
 
-Simple image:
-- Node.js 20 + git
-- Global tsx for TypeScript execution
-- Mounts repository as volume
-- Can modify files in workspace
+## Development Guidelines
 
-### Orchestration (`docker-compose.yml`)
-
-Services:
-- **web**: Always running, port 3000
-- **runner**: On-demand (profile: runner)
-
-Volumes:
-- Web: mounts `plans/` and `progress.txt`
-- Runner: mounts entire repo (needs write access)
-
-## Security Considerations
-
-### Current Implementation
-
-- **Server-side only file I/O**: Client cannot write files directly
-- **No authentication**: Designed for local/trusted use
-- **Command restrictions**: Runner limits shell commands
-- **Input validation**: All data validated with Zod
-
-### Production Recommendations
-
-If deploying publicly:
-1. Add authentication (NextAuth.js, Clerk, etc.)
-2. Implement authorization (user can only access their boards)
-3. Rate limit AI endpoints
-4. Sanitize all user inputs
-5. Use HTTPS
-6. Set CSP headers
-
-## Testing Strategy
-
-### Current State
-
-No automated tests included (single-shot implementation).
-
-### Recommended Approach
-
-1. **Unit Tests**:
-   - Schema validation (Zod)
-   - Storage adapter methods
-   - Utility functions
-
-2. **Integration Tests**:
-   - API routes (Next.js testing)
-   - Runner task selection logic
-   - AI action flows
-
-3. **E2E Tests**:
-   - Playwright for UI flows
-   - Board creation and task management
-   - Drag & drop interactions
-
-4. **Manual Testing**:
-   - Create `.env.local` with test API key
-   - Run `npm run dev`
-   - Test all UI flows
-   - Trigger the loop via the "Run AI Loop" button or `POST /api/runs/start` and monitor `/runs`
-
-## Performance Considerations
-
-### Current Optimizations
-
-- **Atomic writes**: Prevent file corruption
-- **JSON validation**: Catch errors early
-- **Standalone Next.js output**: Smaller Docker images
-- **Component memoization**: React Compiler enabled
-
-### Future Optimizations
-
-- [ ] Lazy load board tasks (pagination)
-- [ ] Cache AI responses (for identical prompts)
-- [ ] Stream runner output (Server-Sent Events)
-- [ ] Incremental static regeneration for dashboard
-- [ ] Database for faster queries (if needed)
-
-## Extension Points
-
-### Adding New Storage Backend
-
-1. Implement `StorageAdapter` interface
-2. Handle async operations
-3. Maintain atomicity guarantees
-4. Update `src/lib/storage/index.ts` to export new adapter
-
-Example: S3 storage, Supabase, PlanetScale, etc.
-
-### Adding Custom AI Actions
-
-1. Define new action in `/api/ai/board` or `/api/ai/task`
-2. Create Zod schema for input/output
-3. Use `generateObject` or `generateText`
-4. Update UI to trigger action
-
-### Extending Task Schema
-
-1. Add fields to `TaskSchema` in `schemas.ts`
-2. Update TypeScript types (auto-generated from Zod)
-3. Add UI fields in `TaskEditorDialog`
-4. Update API routes if needed
-
-### Custom Runner Tools
-
-To add file modification capability:
-1. Define tools in runner with Zod schemas
-2. Implement tool handlers (readFile, writeFile, etc.)
-3. Pass tools to AI SDK `generateText` call
-4. AI will call tools as needed
-
-## Troubleshooting
-
-### Common Issues
-
-**TypeScript Errors**:
-- Run `npm run typecheck` to identify issues
-- Ensure Zod schemas match usage
-- Check for missing `await` keywords
-
-**Storage Errors**:
-- Verify `plans/` directory exists
-- Check JSON file validity: `node -e "JSON.parse(require('fs').readFileSync('plans/prd.json'))"`
-- Ensure file permissions allow read/write
-
-**AI Errors**:
-- Verify `OPENAI_API_KEY` is set
-- Check API key has sufficient credits
-- Review error messages in console/logs
-- Try different model if quota exceeded
-
-**Runner Not Executing Tasks**:
-- Ensure tasks have `passes: false`
-- Check task status is not `done`
-- Verify test commands in settings are correct
-- Review `progress.txt` for error details
-
-## Future Architecture Considerations
-
-### Scalability
-
-Current architecture is designed for:
-- Single user or small team
-- Local/self-hosted deployment
-- Moderate task volumes (<1000 tasks per board)
-
-For scale:
-- Move to database (PostgreSQL, MongoDB)
-- Add caching layer (Redis)
-- Queue system for AI requests (BullMQ)
-- Horizontal scaling with session store
-
-### Multi-Tenancy
-
-To support multiple projects:
-- Add project/workspace concept
-- Namespace boards and settings
-- Implement user authentication
-- Project-based permissions
-
-### Real-Time Collaboration
-
-To enable live updates:
-- WebSocket server (Socket.io, Pusher)
-- Optimistic UI updates
-- Conflict resolution strategy
-- Presence indicators
+See [CLAUDE.md](./CLAUDE.md) for:
+- API authentication patterns
+- Error response format
+- Form handling conventions
+- Rate limiting details
+- Naming conventions
 
 ---
 
-**Last Updated**: 2026-01-07
-**Version**: 1.0.0
+**Last Updated**: 2026-01-10
+**Version**: 2.0.0

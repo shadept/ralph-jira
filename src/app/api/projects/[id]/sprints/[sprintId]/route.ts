@@ -5,51 +5,87 @@ import {
 	handleProjectRouteError,
 } from "@/lib/projects/db-server";
 
-// Map sprint status to board status for backward compatibility
-function mapSprintStatusToBoardStatus(
-	status: string
-): "planned" | "active" | "completed" | "archived" {
-	switch (status) {
-		case "planning":
-			return "planned";
-		case "active":
-			return "active";
-		case "completed":
-			return "completed";
-		case "archived":
-			return "archived";
-		default:
-			return "planned";
-	}
-}
-
-// Map board status to sprint status
-function mapBoardStatusToSprintStatus(
-	status: string
-): "planning" | "active" | "completed" | "archived" {
-	switch (status) {
-		case "planned":
-			return "planning";
-		case "active":
-			return "active";
-		case "completed":
-			return "completed";
-		case "archived":
-			return "archived";
-		default:
-			return "planning";
-	}
+function formatSprint(sprint: {
+	id: string;
+	name: string;
+	goal: string | null;
+	deadline: Date;
+	status: string;
+	metricsJson: string | null;
+	createdAt: Date;
+	updatedAt: Date;
+	columns: { columnId: string; name: string; order: number }[];
+	tasks: {
+		id: string;
+		projectId: string;
+		sprintId: string | null;
+		category: string;
+		title: string | null;
+		description: string;
+		acceptanceCriteriaJson: string;
+		status: string;
+		priority: string;
+		passes: boolean;
+		estimate: number | null;
+		deadline: Date | null;
+		tagsJson: string;
+		filesTouchedJson: string;
+		assigneeId: string | null;
+		createdById: string | null;
+		lastRun: Date | null;
+		failureNotes: string | null;
+		createdAt: Date;
+		updatedAt: Date;
+	}[];
+}) {
+	return {
+		id: sprint.id,
+		name: sprint.name,
+		goal: sprint.goal || "",
+		deadline: sprint.deadline.toISOString(),
+		status: sprint.status,
+		columns: sprint.columns.map((col) => ({
+			id: col.columnId,
+			name: col.name,
+			order: col.order,
+		})),
+		tasks: sprint.tasks.map((task) => ({
+			id: task.id,
+			projectId: task.projectId,
+			sprintId: task.sprintId,
+			category: task.category,
+			title: task.title,
+			description: task.description,
+			acceptanceCriteria: JSON.parse(task.acceptanceCriteriaJson),
+			status: task.status,
+			priority: task.priority,
+			passes: task.passes,
+			estimate: task.estimate,
+			deadline: task.deadline?.toISOString() || null,
+			tags: JSON.parse(task.tagsJson),
+			filesTouched: JSON.parse(task.filesTouchedJson),
+			assigneeId: task.assigneeId,
+			createdById: task.createdById,
+			lastRun: task.lastRun?.toISOString() || null,
+			failureNotes: task.failureNotes,
+			createdAt: task.createdAt.toISOString(),
+			updatedAt: task.updatedAt.toISOString(),
+		})),
+		createdAt: sprint.createdAt.toISOString(),
+		updatedAt: sprint.updatedAt.toISOString(),
+		metrics: sprint.metricsJson ? JSON.parse(sprint.metricsJson) : undefined,
+	};
 }
 
 export async function GET(
-	request: Request,
-	{ params }: { params: Promise<{ id: string; sprintId: string }> }
+	_request: Request,
+	{ params }: { params: Promise<{ id: string; sprintId: string }> },
 ) {
 	try {
 		const { id, sprintId } = await params;
 		const { project } = await getProjectContextFromParams(id);
 
-		const sprint = await prisma.sprint.findFirst({
+		const dbSprint = await prisma.sprint.findFirst({
 			where: {
 				id: sprintId,
 				projectId: project.id,
@@ -60,50 +96,16 @@ export async function GET(
 			},
 		});
 
-		if (!sprint) {
-			return NextResponse.json({ error: "Board not found" }, { status: 404 });
+		if (!dbSprint) {
+			return NextResponse.json(
+				{ error: "Sprint not found", code: "SPRINT_NOT_FOUND" },
+				{ status: 404 },
+			);
 		}
 
-		// Format as board for backward compatibility
-		const board = {
-			id: sprint.id,
-			name: sprint.name,
-			goal: sprint.goal || "",
-			deadline: sprint.deadline.toISOString(),
-			status: mapSprintStatusToBoardStatus(sprint.status),
-			columns: sprint.columns.map((col) => ({
-				id: col.columnId,
-				name: col.name,
-				order: col.order,
-			})),
-			tasks: sprint.tasks.map((task) => ({
-				id: task.id,
-				projectId: task.projectId,
-				sprintId: task.sprintId,
-				category: task.category,
-				title: task.title,
-				description: task.description,
-				acceptanceCriteria: JSON.parse(task.acceptanceCriteriaJson),
-				status: task.status,
-				priority: task.priority,
-				passes: task.passes,
-				estimate: task.estimate,
-				deadline: task.deadline?.toISOString() || null,
-				tags: JSON.parse(task.tagsJson),
-				filesTouched: JSON.parse(task.filesTouchedJson),
-				assigneeId: task.assigneeId,
-				createdById: task.createdById,
-				lastRun: task.lastRun?.toISOString() || null,
-				failureNotes: task.failureNotes,
-				createdAt: task.createdAt.toISOString(),
-				updatedAt: task.updatedAt.toISOString(),
-			})),
-			createdAt: sprint.createdAt.toISOString(),
-			updatedAt: sprint.updatedAt.toISOString(),
-			metrics: sprint.metricsJson ? JSON.parse(sprint.metricsJson) : undefined,
-		};
+		const sprint = formatSprint(dbSprint);
 
-		return NextResponse.json({ board });
+		return NextResponse.json({ sprint });
 	} catch (error) {
 		console.error("Error fetching sprint:", error);
 		return handleProjectRouteError(error);
@@ -112,7 +114,7 @@ export async function GET(
 
 export async function PUT(
 	request: Request,
-	{ params }: { params: Promise<{ id: string; sprintId: string }> }
+	{ params }: { params: Promise<{ id: string; sprintId: string }> },
 ) {
 	try {
 		const { id, sprintId } = await params;
@@ -124,7 +126,10 @@ export async function PUT(
 		});
 
 		if (!existing) {
-			return NextResponse.json({ error: "Board not found" }, { status: 404 });
+			return NextResponse.json(
+				{ error: "Sprint not found", code: "SPRINT_NOT_FOUND" },
+				{ status: 404 },
+			);
 		}
 
 		await prisma.sprint.update({
@@ -135,9 +140,7 @@ export async function PUT(
 				deadline: updates.deadline
 					? new Date(updates.deadline)
 					: existing.deadline,
-				status: updates.status
-					? mapBoardStatusToSprintStatus(updates.status)
-					: existing.status,
+				status: updates.status ?? existing.status,
 				metricsJson: updates.metrics
 					? JSON.stringify(updates.metrics)
 					: existing.metricsJson,
@@ -153,7 +156,7 @@ export async function PUT(
 						columnId: col.id,
 						name: col.name,
 						order: col.order,
-					})
+					}),
 				),
 			});
 		}
@@ -211,7 +214,7 @@ export async function PUT(
 								title: task.title || null,
 								description: task.description || "",
 								acceptanceCriteriaJson: JSON.stringify(
-									task.acceptanceCriteria || []
+									task.acceptanceCriteria || [],
 								),
 								status: task.status || "backlog",
 								priority: task.priority || "medium",
@@ -232,7 +235,7 @@ export async function PUT(
 							title: task.title || null,
 							description: task.description || "",
 							acceptanceCriteriaJson: JSON.stringify(
-								task.acceptanceCriteria || []
+								task.acceptanceCriteria || [],
 							),
 							status: task.status || "backlog",
 							priority: task.priority || "medium",
@@ -255,48 +258,16 @@ export async function PUT(
 			},
 		});
 
-		// Format as board for backward compatibility
-		const board = {
-			id: updatedSprint!.id,
-			name: updatedSprint!.name,
-			goal: updatedSprint!.goal || "",
-			deadline: updatedSprint!.deadline.toISOString(),
-			status: mapSprintStatusToBoardStatus(updatedSprint!.status),
-			columns: updatedSprint!.columns.map((col) => ({
-				id: col.columnId,
-				name: col.name,
-				order: col.order,
-			})),
-			tasks: updatedSprint!.tasks.map((task) => ({
-				id: task.id,
-				projectId: task.projectId,
-				sprintId: task.sprintId,
-				category: task.category,
-				title: task.title,
-				description: task.description,
-				acceptanceCriteria: JSON.parse(task.acceptanceCriteriaJson),
-				status: task.status,
-				priority: task.priority,
-				passes: task.passes,
-				estimate: task.estimate,
-				deadline: task.deadline?.toISOString() || null,
-				tags: JSON.parse(task.tagsJson),
-				filesTouched: JSON.parse(task.filesTouchedJson),
-				assigneeId: task.assigneeId,
-				createdById: task.createdById,
-				lastRun: task.lastRun?.toISOString() || null,
-				failureNotes: task.failureNotes,
-				createdAt: task.createdAt.toISOString(),
-				updatedAt: task.updatedAt.toISOString(),
-			})),
-			createdAt: updatedSprint!.createdAt.toISOString(),
-			updatedAt: updatedSprint!.updatedAt.toISOString(),
-			metrics: updatedSprint!.metricsJson
-				? JSON.parse(updatedSprint!.metricsJson)
-				: undefined,
-		};
+		if (!updatedSprint) {
+			return NextResponse.json(
+				{ error: "Sprint not found after update" },
+				{ status: 404 },
+			);
+		}
 
-		return NextResponse.json({ success: true, board });
+		const sprint = formatSprint(updatedSprint);
+
+		return NextResponse.json({ success: true, sprint });
 	} catch (error) {
 		console.error("Error updating sprint:", error);
 		return handleProjectRouteError(error);
@@ -304,8 +275,8 @@ export async function PUT(
 }
 
 export async function DELETE(
-	request: Request,
-	{ params }: { params: Promise<{ id: string; sprintId: string }> }
+	_request: Request,
+	{ params }: { params: Promise<{ id: string; sprintId: string }> },
 ) {
 	try {
 		const { id, sprintId } = await params;
@@ -316,7 +287,10 @@ export async function DELETE(
 		});
 
 		if (!sprint) {
-			return NextResponse.json({ error: "Board not found" }, { status: 404 });
+			return NextResponse.json(
+				{ error: "Sprint not found", code: "SPRINT_NOT_FOUND" },
+				{ status: 404 },
+			);
 		}
 
 		await prisma.sprint.update({

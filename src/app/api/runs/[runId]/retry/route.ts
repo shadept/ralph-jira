@@ -5,11 +5,11 @@ import {
 	getProjectContext,
 	handleProjectRouteError,
 } from "@/lib/projects/db-server";
-import { resolveRunnerCommand } from "@/lib/runs/store";
+import { resolveRunnerCommand } from "@/lib/runs/runner-command";
 
 export async function POST(
 	request: Request,
-	{ params }: { params: Promise<{ runId: string }> }
+	{ params }: { params: Promise<{ runId: string }> },
 ) {
 	try {
 		const { runId } = await params;
@@ -29,7 +29,7 @@ export async function POST(
 		if (!terminalStatuses.includes(run.status)) {
 			return NextResponse.json(
 				{ error: `Cannot retry a run in status: ${run.status}` },
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
@@ -48,10 +48,11 @@ export async function POST(
 			include: { sprint: { select: { name: true } } },
 		});
 
-		const executorMode = (
-			run.executorMode ||
-			(process.env.RUN_LOOP_EXECUTOR === "docker" ? "docker" : "local")
-		) as "local" | "docker" | "cloud";
+		const executorMode = (run.executorMode ||
+			(process.env.RUN_LOOP_EXECUTOR === "docker" ? "docker" : "local")) as
+			| "local"
+			| "docker"
+			| "cloud";
 
 		// Use the project's repoUrl as the path for local runs
 		const projectPath = project.repoUrl || process.cwd();

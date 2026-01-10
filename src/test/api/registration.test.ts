@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+	orgRegistrationSchema,
 	orgRegistrationStep1Schema,
 	orgRegistrationStep2Schema,
-	orgRegistrationSchema,
 } from "@/lib/auth/registration";
 
 // Mock prisma for testing
@@ -26,13 +26,17 @@ vi.mock("@/lib/db", () => ({
 		subscription: {
 			create: vi.fn(),
 		},
-		$transaction: vi.fn((callback) => callback({
-			plan: { findUnique: vi.fn(), create: vi.fn() },
-			user: { create: vi.fn(() => ({ id: "test-user-id" })) },
-			organization: { create: vi.fn(() => ({ id: "test-org-id", slug: "test-org" })) },
-			organizationMember: { create: vi.fn() },
-			subscription: { create: vi.fn() },
-		})),
+		$transaction: vi.fn((callback) =>
+			callback({
+				plan: { findUnique: vi.fn(), create: vi.fn() },
+				user: { create: vi.fn(() => ({ id: "test-user-id" })) },
+				organization: {
+					create: vi.fn(() => ({ id: "test-org-id", slug: "test-org" })),
+				},
+				organizationMember: { create: vi.fn() },
+				subscription: { create: vi.fn() },
+			}),
+		),
 	},
 }));
 

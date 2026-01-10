@@ -1,34 +1,30 @@
 "use client";
 
-import { useState } from "react";
 import {
 	DndContext,
-	DragEndEvent,
+	type DragEndEvent,
 	DragOverlay,
-	DragStartEvent,
+	type DragStartEvent,
 	PointerSensor,
 	pointerWithin,
 	useSensor,
 	useSensors,
 } from "@dnd-kit/core";
-import {
-	SortableContext,
-	verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { Board, Task } from "@/lib/schemas";
+import { useState } from "react";
+import type { Sprint, Task } from "@/lib/schemas";
 import { KanbanColumn } from "./kanban-column";
 import { TaskCard } from "./task-card";
 
 interface KanbanBoardProps {
-	board: Board;
-	onUpdateBoard: (board: Board) => Promise<void>;
+	sprint: Sprint;
+	onUpdateSprint: (sprint: Sprint) => Promise<void>;
 	onTaskClick: (task: Task) => void;
 	onTogglePasses?: (taskId: string) => void;
 }
 
 export function KanbanBoard({
-	board,
-	onUpdateBoard,
+	sprint,
+	onUpdateSprint,
 	onTaskClick,
 	onTogglePasses,
 }: KanbanBoardProps) {
@@ -42,19 +38,22 @@ export function KanbanBoard({
 		}),
 	);
 
+	const tasks = sprint.tasks || [];
+	const columns = sprint.columns || [];
+
 	const handleDragStart = (event: DragStartEvent) => {
-		const task = board.tasks.find((t) => t.id === event.active.id);
+		const task = tasks.find((t) => t.id === event.active.id);
 		setActiveTask(task || null);
 	};
 
 	const resolveStatusFromTarget = (
 		targetId: string,
 	): Task["status"] | undefined => {
-		if (board.columns.some((column) => column.id === targetId)) {
+		if (columns.some((column) => column.id === targetId)) {
 			return targetId as Task["status"];
 		}
 
-		const targetTask = board.tasks.find((t) => t.id === targetId);
+		const targetTask = tasks.find((t) => t.id === targetId);
 		return targetTask?.status;
 	};
 
@@ -64,10 +63,10 @@ export function KanbanBoard({
 			return;
 		}
 
-		const task = board.tasks.find((t) => t.id === taskId);
+		const task = tasks.find((t) => t.id === taskId);
 		if (!task) return;
 
-		const nextTasks = board.tasks.map((t) =>
+		const nextTasks = tasks.map((t) =>
 			t.id === taskId
 				? {
 						...t,
@@ -77,13 +76,13 @@ export function KanbanBoard({
 				: t,
 		);
 
-		const updatedBoard = {
-			...board,
+		const updatedSprint = {
+			...sprint,
 			tasks: nextTasks,
 			updatedAt: new Date().toISOString(),
 		};
 
-		await onUpdateBoard(updatedBoard);
+		await onUpdateSprint(updatedSprint);
 	};
 
 	const handleDragEnd = async (event: DragEndEvent) => {
@@ -102,13 +101,13 @@ export function KanbanBoard({
 			return;
 		}
 
-		const task = board.tasks.find((t) => t.id === taskId);
+		const task = tasks.find((t) => t.id === taskId);
 		if (!task || task.status === newStatus) {
 			setActiveTask(null);
 			return;
 		}
 
-		const nextTasks = board.tasks.map((t) =>
+		const nextTasks = tasks.map((t) =>
 			t.id === taskId
 				? {
 						...t,
@@ -118,14 +117,14 @@ export function KanbanBoard({
 				: t,
 		);
 
-		const updatedBoard = {
-			...board,
+		const updatedSprint = {
+			...sprint,
 			tasks: nextTasks,
 			updatedAt: new Date().toISOString(),
 		};
 
 		setActiveTask(null);
-		await onUpdateBoard(updatedBoard);
+		await onUpdateSprint(updatedSprint);
 	};
 
 	return (
@@ -136,12 +135,10 @@ export function KanbanBoard({
 			onDragEnd={handleDragEnd}
 		>
 			<div className="mx-auto flex flex-1 gap-4 pb-4">
-				{board.columns
+				{columns
 					.sort((a, b) => a.order - b.order)
 					.map((column) => {
-						const columnTasks = board.tasks.filter(
-							(t) => t.status === column.id,
-						);
+						const columnTasks = tasks.filter((t) => t.status === column.id);
 
 						return (
 							<KanbanColumn

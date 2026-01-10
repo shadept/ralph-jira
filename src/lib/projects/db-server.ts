@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 
 const PROJECT_QUERY_PARAM = "projectId";
 
@@ -44,7 +44,7 @@ export interface ProjectContext {
  */
 async function resolveProjectContext(
 	projectId: string,
-	userId: string
+	userId: string,
 ): Promise<ProjectContext> {
 	// Fetch project
 	const project = await prisma.project.findUnique({
@@ -90,7 +90,7 @@ async function resolveProjectContext(
  * Requires projectId query param and valid session.
  */
 export async function getProjectContext(
-	request: Request
+	request: Request,
 ): Promise<ProjectContext> {
 	// Check auth
 	const session = await auth();
@@ -114,7 +114,7 @@ export async function getProjectContext(
  * Takes project ID directly from route params.
  */
 export async function getProjectContextFromParams(
-	projectId: string
+	projectId: string,
 ): Promise<ProjectContext> {
 	// Check auth
 	const session = await auth();
@@ -136,14 +136,14 @@ export function handleProjectRouteError(error: unknown) {
 	if (error instanceof UnauthorizedError) {
 		return NextResponse.json(
 			{ error: "Unauthorized", code: "UNAUTHORIZED" },
-			{ status: 401 }
+			{ status: 401 },
 		);
 	}
 
 	if (error instanceof AccessDeniedError) {
 		return NextResponse.json(
 			{ error: "Access denied", code: "ACCESS_DENIED" },
-			{ status: 403 }
+			{ status: 403 },
 		);
 	}
 
@@ -154,13 +154,13 @@ export function handleProjectRouteError(error: unknown) {
 				code: "PROJECT_NOT_FOUND",
 				projectId: error.projectId,
 			},
-			{ status: 404 }
+			{ status: 404 },
 		);
 	}
 
 	console.error("Unhandled project route error:", error);
 	return NextResponse.json(
-		{ error: "Internal server error" },
-		{ status: 500 }
+		{ error: "Internal server error", code: "INTERNAL_ERROR" },
+		{ status: 500 },
 	);
 }

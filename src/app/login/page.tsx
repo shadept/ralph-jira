@@ -1,20 +1,20 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import {
+	Envelope,
+	Eye,
+	EyeSlash,
+	GithubLogo,
+	Lock,
+	Robot,
+} from "@phosphor-icons/react";
+import { useForm } from "@tanstack/react-form";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { useForm } from "@tanstack/react-form";
-import {
-	Robot,
-	GithubLogo,
-	Envelope,
-	Lock,
-	Eye,
-	EyeSlash,
-} from "@phosphor-icons/react";
+import { Suspense, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
 	Card,
 	CardContent,
@@ -22,7 +22,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
 
 function LoginForm() {
 	const router = useRouter();
@@ -72,7 +72,7 @@ function LoginForm() {
 			toast.error(
 				error === "CredentialsSignin"
 					? "Invalid email or password"
-					: "An error occurred during sign in"
+					: "An error occurred during sign in",
 			);
 		}
 	}, [error]);

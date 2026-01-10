@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-
+import { AnsiLog } from "@/components/ansi-log";
+import { AppLayout } from "@/components/layout/app-layout";
+import { useProjectContext } from "@/components/projects/project-provider";
 import {
 	Card,
 	CardContent,
@@ -11,12 +13,8 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useProjectContext } from "@/components/projects/project-provider";
-import { AppLayout } from "@/components/layout/app-layout";
-import { AnsiLog } from "@/components/ansi-log";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function FilesPage() {
 	const {
@@ -113,7 +111,10 @@ export default function FilesPage() {
 						<CardContent>
 							<p className="text-sm text-muted-foreground">
 								View and edit the active sprint at{" "}
-								<Link href="/project/sprints/prd" className="text-primary underline">
+								<Link
+									href="/project/sprints/prd"
+									className="text-primary underline"
+								>
 									/project/sprints/prd
 								</Link>
 							</p>
@@ -130,7 +131,10 @@ export default function FilesPage() {
 						<CardContent>
 							<p className="text-sm text-muted-foreground">
 								View and edit settings at{" "}
-								<Link href="/project/settings" className="text-primary underline">
+								<Link
+									href="/project/settings"
+									className="text-primary underline"
+								>
 									/project/settings
 								</Link>
 							</p>

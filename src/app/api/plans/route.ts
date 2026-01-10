@@ -32,7 +32,7 @@ export async function GET() {
 		console.error("Error fetching plans:", error);
 		return NextResponse.json(
 			{ success: false, error: "Failed to fetch plans" },
-			{ status: 500 }
+			{ status: 500 },
 		);
 	}
 }

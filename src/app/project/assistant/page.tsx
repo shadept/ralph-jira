@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import { Sparkle } from "@phosphor-icons/react";
+import { useState } from "react";
 import { toast } from "sonner";
-
+import { AppLayout } from "@/components/layout/app-layout";
+import { useProjectContext } from "@/components/projects/project-provider";
+import { Button } from "@/components/ui/button";
 import {
 	Card,
 	CardContent,
@@ -11,10 +13,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useProjectContext } from "@/components/projects/project-provider";
-import { AppLayout } from "@/components/layout/app-layout";
 
 export default function AssistantPage() {
 	const {

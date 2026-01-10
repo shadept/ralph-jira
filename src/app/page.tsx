@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
 import {
-	Sparkle,
-	Kanban,
-	Users,
-	Lightning,
-	CheckCircle,
 	ArrowRight,
+	CheckCircle,
 	GithubLogo,
+	Kanban,
+	Lightning,
 	Robot,
+	Sparkle,
+	Users,
 } from "@phosphor-icons/react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -20,8 +22,6 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ThemeToggle } from "@/components/theme-toggle";
 
 interface Plan {
 	id: string;

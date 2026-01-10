@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { type NextRequest, NextResponse } from "next/server";
 import { orgRegistrationStep1Schema } from "@/lib/auth/registration";
+import { prisma } from "@/lib/db";
 
 /**
  * POST /api/register/validate-step1
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
 					success: false,
 					errors: parsed.error.flatten().fieldErrors,
 				},
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 						orgSlug: ["This organization URL is already taken"],
 					},
 				},
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
 				success: false,
 				errors: { _form: ["An unexpected error occurred"] },
 			},
-			{ status: 500 }
+			{ status: 500 },
 		);
 	}
 }

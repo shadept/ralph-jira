@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 
 const updateMemberSchema = z.object({
 	role: z.enum(["owner", "admin", "member"]),
@@ -14,14 +14,14 @@ const updateMemberSchema = z.object({
  */
 export async function PUT(
 	request: NextRequest,
-	{ params }: { params: Promise<{ orgId: string; memberId: string }> }
+	{ params }: { params: Promise<{ orgId: string; memberId: string }> },
 ) {
 	try {
 		const session = await auth();
 		if (!session?.user?.id) {
 			return NextResponse.json(
 				{ success: false, error: "Unauthorized" },
-				{ status: 401 }
+				{ status: 401 },
 			);
 		}
 
@@ -43,7 +43,7 @@ export async function PUT(
 					success: false,
 					error: "Only organization owners can change member roles",
 				},
-				{ status: 403 }
+				{ status: 403 },
 			);
 		}
 
@@ -55,7 +55,7 @@ export async function PUT(
 		if (!targetMember || targetMember.organizationId !== orgId) {
 			return NextResponse.json(
 				{ success: false, error: "Member not found" },
-				{ status: 404 }
+				{ status: 404 },
 			);
 		}
 
@@ -72,9 +72,10 @@ export async function PUT(
 				return NextResponse.json(
 					{
 						success: false,
-						error: "Cannot change role of the last owner. Transfer ownership first.",
+						error:
+							"Cannot change role of the last owner. Transfer ownership first.",
 					},
-					{ status: 400 }
+					{ status: 400 },
 				);
 			}
 		}
@@ -88,7 +89,7 @@ export async function PUT(
 					success: false,
 					errors: parsed.error.flatten().fieldErrors,
 				},
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
@@ -128,7 +129,7 @@ export async function PUT(
 		console.error("Error updating member:", error);
 		return NextResponse.json(
 			{ success: false, error: "Failed to update member" },
-			{ status: 500 }
+			{ status: 500 },
 		);
 	}
 }
@@ -139,15 +140,15 @@ export async function PUT(
  * Owners can remove anyone, members can remove themselves
  */
 export async function DELETE(
-	request: NextRequest,
-	{ params }: { params: Promise<{ orgId: string; memberId: string }> }
+	_request: NextRequest,
+	{ params }: { params: Promise<{ orgId: string; memberId: string }> },
 ) {
 	try {
 		const session = await auth();
 		if (!session?.user?.id) {
 			return NextResponse.json(
 				{ success: false, error: "Unauthorized" },
-				{ status: 401 }
+				{ status: 401 },
 			);
 		}
 
@@ -166,7 +167,7 @@ export async function DELETE(
 		if (!currentMembership) {
 			return NextResponse.json(
 				{ success: false, error: "You don't have access to this organization" },
-				{ status: 403 }
+				{ status: 403 },
 			);
 		}
 
@@ -178,7 +179,7 @@ export async function DELETE(
 		if (!targetMember || targetMember.organizationId !== orgId) {
 			return NextResponse.json(
 				{ success: false, error: "Member not found" },
-				{ status: 404 }
+				{ status: 404 },
 			);
 		}
 
@@ -192,7 +193,7 @@ export async function DELETE(
 					success: false,
 					error: "Only organization owners can remove other members",
 				},
-				{ status: 403 }
+				{ status: 403 },
 			);
 		}
 
@@ -211,7 +212,7 @@ export async function DELETE(
 						success: false,
 						error: "Cannot remove the last owner. Transfer ownership first.",
 					},
-					{ status: 400 }
+					{ status: 400 },
 				);
 			}
 		}
@@ -230,7 +231,7 @@ export async function DELETE(
 		console.error("Error removing member:", error);
 		return NextResponse.json(
 			{ success: false, error: "Failed to remove member" },
-			{ status: 500 }
+			{ status: 500 },
 		);
 	}
 }

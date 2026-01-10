@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { openai } from "@ai-sdk/openai";
 import { generateObject, generateText } from "ai";
+import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import {
@@ -11,7 +11,7 @@ import {
 export async function POST(request: Request) {
 	try {
 		const { project } = await getProjectContext(request);
-		const { action, boardId, taskId, data } = await request.json();
+		const { action, taskId } = await request.json();
 
 		// Get task
 		const task = await prisma.task.findFirst({
@@ -77,7 +77,7 @@ Provide improved acceptance criteria that cover:
 					where: { id: task.id },
 					data: {
 						acceptanceCriteriaJson: JSON.stringify(
-							result.object.acceptanceCriteria
+							result.object.acceptanceCriteria,
 						),
 					},
 				});
@@ -138,7 +138,7 @@ Consider:
 							z.object({
 								component: z.string(),
 								points: z.number(),
-							})
+							}),
 						),
 					}),
 					prompt: `Estimate the effort for this task in story points (Fibonacci: 1, 2, 3, 5, 8, 13).
@@ -178,7 +178,7 @@ Provide a detailed breakdown.`,
 								path: z.string(),
 								purpose: z.string(),
 								changes: z.string(),
-							})
+							}),
 						),
 					}),
 					prompt: `Suggest which files would need to be modified to implement this task:

@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useForm, useStore } from "@tanstack/react-form";
 import { FloppyDiskIcon, FolderOpen, GithubLogo } from "@phosphor-icons/react";
+import { useForm, useStore } from "@tanstack/react-form";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AppLayout } from "@/components/layout/app-layout";
@@ -25,7 +25,6 @@ import {
 } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
 	Select,
 	SelectContent,
@@ -33,17 +32,18 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
-	ProjectSettings,
 	CLAUDE_MODELS,
 	CLAUDE_PERMISSION_MODES,
+	DEFAULT_AUTOMATION_SETTINGS,
 	DEFAULT_CLAUDE_MODEL,
 	DEFAULT_CLAUDE_PERMISSION_MODE,
-	DEFAULT_AUTOMATION_SETTINGS,
 	ensureAgentDefaults,
 	ensureAutomationDefaults,
-	withAutomationDefaults,
 	isKnownClaudeModel,
+	type ProjectSettings,
+	withAutomationDefaults,
 } from "@/lib/schemas";
 
 type OpencodeModelsState = {
@@ -99,7 +99,7 @@ function settingsToFormValues(settings: ProjectSettings): FormValues {
 
 function formValuesToSettings(
 	values: FormValues,
-	existingSettings: ProjectSettings
+	existingSettings: ProjectSettings,
 ): ProjectSettings {
 	const parseLines = (text: string) =>
 		text
@@ -244,7 +244,9 @@ function SettingsForm({
 					<form.Field name="setupCommands">
 						{(field) => (
 							<div>
-								<Label htmlFor={field.name}>Setup Commands (one per line)</Label>
+								<Label htmlFor={field.name}>
+									Setup Commands (one per line)
+								</Label>
 								<Textarea
 									id={field.name}
 									value={field.state.value}
@@ -268,12 +270,15 @@ function SettingsForm({
 											if (value === "claude") {
 												const currentModel = form.getFieldValue("agentModel");
 												if (!isKnownClaudeModel(currentModel)) {
-													form.setFieldValue("agentModel", DEFAULT_CLAUDE_MODEL);
+													form.setFieldValue(
+														"agentModel",
+														DEFAULT_CLAUDE_MODEL,
+													);
 												}
 												form.setFieldValue(
 													"permissionMode",
 													form.getFieldValue("permissionMode") ||
-														DEFAULT_CLAUDE_PERMISSION_MODE
+														DEFAULT_CLAUDE_PERMISSION_MODE,
 												);
 											}
 										}}
@@ -350,7 +355,9 @@ function SettingsForm({
 									<div>
 										<Label htmlFor={field.name}>Permission Mode</Label>
 										<Select
-											value={field.state.value || DEFAULT_CLAUDE_PERMISSION_MODE}
+											value={
+												field.state.value || DEFAULT_CLAUDE_PERMISSION_MODE
+											}
 											onValueChange={(value) => field.handleChange(value)}
 										>
 											<SelectTrigger id={field.name} className="mt-1 w-full">
@@ -380,7 +387,9 @@ function SettingsForm({
 											<Input
 												id={field.name}
 												value={field.state.value}
-												onChange={(e) => field.handleChange(e.target.value.trim())}
+												onChange={(e) =>
+													field.handleChange(e.target.value.trim())
+												}
 												className="mt-1 w-full"
 												placeholder="Enter model ID"
 											/>
@@ -451,7 +460,9 @@ function SettingsForm({
 					<form.Field name="extraArgs">
 						{(field) => (
 							<div>
-								<Label htmlFor={field.name}>Extra CLI Args (one per line)</Label>
+								<Label htmlFor={field.name}>
+									Extra CLI Args (one per line)
+								</Label>
 								<Textarea
 									id={field.name}
 									value={field.state.value}

@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-import { randomBytes } from "crypto";
+import { randomBytes } from "node:crypto";
+import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { email } from "@/lib/email";
 
 const inviteSchema = z.object({
@@ -15,15 +15,15 @@ const inviteSchema = z.object({
  * List pending invitations for an organization
  */
 export async function GET(
-	request: NextRequest,
-	{ params }: { params: Promise<{ orgId: string }> }
+	_request: NextRequest,
+	{ params }: { params: Promise<{ orgId: string }> },
 ) {
 	try {
 		const session = await auth();
 		if (!session?.user?.id) {
 			return NextResponse.json(
 				{ success: false, error: "Unauthorized" },
-				{ status: 401 }
+				{ status: 401 },
 			);
 		}
 
@@ -41,8 +41,11 @@ export async function GET(
 
 		if (!membership || membership.role === "member") {
 			return NextResponse.json(
-				{ success: false, error: "You don't have permission to view invitations" },
-				{ status: 403 }
+				{
+					success: false,
+					error: "You don't have permission to view invitations",
+				},
+				{ status: 403 },
 			);
 		}
 
@@ -69,7 +72,7 @@ export async function GET(
 		console.error("Error fetching invitations:", error);
 		return NextResponse.json(
 			{ success: false, error: "Failed to fetch invitations" },
-			{ status: 500 }
+			{ status: 500 },
 		);
 	}
 }
@@ -80,14 +83,14 @@ export async function GET(
  */
 export async function POST(
 	request: NextRequest,
-	{ params }: { params: Promise<{ orgId: string }> }
+	{ params }: { params: Promise<{ orgId: string }> },
 ) {
 	try {
 		const session = await auth();
 		if (!session?.user?.id) {
 			return NextResponse.json(
 				{ success: false, error: "Unauthorized" },
-				{ status: 401 }
+				{ status: 401 },
 			);
 		}
 
@@ -109,8 +112,11 @@ export async function POST(
 
 		if (!membership || membership.role === "member") {
 			return NextResponse.json(
-				{ success: false, error: "You don't have permission to invite members" },
-				{ status: 403 }
+				{
+					success: false,
+					error: "You don't have permission to invite members",
+				},
+				{ status: 403 },
 			);
 		}
 
@@ -123,7 +129,7 @@ export async function POST(
 					success: false,
 					errors: parsed.error.flatten().fieldErrors,
 				},
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
@@ -145,7 +151,7 @@ export async function POST(
 					success: false,
 					error: "This user is already a member of your organization",
 				},
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
@@ -165,7 +171,7 @@ export async function POST(
 					success: false,
 					error: "An invitation has already been sent to this email",
 				},
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
@@ -213,7 +219,7 @@ export async function POST(
 		console.error("Error sending invitation:", error);
 		return NextResponse.json(
 			{ success: false, error: "Failed to send invitation" },
-			{ status: 500 }
+			{ status: 500 },
 		);
 	}
 }

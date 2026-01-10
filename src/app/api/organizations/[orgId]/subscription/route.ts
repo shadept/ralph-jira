@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 
 /**
  * GET /api/organizations/[orgId]/subscription
@@ -8,15 +8,15 @@ import { auth } from "@/lib/auth";
  * Any member can read
  */
 export async function GET(
-	request: NextRequest,
-	{ params }: { params: Promise<{ orgId: string }> }
+	_request: NextRequest,
+	{ params }: { params: Promise<{ orgId: string }> },
 ) {
 	try {
 		const session = await auth();
 		if (!session?.user?.id) {
 			return NextResponse.json(
 				{ success: false, error: "Unauthorized" },
-				{ status: 401 }
+				{ status: 401 },
 			);
 		}
 
@@ -35,7 +35,7 @@ export async function GET(
 		if (!membership) {
 			return NextResponse.json(
 				{ success: false, error: "You don't have access to this organization" },
-				{ status: 403 }
+				{ status: 403 },
 			);
 		}
 
@@ -47,7 +47,7 @@ export async function GET(
 		if (!organization) {
 			return NextResponse.json(
 				{ success: false, error: "Organization not found" },
-				{ status: 404 }
+				{ status: 404 },
 			);
 		}
 
@@ -101,7 +101,9 @@ export async function GET(
 						trialEndsAt: subscription.trialEndsAt?.toISOString() || null,
 						cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
 						canceledAt: subscription.canceledAt?.toISOString() || null,
-						featureOverrides: JSON.parse(subscription.featureOverridesJson || "{}"),
+						featureOverrides: JSON.parse(
+							subscription.featureOverridesJson || "{}",
+						),
 						createdAt: subscription.createdAt.toISOString(),
 						plan: {
 							id: subscription.plan.id,
@@ -142,7 +144,7 @@ export async function GET(
 		console.error("Error fetching subscription:", error);
 		return NextResponse.json(
 			{ success: false, error: "Failed to fetch subscription" },
-			{ status: 500 }
+			{ status: 500 },
 		);
 	}
 }

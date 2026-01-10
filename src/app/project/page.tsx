@@ -1,12 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import {
+	FolderOpen,
+	GearSix,
+	ListChecks,
+	Plus,
+	Sparkle,
+} from "@phosphor-icons/react";
 import { format } from "date-fns";
-import { Plus, FolderOpen, Sparkle, GearSix, ListChecks } from "@phosphor-icons/react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-
-import { Board } from "@/lib/schemas";
+import { AppLayout } from "@/components/layout/app-layout";
+import { useProjectContext } from "@/components/projects/project-provider";
+import { SprintPropertiesDialog } from "@/components/sprint-properties-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
 	Card,
 	CardContent,
@@ -14,11 +23,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useProjectContext } from "@/components/projects/project-provider";
-import { AppLayout } from "@/components/layout/app-layout";
-import { BoardPropertiesDialog } from "@/components/board-properties-dialog";
+import type { Sprint } from "@/lib/schemas";
 
 export default function ProjectPage() {
 	const router = useRouter();
@@ -27,8 +32,7 @@ export default function ProjectPage() {
 		loading: projectLoading,
 		apiFetch,
 	} = useProjectContext();
-	// Using Board type for backward compatibility with API response
-	const [sprints, setSprints] = useState<Board[]>([]);
+	const [sprints, setSprints] = useState<Sprint[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
@@ -41,9 +45,9 @@ export default function ProjectPage() {
 
 		setLoading(true);
 		try {
-			const res = await apiFetch("/api/boards");
+			const res = await apiFetch("/api/sprints");
 			const data = await res.json();
-			setSprints(data.boards);
+			setSprints(data.sprints || []);
 		} catch (error) {
 			toast.error("Failed to load sprints");
 			console.error(error);
@@ -56,11 +60,11 @@ export default function ProjectPage() {
 		loadSprints();
 	}, [loadSprints]);
 
-	const handleCreateSprint = async (newSprint: Board) => {
+	const handleCreateSprint = async (newSprint: Sprint) => {
 		if (!currentProject) return;
 
 		try {
-			const res = await apiFetch("/api/boards", {
+			const res = await apiFetch("/api/sprints", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(newSprint),
@@ -77,11 +81,11 @@ export default function ProjectPage() {
 		}
 	};
 
-	const getStatusColor = (status: Board["status"]) => {
+	const getStatusColor = (status: Sprint["status"]) => {
 		switch (status) {
 			case "active":
 				return "bg-green-500/10 text-green-700 dark:text-green-300";
-			case "planned":
+			case "planning":
 				return "bg-blue-500/10 text-blue-700 dark:text-blue-300";
 			case "completed":
 				return "bg-gray-500/10 text-gray-700 dark:text-gray-300";
@@ -162,7 +166,9 @@ export default function ProjectPage() {
 										<CardDescription>{activeSprint.goal}</CardDescription>
 									</div>
 									<Button
-										onClick={() => router.push(`/project/sprints/${activeSprint.id}`)}
+										onClick={() =>
+											router.push(`/project/sprints/${activeSprint.id}`)
+										}
 									>
 										<FolderOpen className="w-4 h-4 mr-2" />
 										Open Sprint
@@ -171,20 +177,23 @@ export default function ProjectPage() {
 							</CardHeader>
 							<CardContent>
 								<div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
-									<Stat label="Total Tasks" value={activeSprint.tasks.length} />
+									<Stat
+										label="Total Tasks"
+										value={activeSprint.tasks?.length || 0}
+									/>
 									<Stat
 										label="Completed"
 										value={
-											activeSprint.tasks.filter((t) => t.status === "done")
-												.length
+											activeSprint.tasks?.filter((t) => t.status === "done")
+												.length || 0
 										}
 									/>
 									<Stat
 										label="In Progress"
 										value={
-											activeSprint.tasks.filter(
+											activeSprint.tasks?.filter(
 												(t) => t.status === "in_progress",
-											).length
+											).length || 0
 										}
 									/>
 									<div>
@@ -226,9 +235,10 @@ export default function ProjectPage() {
 								</CardHeader>
 								<CardContent>
 									<div className="flex justify-between text-sm text-muted-foreground">
-										<span>{sprint.tasks.length} tasks</span>
+										<span>{sprint.tasks?.length || 0} tasks</span>
 										<span>
-											{sprint.tasks.filter((t) => t.status === "done").length}{" "}
+											{sprint.tasks?.filter((t) => t.status === "done")
+												.length || 0}{" "}
 											done
 										</span>
 									</div>
@@ -311,8 +321,8 @@ export default function ProjectPage() {
 		>
 			{renderContent()}
 
-			<BoardPropertiesDialog
-				board={null}
+			<SprintPropertiesDialog
+				sprint={null}
 				open={createDialogOpen}
 				onClose={() => setCreateDialogOpen(false)}
 				onSave={handleCreateSprint}

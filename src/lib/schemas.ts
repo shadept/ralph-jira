@@ -416,7 +416,16 @@ export function withAutomationDefaults(
 // SPRINT & TASK SCHEMAS
 // ============================================================================
 
-// Sprint Column schema
+// Column schema for frontend (simplified, no sprintId needed)
+export const ColumnSchema = z.object({
+	id: z.string(),
+	name: z.string(),
+	order: z.number(),
+});
+
+export type Column = z.infer<typeof ColumnSchema>;
+
+// Sprint Column schema (database model, includes sprintId)
 export const SprintColumnSchema = z.object({
 	id: z.string(),
 	sprintId: z.string(),
@@ -464,10 +473,10 @@ export const TaskSchema = z.object({
 
 export type Task = z.infer<typeof TaskSchema>;
 
-// Sprint schema (was Board)
+// Sprint schema
 export const SprintSchema = z.object({
 	id: z.string(),
-	projectId: z.string(),
+	projectId: z.string().optional(), // Optional for frontend (comes from context)
 	name: z.string(),
 	goal: z.string().nullable().optional(),
 	deadline: z.string(),
@@ -479,7 +488,7 @@ export const SprintSchema = z.object({
 			total: z.number().optional(),
 		})
 		.optional(),
-	columns: z.array(SprintColumnSchema).optional(),
+	columns: z.array(ColumnSchema).optional(),
 	tasks: z.array(TaskSchema).optional(),
 	createdAt: z.string(),
 	updatedAt: z.string(),
@@ -555,68 +564,6 @@ export const RunLogEntrySchema = z.object({
 });
 
 export type RunLogEntry = z.infer<typeof RunLogEntrySchema>;
-
-// ============================================================================
-// LEGACY SCHEMAS (for backwards compatibility)
-// ============================================================================
-
-// Column schema (LEGACY - use SprintColumn)
-export const ColumnSchema = z.object({
-	id: z.string(),
-	name: z.string(),
-	order: z.number(),
-});
-
-export type Column = z.infer<typeof ColumnSchema>;
-
-// Board/Sprint schema (LEGACY - use Sprint)
-export const BoardSchema = z.object({
-	id: z.string(),
-	name: z.string(),
-	goal: z.string(),
-	deadline: z.string(),
-	status: z.enum(["planned", "active", "completed", "archived"]),
-	columns: z.array(ColumnSchema),
-	tasks: z.array(TaskSchema),
-	createdAt: z.string(),
-	updatedAt: z.string(),
-	metrics: z
-		.object({
-			velocity: z.number().optional(),
-			completed: z.number().optional(),
-			total: z.number().optional(),
-		})
-		.optional(),
-});
-
-export type Board = z.infer<typeof BoardSchema>;
-
-// Run log schema (LEGACY)
-export const RunLogSchema = z.object({
-	runId: z.string(),
-	boardId: z.string(),
-	startTime: z.string(),
-	endTime: z.string().optional(),
-	tasksAttempted: z.array(
-		z.object({
-			taskId: z.string(),
-			description: z.string(),
-			result: z.enum(["pass", "fail", "skipped"]),
-			filesChanged: z.array(z.string()),
-			commands: z.array(z.string()),
-			output: z.string(),
-		}),
-	),
-	status: z.enum(["running", "completed", "failed", "cancelled"]),
-	environment: z
-		.object({
-			nodeVersion: z.string().optional(),
-			platform: z.string().optional(),
-		})
-		.optional(),
-});
-
-export type RunLog = z.infer<typeof RunLogSchema>;
 
 // ============================================================================
 // AI TOOL SCHEMAS

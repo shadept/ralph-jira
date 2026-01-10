@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
 	Dialog,
 	DialogContent,
@@ -9,8 +11,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 
 export interface ProjectErrorDialogProps {
 	projectName?: string;
@@ -37,7 +37,7 @@ export function ProjectErrorDialog({
 			await onRemove();
 		} catch (error) {
 			toast.error(
-				error instanceof Error ? error.message : "Failed to remove project"
+				error instanceof Error ? error.message : "Failed to remove project",
 			);
 		} finally {
 			setRemoving(false);
@@ -66,7 +66,11 @@ export function ProjectErrorDialog({
 					<Button variant="outline" onClick={onClose} disabled={removing}>
 						Close
 					</Button>
-					<Button variant="destructive" onClick={handleRemove} disabled={removing}>
+					<Button
+						variant="destructive"
+						onClick={handleRemove}
+						disabled={removing}
+					>
 						{removing ? "Removing..." : "Remove Project"}
 					</Button>
 				</DialogFooter>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import {
 	createContext,
 	useCallback,
@@ -8,7 +9,6 @@ import {
 	useMemo,
 	useState,
 } from "react";
-import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import type { ProjectMetadata } from "@/lib/projects/types";
 import { ProjectErrorDialog } from "./project-error-dialog";
@@ -37,7 +37,7 @@ interface ProjectContextValue {
 	apiFetch: (
 		url: string,
 		init?: RequestInit,
-		options?: { projectId?: string }
+		options?: { projectId?: string },
 	) => Promise<Response>;
 	clearProjectError: () => void;
 	triggerProjectError: (error: ProjectErrorState) => void;
@@ -46,7 +46,7 @@ interface ProjectContextValue {
 const STORAGE_KEY = "ralph-current-project";
 
 const ProjectContext = createContext<ProjectContextValue | undefined>(
-	undefined
+	undefined,
 );
 
 /**
@@ -131,11 +131,11 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 	const { status: sessionStatus } = useSession();
 	const [projects, setProjects] = useState<ProjectMetadata[]>([]);
 	const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
-		null
+		null,
 	);
 	const [loading, setLoading] = useState(true);
 	const [projectError, setProjectError] = useState<ProjectErrorState | null>(
-		null
+		null,
 	);
 
 	const loadProjects = useCallback(async () => {
@@ -209,7 +209,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 		async (
 			url: string,
 			init?: RequestInit,
-			options?: { projectId?: string }
+			options?: { projectId?: string },
 		) => {
 			const projectId = options?.projectId || currentProject?.id;
 			if (!projectId) {
@@ -244,7 +244,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
 			return response;
 		},
-		[currentProject?.id, refreshProjects]
+		[currentProject?.id, refreshProjects],
 	);
 
 	const addProject = useCallback(
@@ -265,7 +265,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 			selectProject(data.project.id);
 			toast.success("Project added");
 		},
-		[refreshProjects, selectProject]
+		[refreshProjects, selectProject],
 	);
 
 	const removeProject = useCallback(
@@ -293,13 +293,13 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 				}
 			}
 		},
-		[projects, refreshProjects, selectProject, selectedProjectId]
+		[projects, refreshProjects, selectProject, selectedProjectId],
 	);
 
 	const clearProjectError = useCallback(() => setProjectError(null), []);
 	const triggerProjectError = useCallback(
 		(error: ProjectErrorState) => setProjectError(error),
-		[]
+		[],
 	);
 
 	const value: ProjectContextValue = {

@@ -7,7 +7,7 @@ import {
 
 export async function GET(
 	request: Request,
-	{ params }: { params: Promise<{ runId: string }> }
+	{ params }: { params: Promise<{ runId: string }> },
 ) {
 	try {
 		const { runId } = await params;
@@ -72,7 +72,7 @@ export async function GET(
 
 export async function PUT(
 	request: Request,
-	{ params }: { params: Promise<{ runId: string }> }
+	{ params }: { params: Promise<{ runId: string }> },
 ) {
 	try {
 		const { runId } = await params;
@@ -102,9 +102,7 @@ export async function PUT(
 					: existing.finishedAt,
 				currentIteration: body.currentIteration ?? existing.currentIteration,
 				lastTaskId:
-					body.lastTaskId !== undefined
-						? body.lastTaskId
-						: existing.lastTaskId,
+					body.lastTaskId !== undefined ? body.lastTaskId : existing.lastTaskId,
 				lastMessage:
 					body.lastMessage !== undefined
 						? body.lastMessage

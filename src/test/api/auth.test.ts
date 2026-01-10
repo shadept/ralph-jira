@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import bcrypt from "bcryptjs";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock bcrypt
 vi.mock("bcryptjs", () => ({
 	default: {
 		hash: vi.fn((password: string) => Promise.resolve(`hashed_${password}`)),
 		compare: vi.fn((password: string, hash: string) =>
-			Promise.resolve(hash === `hashed_${password}`)
+			Promise.resolve(hash === `hashed_${password}`),
 		),
 	},
 }));

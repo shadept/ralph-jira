@@ -1,7 +1,6 @@
 "use client";
 
-import * as React from "react";
-import { Moon, Sun, Monitor } from "@phosphor-icons/react";
+import { Monitor, Moon, Sun } from "@phosphor-icons/react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function ThemeToggle() {
-	const { setTheme, theme } = useTheme();
+	const { setTheme } = useTheme();
 
 	return (
 		<DropdownMenu>

@@ -1,6 +1,8 @@
 "use client";
 
+import { CaretDown, Check, Plus } from "@phosphor-icons/react";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -9,17 +11,15 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { CaretDown, Check, Plus } from "@phosphor-icons/react";
-import { useProjectContext } from "./project-provider";
 import { ProjectManagerDialog } from "./project-manager-dialog";
+import { useProjectContext } from "./project-provider";
 
 export function ProjectSwitcher() {
 	const { projects, currentProject, selectProject, loading } =
 		useProjectContext();
 	const [managerOpen, setManagerOpen] = useState(false);
 
-	const hasProjects = projects.length > 0;
+	const _hasProjects = projects.length > 0;
 
 	return (
 		<div className="flex items-center gap-2">

@@ -52,8 +52,8 @@ function formatTask(task: {
 }
 
 export async function GET(
-	request: Request,
-	{ params }: { params: Promise<{ id: string; taskId: string }> }
+	_request: Request,
+	{ params }: { params: Promise<{ id: string; taskId: string }> },
 ) {
 	try {
 		const { id, taskId } = await params;
@@ -79,7 +79,7 @@ export async function GET(
 
 export async function PUT(
 	request: Request,
-	{ params }: { params: Promise<{ id: string; taskId: string }> }
+	{ params }: { params: Promise<{ id: string; taskId: string }> },
 ) {
 	try {
 		const { id, taskId } = await params;
@@ -126,8 +126,7 @@ export async function PUT(
 					body.filesTouched !== undefined
 						? JSON.stringify(body.filesTouched)
 						: undefined,
-				assigneeId:
-					body.assigneeId !== undefined ? body.assigneeId : undefined,
+				assigneeId: body.assigneeId !== undefined ? body.assigneeId : undefined,
 				failureNotes:
 					body.failureNotes !== undefined ? body.failureNotes : undefined,
 			},
@@ -141,8 +140,8 @@ export async function PUT(
 }
 
 export async function DELETE(
-	request: Request,
-	{ params }: { params: Promise<{ id: string; taskId: string }> }
+	_request: Request,
+	{ params }: { params: Promise<{ id: string; taskId: string }> },
 ) {
 	try {
 		const { id, taskId } = await params;

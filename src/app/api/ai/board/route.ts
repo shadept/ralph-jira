@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { openai } from "@ai-sdk/openai";
 import { generateObject, generateText, Output } from "ai";
+import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import {
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
 									priority: z.enum(["low", "medium", "high", "urgent"]),
 									estimate: z.number(),
 									tags: z.array(z.string()),
-								})
+								}),
 							),
 						}),
 					}),
@@ -104,7 +104,7 @@ Category: ${category}`,
 
 				// Create tasks in database
 				const newTasks = await Promise.all(
-					result.output.tasks.map(async (t, idx) => {
+					result.output.tasks.map(async (t, _idx) => {
 						const task = await prisma.task.create({
 							data: {
 								projectId: project.id,
@@ -134,7 +134,7 @@ Category: ${category}`,
 							createdAt: task.createdAt.toISOString(),
 							updatedAt: task.updatedAt.toISOString(),
 						};
-					})
+					}),
 				);
 
 				return NextResponse.json({ success: true, tasks: newTasks });
@@ -151,7 +151,7 @@ Category: ${category}`,
 								taskId: z.string(),
 								priority: z.enum(["low", "medium", "high", "urgent"]),
 								reasoning: z.string(),
-							})
+							}),
 						),
 					}),
 					prompt: `Prioritize these tasks based on: ${criteria || "business value, dependencies, and risk"}
@@ -168,8 +168,8 @@ Project context: ${projectDescription}`,
 						prisma.task.update({
 							where: { id: taskId },
 							data: { priority },
-						})
-					)
+						}),
+					),
 				);
 
 				return NextResponse.json({
@@ -188,7 +188,7 @@ Project context: ${projectDescription}`,
 								goal: z.string(),
 								taskIds: z.array(z.string()),
 								durationWeeks: z.number(),
-							})
+							}),
 						),
 					}),
 					prompt: `Split these ${tasks.length} tasks into logical sprints (2-3 week iterations).
@@ -222,7 +222,7 @@ ${tasks
 Task: ${t.description}
 Current acceptance criteria:
 ${t.acceptanceCriteria.map((s: string, i: number) => `${i + 1}. ${s}`).join("\n")}
-`
+`,
 	)
 	.join("\n---\n")}
 

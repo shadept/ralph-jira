@@ -1,21 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
-import { toast } from "sonner";
 import {
-	CreditCard,
-	Calendar,
-	Users,
-	Folder,
-	Lightning,
-	Check,
-	X,
-	Clock,
-	Warning,
 	ArrowRight,
-	Infinity,
+	Check,
+	Clock,
+	CreditCard,
+	Folder,
+	Infinity as InfinityIcon,
+	Lightning,
+	Users,
+	Warning,
+	X,
 } from "@phosphor-icons/react";
+import { useSession } from "next-auth/react";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
@@ -133,13 +132,20 @@ function UsageBar({
 					<span>{label}</span>
 				</div>
 				<span className={isAtLimit ? "text-red-600 font-medium" : ""}>
-					{current} / {isUnlimited ? <Infinity className="w-4 h-4 inline" /> : max}
+					{current} /{" "}
+					{isUnlimited ? <InfinityIcon className="w-4 h-4 inline" /> : max}
 				</span>
 			</div>
 			{!isUnlimited && (
 				<Progress
 					value={percentage}
-					className={isAtLimit ? "[&>div]:bg-red-500" : isNearLimit ? "[&>div]:bg-yellow-500" : ""}
+					className={
+						isAtLimit
+							? "[&>div]:bg-red-500"
+							: isNearLimit
+								? "[&>div]:bg-yellow-500"
+								: ""
+					}
 				/>
 			)}
 			{isUnlimited && (
@@ -278,7 +284,8 @@ export default function SubscriptionPage() {
 							<div>
 								<p className="font-medium text-red-600">Payment Past Due</p>
 								<p className="text-sm text-muted-foreground">
-									Please update your payment method to avoid service interruption.
+									Please update your payment method to avoid service
+									interruption.
 								</p>
 							</div>
 							{isOwner && (
@@ -299,8 +306,9 @@ export default function SubscriptionPage() {
 									Subscription Ending
 								</p>
 								<p className="text-sm text-muted-foreground">
-									Your subscription will end on {formatDate(sub.currentPeriodEnd)}.
-									You'll lose access to premium features after this date.
+									Your subscription will end on{" "}
+									{formatDate(sub.currentPeriodEnd)}. You'll lose access to
+									premium features after this date.
 								</p>
 							</div>
 							{isOwner && (
@@ -319,7 +327,9 @@ export default function SubscriptionPage() {
 							<div>
 								<CardTitle className="flex items-center gap-2">
 									{plan?.displayName} Plan
-									<Badge className={statusColors[sub.status] || statusColors.active}>
+									<Badge
+										className={statusColors[sub.status] || statusColors.active}
+									>
 										{statusLabels[sub.status] || sub.status}
 									</Badge>
 								</CardTitle>
@@ -330,7 +340,9 @@ export default function SubscriptionPage() {
 							{isOwner && (
 								<span title="Coming soon">
 									<Button variant="outline" disabled>
-										{plan?.name === "enterprise" ? "Contact Sales" : "Change Plan"}
+										{plan?.name === "enterprise"
+											? "Contact Sales"
+											: "Change Plan"}
 									</Button>
 								</span>
 							)}
@@ -346,7 +358,8 @@ export default function SubscriptionPage() {
 							<div className="space-y-1">
 								<p className="text-sm text-muted-foreground">Current Period</p>
 								<p className="font-medium">
-									{formatDate(sub.currentPeriodStart)} - {formatDate(sub.currentPeriodEnd)}
+									{formatDate(sub.currentPeriodStart)} -{" "}
+									{formatDate(sub.currentPeriodEnd)}
 								</p>
 							</div>
 							<div className="space-y-1">
@@ -367,7 +380,7 @@ export default function SubscriptionPage() {
 										: formatPrice(
 												sub.billingPeriod === "yearly"
 													? plan?.yearlyPriceCents || 0
-													: plan?.monthlyPriceCents || 0
+													: plan?.monthlyPriceCents || 0,
 											)}
 									{plan && plan.monthlyPriceCents > 0 && (
 										<span className="text-muted-foreground text-sm">
@@ -382,7 +395,8 @@ export default function SubscriptionPage() {
 							<div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
 								<p className="text-sm text-blue-700 dark:text-blue-400">
 									<Clock className="w-4 h-4 inline mr-1" />
-									Trial ends on {formatDate(sub.trialEndsAt)}. Add a payment method to continue after your trial.
+									Trial ends on {formatDate(sub.trialEndsAt)}. Add a payment
+									method to continue after your trial.
 								</p>
 							</div>
 						)}
@@ -392,7 +406,8 @@ export default function SubscriptionPage() {
 							<div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
 								<p className="text-sm text-amber-700 dark:text-amber-400">
 									<Lightning className="w-4 h-4 inline mr-1" weight="fill" />
-									Founder Plan - Zero-cost Enterprise subscription with all features enabled.
+									Founder Plan - Zero-cost Enterprise subscription with all
+									features enabled.
 								</p>
 							</div>
 						)}
@@ -435,7 +450,9 @@ export default function SubscriptionPage() {
 									label="AI Runs (this week)"
 									icon={Lightning}
 									current={usage.aiRunsThisWeek}
-									max={effectiveFeatures.byokEnabled ? null : plan.maxAiRunsPerWeek}
+									max={
+										effectiveFeatures.byokEnabled ? null : plan.maxAiRunsPerWeek
+									}
 								/>
 							</>
 						)}
@@ -485,8 +502,12 @@ export default function SubscriptionPage() {
 						<div className="mt-6 pt-4 border-t">
 							<div className="grid gap-4 md:grid-cols-2">
 								<div>
-									<p className="text-sm text-muted-foreground">Max Iterations per AI Run</p>
-									<p className="font-medium">{plan?.maxIterationsPerRun || 5}</p>
+									<p className="text-sm text-muted-foreground">
+										Max Iterations per AI Run
+									</p>
+									<p className="font-medium">
+										{plan?.maxIterationsPerRun || 5}
+									</p>
 								</div>
 								<div>
 									<p className="text-sm text-muted-foreground">Max File Size</p>
@@ -540,7 +561,8 @@ export default function SubscriptionPage() {
 								<div>
 									<p className="font-medium">Cancel Subscription</p>
 									<p className="text-sm text-muted-foreground">
-										Your subscription will remain active until the end of the current billing period.
+										Your subscription will remain active until the end of the
+										current billing period.
 									</p>
 								</div>
 								<Button variant="destructive">Cancel Subscription</Button>

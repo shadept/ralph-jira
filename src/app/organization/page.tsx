@@ -1,46 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
-import { useForm } from "@tanstack/react-form";
-import { toast } from "sonner";
 import {
+	ArrowRight,
 	Buildings,
+	CreditCard,
 	Crown,
-	Shield,
-	User,
-	UserPlus,
-	Trash,
 	FloppyDisk,
 	FolderOpen,
 	GitBranch,
-	ArrowRight,
+	Shield,
+	Trash,
+	User,
+	UserPlus,
 	Warning,
-	CreditCard,
 } from "@phosphor-icons/react";
+import { useForm } from "@tanstack/react-form";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { AppLayout } from "@/components/layout/app-layout";
 import { useProjectContext } from "@/components/projects/project-provider";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -51,6 +32,16 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import {
 	Dialog,
 	DialogContent,
@@ -59,6 +50,15 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 
 type Organization = {
 	id: string;
@@ -289,7 +289,7 @@ function TransferOwnershipDialog({
 	const [confirmStep, setConfirmStep] = useState(false);
 
 	const eligibleMembers = members.filter(
-		(m) => m.userId !== currentUserId && m.role !== "owner"
+		(m) => m.userId !== currentUserId && m.role !== "owner",
 	);
 
 	const selectedMember = eligibleMembers.find((m) => m.id === selectedMemberId);
@@ -366,10 +366,7 @@ function TransferOwnershipDialog({
 							<Button variant="outline" onClick={() => onOpenChange(false)}>
 								Cancel
 							</Button>
-							<Button
-								onClick={handleContinue}
-								disabled={!selectedMemberId}
-							>
+							<Button onClick={handleContinue} disabled={!selectedMemberId}>
 								Continue
 							</Button>
 						</DialogFooter>
@@ -390,12 +387,17 @@ function TransferOwnershipDialog({
 								</p>
 								<p className="text-sm">
 									You are about to transfer ownership to{" "}
-									<strong>{selectedMember?.user.name || selectedMember?.user.email}</strong>.
+									<strong>
+										{selectedMember?.user.name || selectedMember?.user.email}
+									</strong>
+									.
 								</p>
 								<ul className="text-sm space-y-1 list-disc list-inside text-muted-foreground">
 									<li>You will be demoted to Admin</li>
 									<li>Only the new owner can transfer ownership back to you</li>
-									<li>The new owner will have full control over this organization</li>
+									<li>
+										The new owner will have full control over this organization
+									</li>
 								</ul>
 							</div>
 
@@ -513,7 +515,7 @@ export default function OrganizationPage() {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({ email, role }),
-				}
+				},
 			);
 
 			const json = await res.json();
@@ -543,7 +545,7 @@ export default function OrganizationPage() {
 					method: "PUT",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({ role: newRole }),
-				}
+				},
 			);
 
 			const json = await res.json();
@@ -570,7 +572,7 @@ export default function OrganizationPage() {
 				`/api/organizations/${data.organization.id}/members/${memberToRemove.id}`,
 				{
 					method: "DELETE",
-				}
+				},
 			);
 
 			const json = await res.json();
@@ -603,7 +605,7 @@ export default function OrganizationPage() {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({ newOwnerMemberId }),
-				}
+				},
 			);
 
 			const json = await res.json();
@@ -678,7 +680,6 @@ export default function OrganizationPage() {
 							saving={saving}
 							disabled={!isOwner}
 						/>
-
 					</CardContent>
 				</Card>
 
@@ -687,11 +688,12 @@ export default function OrganizationPage() {
 						<div className="flex items-center justify-between">
 							<div>
 								<CardTitle>Subscription</CardTitle>
-								<CardDescription>
-									Manage your plan and billing
-								</CardDescription>
+								<CardDescription>Manage your plan and billing</CardDescription>
 							</div>
-							<Button variant="outline" onClick={() => router.push("/organization/subscription")}>
+							<Button
+								variant="outline"
+								onClick={() => router.push("/organization/subscription")}
+							>
 								<CreditCard className="w-4 h-4 mr-2" />
 								View Subscription
 							</Button>
@@ -709,9 +711,12 @@ export default function OrganizationPage() {
 									{data.members.length !== 1 ? "s" : ""} in this organization
 								</CardDescription>
 							</div>
-							{isAdmin && (
-								data.limits.maxUsers !== null && data.members.length >= data.limits.maxUsers ? (
-									<span title={`Plan limit reached (${data.limits.maxUsers} users). Upgrade to add more members.`}>
+							{isAdmin &&
+								(data.limits.maxUsers !== null &&
+								data.members.length >= data.limits.maxUsers ? (
+									<span
+										title={`Plan limit reached (${data.limits.maxUsers} users). Upgrade to add more members.`}
+									>
 										<Button disabled>
 											<UserPlus className="w-4 h-4 mr-2" />
 											Invite Member
@@ -722,8 +727,7 @@ export default function OrganizationPage() {
 										<UserPlus className="w-4 h-4 mr-2" />
 										Invite Member
 									</Button>
-								)
-							)}
+								))}
 						</div>
 					</CardHeader>
 					<CardContent>
@@ -731,10 +735,12 @@ export default function OrganizationPage() {
 							{data.members.map((member) => {
 								const RoleIcon = roleIcons[member.role];
 								const isSelf = member.userId === session?.user?.id;
-								const canChangeRole = isOwner && !isSelf && member.role !== "owner";
+								const canChangeRole =
+									isOwner && !isSelf && member.role !== "owner";
 								const isLastMember = data.members.length === 1;
 								const isSelfOwner = isSelf && member.role === "owner";
-								const canRemove = (isOwner || isSelf) && !isLastMember && !isSelfOwner;
+								const canRemove =
+									(isOwner || isSelf) && !isLastMember && !isSelfOwner;
 
 								return (
 									<div
@@ -822,7 +828,9 @@ export default function OrganizationPage() {
 						) : (
 							<div className="space-y-3">
 								{data.projects.map((project) => {
-									const isLocalPath = /^([a-zA-Z]:[/\\]|\/|~|\.\.?\/)/.test(project.path);
+									const isLocalPath = /^([a-zA-Z]:[/\\]|\/|~|\.\.?\/)/.test(
+										project.path,
+									);
 									const RepoIcon = isLocalPath ? FolderOpen : GitBranch;
 
 									const handleGoToProject = () => {
@@ -875,7 +883,9 @@ export default function OrganizationPage() {
 						<dl className="grid grid-cols-2 gap-4 text-sm">
 							<div>
 								<dt className="text-muted-foreground">Projects</dt>
-								<dd className="font-medium">{data.organization.projectCount}</dd>
+								<dd className="font-medium">
+									{data.organization.projectCount}
+								</dd>
 							</div>
 							<div>
 								<dt className="text-muted-foreground">Members</dt>
@@ -910,7 +920,8 @@ export default function OrganizationPage() {
 								<div>
 									<p className="font-medium">Transfer Ownership</p>
 									<p className="text-sm text-muted-foreground">
-										Transfer this organization to another member. You will be demoted to Admin.
+										Transfer this organization to another member. You will be
+										demoted to Admin.
 									</p>
 								</div>
 								<Button

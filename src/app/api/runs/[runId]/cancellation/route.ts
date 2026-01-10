@@ -7,7 +7,7 @@ import {
 
 export async function GET(
 	request: Request,
-	{ params }: { params: Promise<{ runId: string }> }
+	{ params }: { params: Promise<{ runId: string }> },
 ) {
 	try {
 		const { runId } = await params;

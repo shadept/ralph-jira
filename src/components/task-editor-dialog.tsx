@@ -1,30 +1,30 @@
 "use client";
 
-import { startTransition, useEffect, useState } from "react";
+import { Plus, Sparkle, X } from "@phosphor-icons/react";
 import { useForm, useStore } from "@tanstack/react-form";
-import { Task } from "@/lib/schemas";
-
+import { startTransition, useEffect, useState } from "react";
+import type { Task } from "@/lib/schemas";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "./ui/alert-dialog";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
 import {
 	Dialog,
 	DialogContent,
+	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-	DialogFooter,
 } from "./ui/dialog";
-import {
-	AlertDialog,
-	AlertDialogContent,
-	AlertDialogHeader,
-	AlertDialogTitle,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogCancel,
-	AlertDialogAction,
-} from "./ui/alert-dialog";
-import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Textarea } from "./ui/textarea";
 import {
 	Select,
 	SelectContent,
@@ -32,8 +32,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "./ui/select";
-import { Badge } from "./ui/badge";
-import { Plus, X, Sparkle } from "@phosphor-icons/react";
+import { Textarea } from "./ui/textarea";
 
 interface TaskEditorDialogProps {
 	task: Task | null;
@@ -89,7 +88,7 @@ function TaskForm({
 				description: value.description,
 				category: value.category,
 				priority: value.priority,
-				estimate: value.estimate ? parseInt(value.estimate) : undefined,
+				estimate: value.estimate ? parseInt(value.estimate, 10) : undefined,
 				acceptanceCriteria: value.acceptanceCriteria,
 				tags: value.tags,
 				assigneeId: value.assigneeId || undefined,
@@ -117,12 +116,12 @@ function TaskForm({
 
 	const acceptanceCriteria = useStore(
 		form.store,
-		(state) => state.values.acceptanceCriteria
+		(state) => state.values.acceptanceCriteria,
 	);
 	const tags = useStore(form.store, (state) => state.values.tags);
 	const failureNotes = useStore(
 		form.store,
-		(state) => state.values.failureNotes
+		(state) => state.values.failureNotes,
 	);
 
 	const requestClose = () => {
@@ -156,7 +155,7 @@ function TaskForm({
 		const current = form.getFieldValue("acceptanceCriteria");
 		form.setFieldValue(
 			"acceptanceCriteria",
-			current.filter((_, i) => i !== index)
+			current.filter((_, i) => i !== index),
 		);
 	};
 
@@ -179,7 +178,7 @@ function TaskForm({
 		const current = form.getFieldValue("tags");
 		form.setFieldValue(
 			"tags",
-			current.filter((t) => t !== tag)
+			current.filter((t) => t !== tag),
 		);
 	};
 
@@ -295,7 +294,10 @@ function TaskForm({
 							</div>
 							<div className="space-y-2">
 								{acceptanceCriteria.map((step, idx) => (
-									<div key={`${task.id}-step-${idx}`} className="flex items-start gap-2">
+									<div
+										key={`${task.id}-step-${idx}`}
+										className="flex items-start gap-2"
+									>
 										<span className="text-sm text-muted-foreground mt-2 w-6">
 											{idx + 1}.
 										</span>

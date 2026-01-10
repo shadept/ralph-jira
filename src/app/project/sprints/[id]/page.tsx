@@ -1,40 +1,24 @@
 "use client";
 
-import { use, useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useForm } from "@tanstack/react-form";
-import { toast } from "sonner";
 import {
-	Sparkle,
-	PlayCircle,
-	Plus,
 	ClockCounterClockwise,
 	GearSix,
+	PlayCircle,
+	Plus,
+	Sparkle,
 } from "@phosphor-icons/react";
-
-import { Board, Task, RunRecord } from "@/lib/schemas";
+import { useForm } from "@tanstack/react-form";
+import { useRouter } from "next/navigation";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { AnsiLog } from "@/components/ansi-log";
 import { KanbanBoard } from "@/components/kanban-board";
+import { AppLayout } from "@/components/layout/app-layout";
+import { useProjectContext } from "@/components/projects/project-provider";
+import { SprintPropertiesDialog } from "@/components/sprint-properties-dialog";
 import { TaskEditorDialog } from "@/components/task-editor-dialog";
-import { BoardPropertiesDialog } from "@/components/board-properties-dialog";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-	Sheet,
-	SheetContent,
-	SheetDescription,
-	SheetHeader,
-	SheetTitle,
-} from "@/components/ui/sheet";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import {
 	Dialog,
 	DialogContent,
@@ -43,9 +27,24 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { useProjectContext } from "@/components/projects/project-provider";
-import { AppLayout } from "@/components/layout/app-layout";
-import { AnsiLog } from "@/components/ansi-log";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetHeader,
+	SheetTitle,
+} from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
+import type { RunRecord, Sprint, Task } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 
 const RUN_TERMINAL_STATUSES = new Set<RunRecord["status"]>([
@@ -98,7 +97,9 @@ function StartRunDialog({
 			maxIterations: defaultIterations,
 		},
 		onSubmit: async ({ value }) => {
-			const normalizedBranch = toKebabCase(value.branchName || defaultBranchName);
+			const normalizedBranch = toKebabCase(
+				value.branchName || defaultBranchName,
+			);
 			if (!normalizedBranch) {
 				return;
 			}
@@ -129,9 +130,9 @@ function StartRunDialog({
 				<DialogHeader>
 					<DialogTitle>Start AI Loop</DialogTitle>
 					<DialogDescription>
-						Provide the branch name the agent should use. The runner will
-						create a git worktree on this branch and only cleans up the
-						sandbox after commits are pushed to origin.
+						Provide the branch name the agent should use. The runner will create
+						a git worktree on this branch and only cleans up the sandbox after
+						commits are pushed to origin.
 					</DialogDescription>
 				</DialogHeader>
 				<form
@@ -175,7 +176,7 @@ function StartRunDialog({
 									value={field.state.value}
 									onChange={(e) => {
 										const val = parseInt(e.target.value, 10);
-										field.handleChange(isNaN(val) ? 1 : val);
+										field.handleChange(Number.isNaN(val) ? 1 : val);
 									}}
 								/>
 								<p className="text-xs text-muted-foreground">
@@ -301,8 +302,7 @@ export default function SprintPage({
 		apiFetch,
 	} = useProjectContext();
 
-	// Using Board type for backward compatibility with API response
-	const [sprint, setSprint] = useState<Board | null>(null);
+	const [sprint, setSprint] = useState<Sprint | null>(null);
 	const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 	const [isEditorOpen, setIsEditorOpen] = useState(false);
 	const [loading, setLoading] = useState(true);
@@ -359,9 +359,9 @@ export default function SprintPage({
 
 		setLoading(true);
 		try {
-			const res = await apiFetch(`/api/boards/${id}`);
+			const res = await apiFetch(`/api/sprints/${id}`);
 			const data = await res.json();
-			setSprint(data.board);
+			setSprint(data.sprint);
 		} catch (error) {
 			toast.error("Failed to load sprint");
 			console.error(error);
@@ -447,17 +447,17 @@ export default function SprintPage({
 		};
 	}, [pollingRunId, fetchRunStatus]);
 
-	const handleUpdateSprint = async (updatedSprint: Board) => {
+	const handleUpdateSprint = async (updatedSprint: Sprint) => {
 		if (!currentProject) return;
 		try {
-			const res = await apiFetch(`/api/boards/${id}`, {
+			const res = await apiFetch(`/api/sprints/${id}`, {
 				method: "PUT",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(updatedSprint),
 			});
 
 			const data = await res.json();
-			setSprint(data.board);
+			setSprint(data.sprint);
 			toast.success("Sprint updated");
 		} catch (error) {
 			const message =
@@ -470,7 +470,7 @@ export default function SprintPage({
 	const handleDeleteSprint = async (sprintId: string) => {
 		if (!currentProject) return;
 		try {
-			await apiFetch(`/api/boards/${sprintId}`, {
+			await apiFetch(`/api/sprints/${sprintId}`, {
 				method: "DELETE",
 			});
 			toast.success("Sprint deleted");
@@ -516,10 +516,9 @@ export default function SprintPage({
 			updatedAt: timestamp,
 		};
 
-		const existingIndex = sprint.tasks.findIndex(
-			(t) => t.id === preparedTask.id,
-		);
-		const updatedTasks = [...sprint.tasks];
+		const tasks = sprint.tasks || [];
+		const existingIndex = tasks.findIndex((t) => t.id === preparedTask.id);
+		const updatedTasks = [...tasks];
 
 		if (existingIndex >= 0) {
 			updatedTasks[existingIndex] = preparedTask;
@@ -539,9 +538,10 @@ export default function SprintPage({
 	const handleDeleteTask = async (taskId: string) => {
 		if (!sprint) return;
 
+		const tasks = sprint.tasks || [];
 		const updatedSprint = {
 			...sprint,
-			tasks: sprint.tasks.filter((t) => t.id !== taskId),
+			tasks: tasks.filter((t) => t.id !== taskId),
 			updatedAt: new Date().toISOString(),
 		};
 
@@ -761,8 +761,8 @@ export default function SprintPage({
 						)}
 					>
 						<KanbanBoard
-							board={sprint}
-							onUpdateBoard={handleUpdateSprint}
+							sprint={sprint}
+							onUpdateSprint={handleUpdateSprint}
 							onTaskClick={handleTaskClick}
 						/>
 					</div>
@@ -786,7 +786,7 @@ export default function SprintPage({
 	return (
 		<AppLayout
 			title={sprint ? sprint.name : "Sprint"}
-			description={sprint ? sprint.goal : "Plan and track sprint progress"}
+			description={sprint?.goal || "Plan and track sprint progress"}
 			actions={actions}
 			backLink={{ href: "/project", label: "Back to Project" }}
 			fluid
@@ -869,7 +869,9 @@ export default function SprintPage({
 							<div className="flex flex-wrap gap-2">
 								<Button
 									variant="secondary"
-									onClick={() => router.push(`/project/runs/${activeRun.runId}`)}
+									onClick={() =>
+										router.push(`/project/runs/${activeRun.runId}`)
+									}
 								>
 									View Details
 								</Button>
@@ -919,8 +921,8 @@ export default function SprintPage({
 				loading={createTasksLoading}
 			/>
 
-			<BoardPropertiesDialog
-				board={sprint}
+			<SprintPropertiesDialog
+				sprint={sprint}
 				open={sprintPropertiesOpen}
 				onClose={() => setSprintPropertiesOpen(false)}
 				onSave={handleUpdateSprint}

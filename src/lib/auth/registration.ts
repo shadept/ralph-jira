@@ -12,7 +12,7 @@ export const orgRegistrationStep1Schema = z.object({
 		.max(50, "Slug must be at most 50 characters")
 		.regex(
 			/^[a-z0-9-]+$/,
-			"Slug can only contain lowercase letters, numbers, and hyphens"
+			"Slug can only contain lowercase letters, numbers, and hyphens",
 		),
 });
 
@@ -33,7 +33,7 @@ export const orgRegistrationStep2Schema = z.object({
 
 // Combined schema for full registration
 export const orgRegistrationSchema = orgRegistrationStep1Schema.merge(
-	orgRegistrationStep2Schema
+	orgRegistrationStep2Schema,
 );
 
 export type OrgRegistrationStep1 = z.infer<typeof orgRegistrationStep1Schema>;

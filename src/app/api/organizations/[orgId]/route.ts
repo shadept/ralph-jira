@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 
 const updateOrgSchema = z.object({
 	name: z.string().min(1, "Organization name is required").optional(),
@@ -10,7 +10,7 @@ const updateOrgSchema = z.object({
 		.min(2, "Slug must be at least 2 characters")
 		.regex(
 			/^[a-z0-9-]+$/,
-			"Slug can only contain lowercase letters, numbers, and hyphens"
+			"Slug can only contain lowercase letters, numbers, and hyphens",
 		)
 		.optional(),
 	logoUrl: z.string().url().nullable().optional(),
@@ -22,15 +22,15 @@ const updateOrgSchema = z.object({
  * Any member can read
  */
 export async function GET(
-	request: NextRequest,
-	{ params }: { params: Promise<{ orgId: string }> }
+	_request: NextRequest,
+	{ params }: { params: Promise<{ orgId: string }> },
 ) {
 	try {
 		const session = await auth();
 		if (!session?.user?.id) {
 			return NextResponse.json(
 				{ success: false, error: "Unauthorized" },
-				{ status: 401 }
+				{ status: 401 },
 			);
 		}
 
@@ -49,7 +49,7 @@ export async function GET(
 		if (!membership) {
 			return NextResponse.json(
 				{ success: false, error: "You don't have access to this organization" },
-				{ status: 403 }
+				{ status: 403 },
 			);
 		}
 
@@ -60,7 +60,7 @@ export async function GET(
 		if (!organization) {
 			return NextResponse.json(
 				{ success: false, error: "Organization not found" },
-				{ status: 404 }
+				{ status: 404 },
 			);
 		}
 
@@ -139,7 +139,7 @@ export async function GET(
 		console.error("Error fetching organization:", error);
 		return NextResponse.json(
 			{ success: false, error: "Failed to fetch organization" },
-			{ status: 500 }
+			{ status: 500 },
 		);
 	}
 }
@@ -151,14 +151,14 @@ export async function GET(
  */
 export async function PUT(
 	request: NextRequest,
-	{ params }: { params: Promise<{ orgId: string }> }
+	{ params }: { params: Promise<{ orgId: string }> },
 ) {
 	try {
 		const session = await auth();
 		if (!session?.user?.id) {
 			return NextResponse.json(
 				{ success: false, error: "Unauthorized" },
-				{ status: 401 }
+				{ status: 401 },
 			);
 		}
 
@@ -180,7 +180,7 @@ export async function PUT(
 					success: false,
 					error: "Only organization owners can update settings",
 				},
-				{ status: 403 }
+				{ status: 403 },
 			);
 		}
 
@@ -193,7 +193,7 @@ export async function PUT(
 					success: false,
 					errors: parsed.error.flatten().fieldErrors,
 				},
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
@@ -215,7 +215,7 @@ export async function PUT(
 						success: false,
 						error: "This URL slug is already taken",
 					},
-					{ status: 400 }
+					{ status: 400 },
 				);
 			}
 		}
@@ -244,7 +244,7 @@ export async function PUT(
 		console.error("Error updating organization:", error);
 		return NextResponse.json(
 			{ success: false, error: "Failed to update organization" },
-			{ status: 500 }
+			{ status: 500 },
 		);
 	}
 }
