@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Sparkle, X } from "@phosphor-icons/react";
+import { PlusIcon, SparkleIcon, XIcon } from "@phosphor-icons/react";
 import { useForm, useStore } from "@tanstack/react-form";
 import { startTransition, useEffect, useState } from "react";
 import type { Task } from "@/lib/schemas";
@@ -287,7 +287,7 @@ function TaskForm({
 										size="sm"
 										onClick={() => onAIAction("improve-acceptance-criteria")}
 									>
-										<Sparkle className="w-4 h-4 mr-1" />
+										<SparkleIcon className="w-4 h-4 mr-1" />
 										AI Improve
 									</Button>
 								)}
@@ -312,7 +312,7 @@ function TaskForm({
 											size="sm"
 											onClick={() => removeStep(idx)}
 										>
-											<X className="w-4 h-4" />
+											<XIcon className="w-4 h-4" />
 										</Button>
 									</div>
 								))}
@@ -329,7 +329,7 @@ function TaskForm({
 										}}
 									/>
 									<Button type="button" onClick={addStep}>
-										<Plus className="w-4 h-4" />
+										<PlusIcon className="w-4 h-4" />
 									</Button>
 								</div>
 							</div>
@@ -346,7 +346,7 @@ function TaskForm({
 											onClick={() => removeTag(tag)}
 											className="ml-1 hover:text-destructive"
 										>
-											<X className="w-3 h-3" />
+											<XIcon className="w-3 h-3" />
 										</button>
 									</Badge>
 								))}
@@ -364,7 +364,7 @@ function TaskForm({
 									}}
 								/>
 								<Button type="button" onClick={addTag}>
-									<Plus className="w-4 h-4" />
+									<PlusIcon className="w-4 h-4" />
 								</Button>
 							</div>
 						</div>

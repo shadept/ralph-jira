@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft } from "@phosphor-icons/react";
+import { ArrowLeftIcon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -33,7 +33,7 @@ export function BackButton({
 		return (
 			<Button {...baseProps} asChild>
 				<Link href={href}>
-					<ArrowLeft className="h-4 w-4" />
+					<ArrowLeftIcon className="h-4 w-4" />
 					<span>{label}</span>
 				</Link>
 			</Button>
@@ -42,7 +42,7 @@ export function BackButton({
 
 	return (
 		<Button {...baseProps} onClick={() => router.back()}>
-			<ArrowLeft className="h-4 w-4" />
+			<ArrowLeftIcon className="h-4 w-4" />
 			<span>{label}</span>
 		</Button>
 	);

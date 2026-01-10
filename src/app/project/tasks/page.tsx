@@ -1,12 +1,12 @@
 "use client";
 
 import {
-	CaretDown,
-	CaretRight,
-	CheckCircle,
-	Circle,
-	ListChecks,
-	Plus,
+	CaretDownIcon,
+	CaretRightIcon,
+	CheckCircleIcon,
+	CircleIcon,
+	ListChecksIcon,
+	PlusIcon,
 } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -88,9 +88,9 @@ function TaskRow({
 					className="flex-shrink-0 mt-0.5 hover:scale-110 transition-transform"
 				>
 					{task.passes ? (
-						<CheckCircle className="w-5 h-5 text-green-600" weight="fill" />
+						<CheckCircleIcon className="w-5 h-5 text-green-600" weight="fill" />
 					) : (
-						<Circle className="w-5 h-5 text-muted-foreground hover:text-green-600" />
+						<CircleIcon className="w-5 h-5 text-muted-foreground hover:text-green-600" />
 					)}
 				</button>
 
@@ -155,9 +155,9 @@ function TaskGroupSection({
 				<CollapsibleTrigger asChild>
 					<Button variant="ghost" size="sm" className="p-1 h-auto">
 						{isOpen ? (
-							<CaretDown className="w-4 h-4" />
+							<CaretDownIcon className="w-4 h-4" />
 						) : (
-							<CaretRight className="w-4 h-4" />
+							<CaretRightIcon className="w-4 h-4" />
 						)}
 					</Button>
 				</CollapsibleTrigger>
@@ -331,7 +331,7 @@ export default function AllTasksPage() {
 
 	const actions = currentProject ? (
 		<Button onClick={handleNewTask}>
-			<Plus className="w-4 h-4 mr-2" />
+			<PlusIcon className="w-4 h-4 mr-2" />
 			New Task
 		</Button>
 	) : null;
@@ -368,13 +368,13 @@ export default function AllTasksPage() {
 		if (!data || (data.groups.length === 0 && data.totalCount === 0)) {
 			return (
 				<div className="flex h-64 flex-col items-center justify-center gap-3 text-center">
-					<ListChecks className="w-12 h-12 text-muted-foreground" />
+					<ListChecksIcon className="w-12 h-12 text-muted-foreground" />
 					<p className="text-lg font-semibold">No tasks yet</p>
 					<p className="text-sm text-muted-foreground max-w-md">
 						Create your first task to get started.
 					</p>
 					<Button onClick={handleNewTask} className="mt-2">
-						<Plus className="w-4 h-4 mr-2" />
+						<PlusIcon className="w-4 h-4 mr-2" />
 						Create Task
 					</Button>
 				</div>

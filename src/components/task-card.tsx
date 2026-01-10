@@ -2,7 +2,7 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CheckCircle, Circle } from "@phosphor-icons/react";
+import { CheckCircleIcon, CircleIcon } from "@phosphor-icons/react";
 import type { Task } from "@/lib/schemas";
 import { Badge } from "./ui/badge";
 import { Card } from "./ui/card";
@@ -63,9 +63,9 @@ export function TaskCard({
 					className="flex-shrink-0 mt-0.5 hover:scale-110 transition-transform"
 				>
 					{task.passes ? (
-						<CheckCircle className="w-5 h-5 text-green-600" weight="fill" />
+						<CheckCircleIcon className="w-5 h-5 text-green-600" weight="fill" />
 					) : (
-						<Circle className="w-5 h-5 text-muted-foreground hover:text-green-600" />
+						<CircleIcon className="w-5 h-5 text-muted-foreground hover:text-green-600" />
 					)}
 				</button>
 				<div className="flex-1 min-w-0">

@@ -159,8 +159,9 @@ export async function DELETE(
 			return NextResponse.json({ error: "Task not found" }, { status: 404 });
 		}
 
-		await prisma.task.delete({
+		await prisma.task.update({
 			where: { id: taskId },
+			data: { archivedAt: new Date() },
 		});
 
 		return NextResponse.json({ success: true });

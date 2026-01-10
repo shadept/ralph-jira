@@ -1,6 +1,6 @@
 "use client";
 
-import { Sparkle } from "@phosphor-icons/react";
+import { SparkleIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -102,7 +102,7 @@ export default function AssistantPage() {
 							rows={6}
 						/>
 						<Button onClick={handleGenerateTasks} disabled={generating}>
-							<Sparkle className="w-4 h-4 mr-2" />
+							<SparkleIcon className="w-4 h-4 mr-2" />
 							{generating ? "Generating…" : "Generate Tasks"}
 						</Button>
 					</CardContent>

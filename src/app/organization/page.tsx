@@ -1,18 +1,18 @@
 "use client";
 
 import {
-	ArrowRight,
-	Buildings,
-	CreditCard,
-	Crown,
-	FloppyDisk,
-	FolderOpen,
-	GitBranch,
-	Shield,
-	Trash,
-	User,
-	UserPlus,
-	Warning,
+	ArrowRightIcon,
+	BuildingsIcon,
+	CreditCardIcon,
+	CrownIcon,
+	FloppyDiskIcon,
+	FolderOpenIcon,
+	GitBranchIcon,
+	ShieldIcon,
+	TrashIcon,
+	UserIcon,
+	UserPlusIcon,
+	WarningIcon,
 } from "@phosphor-icons/react";
 import { useForm } from "@tanstack/react-form";
 import { useRouter } from "next/navigation";
@@ -59,6 +59,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { getInitials } from "@/lib/utils";
 
 type Organization = {
 	id: string;
@@ -104,9 +105,9 @@ type OrgData = {
 };
 
 const roleIcons = {
-	owner: Crown,
-	admin: Shield,
-	member: User,
+	owner: CrownIcon,
+	admin: ShieldIcon,
+	member: UserIcon,
 };
 
 const roleColors = {
@@ -160,7 +161,7 @@ function OrgSettingsForm({
 
 			{!disabled && (
 				<Button type="submit" disabled={saving}>
-					<FloppyDisk className="w-4 h-4 mr-2" />
+					<FloppyDiskIcon className="w-4 h-4 mr-2" />
 					{saving ? "Saving..." : "Save Changes"}
 				</Button>
 			)}
@@ -324,7 +325,7 @@ function TransferOwnershipDialog({
 					<>
 						<DialogHeader>
 							<DialogTitle className="flex items-center gap-2">
-								<Crown className="w-5 h-5 text-amber-500" />
+								<CrownIcon className="w-5 h-5 text-amber-500" />
 								Transfer Ownership
 							</DialogTitle>
 							<DialogDescription>
@@ -375,7 +376,7 @@ function TransferOwnershipDialog({
 					<>
 						<DialogHeader>
 							<DialogTitle className="flex items-center gap-2 text-destructive">
-								<Warning className="w-5 h-5" weight="fill" />
+								<WarningIcon className="w-5 h-5" weight="fill" />
 								Confirm Ownership Transfer
 							</DialogTitle>
 						</DialogHeader>
@@ -652,7 +653,7 @@ export default function OrganizationPage() {
 		if (!data) {
 			return (
 				<div className="flex h-64 flex-col items-center justify-center gap-3 text-center">
-					<Buildings className="w-12 h-12 text-muted-foreground" />
+					<BuildingsIcon className="w-12 h-12 text-muted-foreground" />
 					<p className="text-lg font-semibold">No organization found</p>
 					<p className="text-sm text-muted-foreground">
 						You're not a member of any organization.
@@ -694,7 +695,7 @@ export default function OrganizationPage() {
 								variant="outline"
 								onClick={() => router.push("/organization/subscription")}
 							>
-								<CreditCard className="w-4 h-4 mr-2" />
+								<CreditCardIcon className="w-4 h-4 mr-2" />
 								View Subscription
 							</Button>
 						</div>
@@ -718,13 +719,13 @@ export default function OrganizationPage() {
 										title={`Plan limit reached (${data.limits.maxUsers} users). Upgrade to add more members.`}
 									>
 										<Button disabled>
-											<UserPlus className="w-4 h-4 mr-2" />
+											<UserPlusIcon className="w-4 h-4 mr-2" />
 											Invite Member
 										</Button>
 									</span>
 								) : (
 									<Button onClick={() => setInviteDialogOpen(true)}>
-										<UserPlus className="w-4 h-4 mr-2" />
+										<UserPlusIcon className="w-4 h-4 mr-2" />
 										Invite Member
 									</Button>
 								))}
@@ -750,9 +751,7 @@ export default function OrganizationPage() {
 										<Avatar>
 											<AvatarImage src={member.user.image || undefined} />
 											<AvatarFallback>
-												{(member.user.name || member.user.email)
-													.charAt(0)
-													.toUpperCase()}
+												{getInitials(member.user.name, member.user.email)}
 											</AvatarFallback>
 										</Avatar>
 
@@ -802,7 +801,7 @@ export default function OrganizationPage() {
 												}}
 												disabled={removingMemberId === member.id}
 											>
-												<Trash className="w-4 h-4 text-muted-foreground hover:text-destructive" />
+												<TrashIcon className="w-4 h-4 text-muted-foreground hover:text-destructive" />
 											</Button>
 										)}
 									</div>
@@ -831,7 +830,7 @@ export default function OrganizationPage() {
 									const isLocalPath = /^([a-zA-Z]:[/\\]|\/|~|\.\.?\/)/.test(
 										project.path,
 									);
-									const RepoIcon = isLocalPath ? FolderOpen : GitBranch;
+									const RepoIcon = isLocalPath ? FolderOpenIcon : GitBranchIcon;
 
 									const handleGoToProject = () => {
 										selectProject(project.id);
@@ -865,7 +864,7 @@ export default function OrganizationPage() {
 												onClick={handleGoToProject}
 											>
 												Open
-												<ArrowRight className="w-4 h-4 ml-1" />
+												<ArrowRightIcon className="w-4 h-4 ml-1" />
 											</Button>
 										</div>
 									);
@@ -928,7 +927,7 @@ export default function OrganizationPage() {
 									variant="destructive"
 									onClick={() => setTransferDialogOpen(true)}
 								>
-									<Crown className="w-4 h-4 mr-2" />
+									<CrownIcon className="w-4 h-4 mr-2" />
 									Transfer Ownership
 								</Button>
 							</div>

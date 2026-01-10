@@ -1,28 +1,18 @@
 "use client";
 
-import {
-	Envelope,
-	Eye,
-	EyeSlash,
-	GithubLogo,
-	Lock,
-	Robot,
-} from "@phosphor-icons/react";
+import { GithubLogoIcon, RobotIcon } from "@phosphor-icons/react";
 import { useForm } from "@tanstack/react-form";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 
 function LoginForm() {
 	const router = useRouter();
@@ -34,7 +24,6 @@ function LoginForm() {
 			: "/project";
 	const error = searchParams?.get("error");
 
-	const [showPassword, setShowPassword] = useState(false);
 	const [loading, setLoading] = useState(false);
 
 	const form = useForm({
@@ -82,124 +71,151 @@ function LoginForm() {
 	};
 
 	return (
-		<div className="min-h-screen flex items-center justify-center bg-muted/50 p-4">
-			<Card className="w-full max-w-md">
-				<CardHeader className="text-center">
+		<div className="min-h-screen flex flex-col items-center justify-center bg-muted/50 p-6 md:p-10">
+			<div className="w-full max-w-sm md:max-w-4xl">
+				<Card className="overflow-hidden p-0">
+					<CardContent className="grid p-0 md:grid-cols-2">
+						<form
+							onSubmit={(e) => {
+								e.preventDefault();
+								form.handleSubmit();
+							}}
+							className="p-6 md:p-8"
+						>
+							<div className="flex flex-col gap-6">
+								<div className="flex flex-col items-center gap-2 text-center">
+									<Link
+										href="/"
+										className="inline-flex items-center justify-center gap-2"
+									>
+										<RobotIcon
+											className="h-8 w-8 text-primary"
+											weight="duotone"
+										/>
+										<span className="text-xl font-bold">Ralph</span>
+									</Link>
+									<h1 className="text-2xl font-bold">Welcome back</h1>
+									<p className="text-muted-foreground text-balance text-sm">
+										Sign in to your account to continue
+									</p>
+								</div>
+
+								<div className="grid gap-4">
+									<form.Field name="email">
+										{(field) => (
+											<div className="grid gap-2">
+												<Label htmlFor={field.name}>Email</Label>
+												<Input
+													id={field.name}
+													type="email"
+													placeholder="you@example.com"
+													value={field.state.value}
+													onChange={(e) => field.handleChange(e.target.value)}
+													required
+												/>
+											</div>
+										)}
+									</form.Field>
+
+									<form.Field name="password">
+										{(field) => (
+											<div className="grid gap-2">
+												<div className="flex items-center">
+													<Label htmlFor={field.name}>Password</Label>
+													<Link
+														href="/forgot-password"
+														className="ml-auto text-sm underline-offset-2 hover:underline"
+													>
+														Forgot password?
+													</Link>
+												</div>
+												<PasswordInput
+													id={field.name}
+													placeholder="Enter your password"
+													value={field.state.value}
+													onChange={(e) => field.handleChange(e.target.value)}
+													required
+												/>
+											</div>
+										)}
+									</form.Field>
+
+									<Button type="submit" className="w-full" disabled={loading}>
+										{loading ? "Signing in..." : "Sign in"}
+									</Button>
+								</div>
+
+								<div className="relative">
+									<div className="absolute inset-0 flex items-center">
+										<span className="w-full border-t" />
+									</div>
+									<div className="relative flex justify-center text-xs uppercase">
+										<span className="bg-card px-2 text-muted-foreground">
+											Or continue with
+										</span>
+									</div>
+								</div>
+
+								<Button
+									variant="outline"
+									className="w-full"
+									onClick={handleGitHubSignIn}
+									type="button"
+								>
+									<GithubLogoIcon className="h-5 w-5" />
+									<span className="ml-2">GitHub</span>
+								</Button>
+
+								<p className="text-center text-sm text-muted-foreground">
+									Don&apos;t have an account?{" "}
+									<Link
+										href="/register"
+										className="underline underline-offset-4 hover:text-primary"
+									>
+										Sign up
+									</Link>
+								</p>
+							</div>
+						</form>
+
+						<div className="bg-primary/5 relative hidden md:block">
+							<div className="absolute inset-0 flex items-center justify-center">
+								<div className="text-center p-8">
+									<RobotIcon
+										className="h-32 w-32 text-primary/20 mx-auto mb-6"
+										weight="duotone"
+									/>
+									<h2 className="text-2xl font-bold text-primary/80 mb-2">
+										AI-Powered Project Management
+									</h2>
+									<p className="text-muted-foreground text-sm max-w-xs mx-auto">
+										Sprint planning, kanban boards, and autonomous task
+										execution - all in one place.
+									</p>
+								</div>
+							</div>
+						</div>
+					</CardContent>
+				</Card>
+
+				<p className="mt-4 px-6 text-center text-xs text-muted-foreground">
+					By continuing, you agree to our{" "}
 					<Link
-						href="/"
-						className="inline-flex items-center justify-center gap-2 mb-4"
+						href="/terms"
+						className="underline underline-offset-4 hover:text-primary"
 					>
-						<Robot className="h-10 w-10 text-primary" weight="duotone" />
-						<span className="text-2xl font-bold">Ralph</span>
+						Terms of Service
+					</Link>{" "}
+					and{" "}
+					<Link
+						href="/privacy"
+						className="underline underline-offset-4 hover:text-primary"
+					>
+						Privacy Policy
 					</Link>
-					<CardTitle className="text-2xl">Welcome back</CardTitle>
-					<CardDescription>Sign in to your account to continue</CardDescription>
-				</CardHeader>
-				<CardContent className="space-y-6">
-					<Button
-						variant="outline"
-						className="w-full"
-						onClick={handleGitHubSignIn}
-						type="button"
-					>
-						<GithubLogo className="mr-2 h-5 w-5" />
-						Continue with GitHub
-					</Button>
-
-					<div className="relative">
-						<div className="absolute inset-0 flex items-center">
-							<span className="w-full border-t" />
-						</div>
-						<div className="relative flex justify-center text-xs uppercase">
-							<span className="bg-card px-2 text-muted-foreground">
-								Or continue with email
-							</span>
-						</div>
-					</div>
-
-					<form
-						onSubmit={(e) => {
-							e.preventDefault();
-							form.handleSubmit();
-						}}
-						className="space-y-4"
-					>
-						<form.Field name="email">
-							{(field) => (
-								<div className="space-y-2">
-									<label htmlFor={field.name} className="text-sm font-medium">
-										Email
-									</label>
-									<div className="relative">
-										<Envelope className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-										<Input
-											id={field.name}
-											type="email"
-											placeholder="you@example.com"
-											value={field.state.value}
-											onChange={(e) => field.handleChange(e.target.value)}
-											className="pl-10"
-											required
-										/>
-									</div>
-								</div>
-							)}
-						</form.Field>
-
-						<form.Field name="password">
-							{(field) => (
-								<div className="space-y-2">
-									<div className="flex items-center justify-between">
-										<label htmlFor={field.name} className="text-sm font-medium">
-											Password
-										</label>
-										<Link
-											href="/forgot-password"
-											className="text-sm text-primary hover:underline"
-										>
-											Forgot password?
-										</Link>
-									</div>
-									<div className="relative">
-										<Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-										<Input
-											id={field.name}
-											type={showPassword ? "text" : "password"}
-											placeholder="Enter your password"
-											value={field.state.value}
-											onChange={(e) => field.handleChange(e.target.value)}
-											className="pl-10 pr-10"
-											required
-										/>
-										<button
-											type="button"
-											onClick={() => setShowPassword(!showPassword)}
-											className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-										>
-											{showPassword ? (
-												<EyeSlash className="h-5 w-5" />
-											) : (
-												<Eye className="h-5 w-5" />
-											)}
-										</button>
-									</div>
-								</div>
-							)}
-						</form.Field>
-
-						<Button type="submit" className="w-full" disabled={loading}>
-							{loading ? "Signing in..." : "Sign in"}
-						</Button>
-					</form>
-
-					<p className="text-center text-sm text-muted-foreground">
-						Don't have an account?{" "}
-						<Link href="/register" className="text-primary hover:underline">
-							Sign up
-						</Link>
-					</p>
-				</CardContent>
-			</Card>
+					.
+				</p>
+			</div>
 		</div>
 	);
 }
@@ -208,16 +224,24 @@ export default function LoginPage() {
 	return (
 		<Suspense
 			fallback={
-				<div className="min-h-screen flex items-center justify-center bg-muted/50 p-4">
-					<Card className="w-full max-w-md">
-						<CardHeader className="text-center">
-							<div className="inline-flex items-center justify-center gap-2 mb-4">
-								<Robot className="h-10 w-10 text-primary" weight="duotone" />
-								<span className="text-2xl font-bold">Ralph</span>
-							</div>
-							<CardTitle className="text-2xl">Loading...</CardTitle>
-						</CardHeader>
-					</Card>
+				<div className="min-h-screen flex flex-col items-center justify-center bg-muted/50 p-6 md:p-10">
+					<div className="w-full max-w-sm md:max-w-4xl">
+						<Card className="overflow-hidden p-0">
+							<CardContent className="grid p-0 md:grid-cols-2">
+								<div className="p-6 md:p-8">
+									<div className="flex flex-col items-center gap-2 text-center">
+										<RobotIcon
+											className="h-8 w-8 text-primary"
+											weight="duotone"
+										/>
+										<span className="text-xl font-bold">Ralph</span>
+										<p className="text-muted-foreground">Loading...</p>
+									</div>
+								</div>
+								<div className="bg-primary/5 relative hidden md:block" />
+							</CardContent>
+						</Card>
+					</div>
 				</div>
 			}
 		>

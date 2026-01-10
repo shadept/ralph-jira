@@ -5,7 +5,7 @@ import { type ChangeEvent, useRef, useState } from "react";
 
 const BROWSER_FOLDER_LIMITATION_MESSAGE = `Chrome can't share the exact folder path. After you approve the "Upload folder" prompt, copy the full path from File Explorer (Alt + D → Ctrl + C) or Finder (⌘ + ⌥ + C) and paste it here.`;
 
-import { Trash } from "@phosphor-icons/react";
+import { TrashIcon } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -160,7 +160,7 @@ export function ProjectManagerDialog({
 												onClick={() => handleRemove(project.id, project.name)}
 												disabled={removingId === project.id}
 											>
-												<Trash className="w-4 h-4" />
+												<TrashIcon className="w-4 h-4" />
 											</Button>
 										</div>
 										<p className="text-xs text-muted-foreground break-all">

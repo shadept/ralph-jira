@@ -1,6 +1,6 @@
 "use client";
 
-import { XIcon } from "@phosphor-icons/react";
+import { XIcon as XIconPhosphor } from "@phosphor-icons/react";
 import { Dialog as SheetPrimitive } from "radix-ui";
 import type * as React from "react";
 import { Button } from "@/components/ui/button";
@@ -74,7 +74,7 @@ function SheetContent({
 							className="absolute top-3 right-3"
 							size="icon-sm"
 						>
-							<XIcon />
+							<XIconPhosphor />
 							<span className="sr-only">Close</span>
 						</Button>
 					</SheetPrimitive.Close>

@@ -1,11 +1,11 @@
 "use client";
 
 import {
-	ClockCounterClockwise,
-	GearSix,
-	PlayCircle,
-	Plus,
-	Sparkle,
+	ClockCounterClockwiseIcon,
+	GearSixIcon,
+	PlayCircleIcon,
+	PlusIcon,
+	SparkleIcon,
 } from "@phosphor-icons/react";
 import { useForm } from "@tanstack/react-form";
 import { useRouter } from "next/navigation";
@@ -664,13 +664,13 @@ export default function SprintPage({
 	const actions = (
 		<div className="flex flex-wrap items-center gap-2">
 			<Button variant="outline" onClick={handleNewTask} disabled={sprintLocked}>
-				<Plus className="w-4 h-4 mr-2" />
+				<PlusIcon className="w-4 h-4 mr-2" />
 				New Task
 			</Button>
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
 					<Button variant="outline" disabled={sprintLocked}>
-						<Sparkle className="w-4 h-4 mr-2" />
+						<SparkleIcon className="w-4 h-4 mr-2" />
 						AI Actions
 					</Button>
 				</DropdownMenuTrigger>
@@ -685,11 +685,11 @@ export default function SprintPage({
 				onClick={() => setSprintPropertiesOpen(true)}
 				disabled={sprintLocked}
 			>
-				<GearSix className="w-4 h-4 mr-2" />
+				<GearSixIcon className="w-4 h-4 mr-2" />
 				Properties
 			</Button>
 			<Button variant="outline" onClick={() => router.push("/project/runs")}>
-				<ClockCounterClockwise className="w-4 h-4 mr-2" />
+				<ClockCounterClockwiseIcon className="w-4 h-4 mr-2" />
 				Run History
 			</Button>
 			<Button
@@ -697,7 +697,7 @@ export default function SprintPage({
 				onClick={handleRunButtonClick}
 				disabled={runLoading}
 			>
-				<PlayCircle className="w-4 h-4 mr-2" />
+				<PlayCircleIcon className="w-4 h-4 mr-2" />
 				{isRunActive ? "Loop Running…" : "Run AI Loop"}
 			</Button>
 		</div>

@@ -1,11 +1,11 @@
 "use client";
 
 import {
-	FolderOpen,
-	GearSix,
-	ListChecks,
-	Plus,
-	Sparkle,
+	FolderOpenIcon,
+	GearSixIcon,
+	ListChecksIcon,
+	PlusIcon,
+	SparkleIcon,
 } from "@phosphor-icons/react";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
@@ -100,7 +100,7 @@ export default function ProjectPage() {
 		<>
 			{currentProject && (
 				<Button onClick={() => setCreateDialogOpen(true)}>
-					<Plus className="w-4 h-4 mr-2" />
+					<PlusIcon className="w-4 h-4 mr-2" />
 					New Sprint
 				</Button>
 			)}
@@ -109,7 +109,7 @@ export default function ProjectPage() {
 				size="icon"
 				onClick={() => router.push("/project/settings")}
 			>
-				<GearSix className="w-5 h-5" />
+				<GearSixIcon className="w-5 h-5" />
 				<span className="sr-only">Settings</span>
 			</Button>
 		</>
@@ -170,7 +170,7 @@ export default function ProjectPage() {
 											router.push(`/project/sprints/${activeSprint.id}`)
 										}
 									>
-										<FolderOpen className="w-4 h-4 mr-2" />
+										<FolderOpenIcon className="w-4 h-4 mr-2" />
 										Open Sprint
 									</Button>
 								</div>
@@ -255,7 +255,7 @@ export default function ProjectPage() {
 								</CardHeader>
 								<CardContent>
 									<Button onClick={() => setCreateDialogOpen(true)}>
-										<Plus className="w-4 h-4 mr-2" />
+										<PlusIcon className="w-4 h-4 mr-2" />
 										Create Sprint
 									</Button>
 								</CardContent>
@@ -272,7 +272,7 @@ export default function ProjectPage() {
 						>
 							<CardHeader>
 								<CardTitle className="text-lg flex items-center gap-2">
-									<ListChecks className="w-5 h-5" />
+									<ListChecksIcon className="w-5 h-5" />
 									All Tasks
 								</CardTitle>
 								<CardDescription>
@@ -299,7 +299,7 @@ export default function ProjectPage() {
 						>
 							<CardHeader>
 								<CardTitle className="text-lg flex items-center gap-2">
-									<Sparkle className="w-5 h-5" />
+									<SparkleIcon className="w-5 h-5" />
 									AI Assistant
 								</CardTitle>
 								<CardDescription>

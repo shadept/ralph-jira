@@ -1,16 +1,16 @@
 "use client";
 
 import {
-	ArrowRight,
-	Check,
-	Clock,
-	CreditCard,
-	Folder,
-	Infinity as InfinityIcon,
-	Lightning,
-	Users,
-	Warning,
-	X,
+	ArrowRightIcon,
+	CheckIcon,
+	ClockIcon,
+	CreditCardIcon,
+	FolderIcon,
+	InfinityIcon,
+	LightningIcon,
+	UsersIcon,
+	WarningIcon,
+	XIcon,
 } from "@phosphor-icons/react";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
@@ -161,9 +161,9 @@ function FeatureRow({ label, enabled }: { label: string; enabled: boolean }) {
 	return (
 		<div className="flex items-center gap-2 text-sm">
 			{enabled ? (
-				<Check className="w-4 h-4 text-green-600" weight="bold" />
+				<CheckIcon className="w-4 h-4 text-green-600" weight="bold" />
 			) : (
-				<X className="w-4 h-4 text-muted-foreground" />
+				<XIcon className="w-4 h-4 text-muted-foreground" />
 			)}
 			<span className={enabled ? "" : "text-muted-foreground"}>{label}</span>
 		</div>
@@ -239,7 +239,7 @@ export default function SubscriptionPage() {
 		if (!data) {
 			return (
 				<div className="flex h-64 flex-col items-center justify-center gap-3 text-center">
-					<CreditCard className="w-12 h-12 text-muted-foreground" />
+					<CreditCardIcon className="w-12 h-12 text-muted-foreground" />
 					<p className="text-lg font-semibold">No subscription found</p>
 					<p className="text-sm text-muted-foreground">
 						You're not a member of any organization.
@@ -251,7 +251,7 @@ export default function SubscriptionPage() {
 		if (!sub) {
 			return (
 				<div className="flex h-64 flex-col items-center justify-center gap-3 text-center">
-					<CreditCard className="w-12 h-12 text-muted-foreground" />
+					<CreditCardIcon className="w-12 h-12 text-muted-foreground" />
 					<p className="text-lg font-semibold">No active subscription</p>
 					<p className="text-sm text-muted-foreground">
 						This organization doesn't have an active subscription.
@@ -259,7 +259,7 @@ export default function SubscriptionPage() {
 					{isOwner && (
 						<Button className="mt-2">
 							Choose a Plan
-							<ArrowRight className="w-4 h-4 ml-2" />
+							<ArrowRightIcon className="w-4 h-4 ml-2" />
 						</Button>
 					)}
 				</div>
@@ -280,7 +280,7 @@ export default function SubscriptionPage() {
 				{isPastDue && (
 					<Card className="border-red-500/50 bg-red-500/5">
 						<CardContent className="flex items-center gap-3 py-4">
-							<Warning className="w-5 h-5 text-red-600" weight="fill" />
+							<WarningIcon className="w-5 h-5 text-red-600" weight="fill" />
 							<div>
 								<p className="font-medium text-red-600">Payment Past Due</p>
 								<p className="text-sm text-muted-foreground">
@@ -300,7 +300,7 @@ export default function SubscriptionPage() {
 				{isCanceling && (
 					<Card className="border-yellow-500/50 bg-yellow-500/5">
 						<CardContent className="flex items-center gap-3 py-4">
-							<Clock className="w-5 h-5 text-yellow-600" />
+							<ClockIcon className="w-5 h-5 text-yellow-600" />
 							<div>
 								<p className="font-medium text-yellow-700 dark:text-yellow-400">
 									Subscription Ending
@@ -394,7 +394,7 @@ export default function SubscriptionPage() {
 						{isTrialing && sub.trialEndsAt && (
 							<div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
 								<p className="text-sm text-blue-700 dark:text-blue-400">
-									<Clock className="w-4 h-4 inline mr-1" />
+									<ClockIcon className="w-4 h-4 inline mr-1" />
 									Trial ends on {formatDate(sub.trialEndsAt)}. Add a payment
 									method to continue after your trial.
 								</p>
@@ -405,7 +405,7 @@ export default function SubscriptionPage() {
 						{effectiveFeatures.founderPlan && (
 							<div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
 								<p className="text-sm text-amber-700 dark:text-amber-400">
-									<Lightning className="w-4 h-4 inline mr-1" weight="fill" />
+									<LightningIcon className="w-4 h-4 inline mr-1" weight="fill" />
 									Founder Plan - Zero-cost Enterprise subscription with all
 									features enabled.
 								</p>
@@ -415,7 +415,7 @@ export default function SubscriptionPage() {
 						{effectiveFeatures.byokEnabled && (
 							<div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
 								<p className="text-sm text-purple-700 dark:text-purple-400">
-									<Lightning className="w-4 h-4 inline mr-1" weight="fill" />
+									<LightningIcon className="w-4 h-4 inline mr-1" weight="fill" />
 									BYOK Enabled - Unlimited AI runs using your own API keys.
 								</p>
 							</div>
@@ -436,19 +436,19 @@ export default function SubscriptionPage() {
 							<>
 								<UsageBar
 									label="Team Members"
-									icon={Users}
+									icon={UsersIcon}
 									current={usage.members}
 									max={plan.maxUsers}
 								/>
 								<UsageBar
 									label="Projects"
-									icon={Folder}
+									icon={FolderIcon}
 									current={usage.projects}
 									max={plan.maxProjects}
 								/>
 								<UsageBar
 									label="AI Runs (this week)"
-									icon={Lightning}
+									icon={LightningIcon}
 									current={usage.aiRunsThisWeek}
 									max={
 										effectiveFeatures.byokEnabled ? null : plan.maxAiRunsPerWeek

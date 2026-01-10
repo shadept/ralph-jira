@@ -1,6 +1,6 @@
 "use client";
 
-import { CaretDown, Check, Plus } from "@phosphor-icons/react";
+import { CaretDownIcon, CheckIcon, PlusIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,7 +33,7 @@ export function ProjectSwitcher() {
 									? "Loading projects..."
 									: "No project"}
 						</span>
-						<CaretDown className="w-4 h-4" />
+						<CaretDownIcon className="w-4 h-4" />
 					</Button>
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end" className="w-64">
@@ -59,7 +59,7 @@ export function ProjectSwitcher() {
 								</p>
 							</div>
 							{currentProject?.id === project.id && (
-								<Check className="w-4 h-4 text-primary" />
+								<CheckIcon className="w-4 h-4 text-primary" />
 							)}
 						</DropdownMenuItem>
 					))}
@@ -68,7 +68,7 @@ export function ProjectSwitcher() {
 						onClick={() => setManagerOpen(true)}
 						className="gap-2"
 					>
-						<Plus className="w-4 h-4" />
+						<PlusIcon className="w-4 h-4" />
 						Manage Projects
 					</DropdownMenuItem>
 				</DropdownMenuContent>

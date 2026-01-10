@@ -1,6 +1,6 @@
 "use client";
 
-import { SidebarIcon } from "@phosphor-icons/react";
+import { SidebarSimpleIcon } from "@phosphor-icons/react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Slot } from "radix-ui";
 import * as React from "react";
@@ -269,7 +269,7 @@ function SidebarTrigger({
 			}}
 			{...props}
 		>
-			<SidebarIcon />
+			<SidebarSimpleIcon />
 			<span className="sr-only">Toggle Sidebar</span>
 		</Button>
 	);

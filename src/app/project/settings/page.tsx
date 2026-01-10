@@ -1,6 +1,6 @@
 "use client";
 
-import { FloppyDiskIcon, FolderOpen, GithubLogo } from "@phosphor-icons/react";
+import { FloppyDiskIcon, FolderOpenIcon, GithubLogoIcon } from "@phosphor-icons/react";
 import { useForm, useStore } from "@tanstack/react-form";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -655,7 +655,7 @@ function RepoSetupCard({
 		<Card className="border-amber-200 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-950/20">
 			<CardHeader>
 				<div className="flex items-center gap-2">
-					<FolderOpen className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+					<FolderOpenIcon className="h-5 w-5 text-amber-600 dark:text-amber-400" />
 					<CardTitle className="text-amber-900 dark:text-amber-100">
 						Repository Setup Required
 					</CardTitle>
@@ -696,7 +696,7 @@ function RepoSetupCard({
 							{saving ? "Saving…" : "Set Repository"}
 						</Button>
 						<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-							<GithubLogo className="h-4 w-4" />
+							<GithubLogoIcon className="h-4 w-4" />
 							<span>GitHub integration coming soon</span>
 						</div>
 					</div>
