@@ -1,24 +1,30 @@
-import { existsSync } from "node:fs";
-
 import { NextResponse } from "next/server";
-
+import { prisma } from "@/lib/db";
 import {
-	getProjectStorage,
+	getProjectContext,
 	handleProjectRouteError,
-} from "@/lib/projects/server";
-import { cancelFlagPath } from "@/lib/runs/store";
+} from "@/lib/projects/db-server";
 
 export async function GET(
 	request: Request,
-	{ params }: { params: Promise<{ runId: string }> },
+	{ params }: { params: Promise<{ runId: string }> }
 ) {
 	try {
 		const { runId } = await params;
-		const { project } = await getProjectStorage(request);
-		const flagPath = cancelFlagPath(project.path, runId);
-		const canceled = existsSync(flagPath);
+		const { project } = await getProjectContext(request);
 
-		return NextResponse.json({ canceled });
+		const run = await prisma.run.findFirst({
+			where: { runId, projectId: project.id },
+			select: { cancellationRequestedAt: true },
+		});
+
+		if (!run) {
+			return NextResponse.json({ error: "Run not found" }, { status: 404 });
+		}
+
+		return NextResponse.json({
+			canceled: run.cancellationRequestedAt !== null,
+		});
 	} catch (error) {
 		console.error("Failed to check cancellation status", error);
 		return handleProjectRouteError(error);

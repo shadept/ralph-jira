@@ -2,31 +2,67 @@ import { NextResponse } from "next/server";
 import { openai } from "@ai-sdk/openai";
 import { generateObject, generateText, Output } from "ai";
 import { z } from "zod";
+import { prisma } from "@/lib/db";
 import {
-	getProjectStorage,
+	getProjectContext,
 	handleProjectRouteError,
-} from "@/lib/projects/server";
+} from "@/lib/projects/db-server";
 
 export async function POST(request: Request) {
 	try {
-		const { storage } = await getProjectStorage(request);
+		const { project } = await getProjectContext(request);
 		const { action, boardId, data } = await request.json();
 
-		const board = await storage.readBoard(boardId);
-		const settings = await storage.readSettings();
+		// Get sprint (board) with tasks
+		const sprint = await prisma.sprint.findFirst({
+			where: {
+				id: boardId,
+				projectId: project.id,
+			},
+			include: {
+				tasks: { orderBy: { createdAt: "asc" } },
+			},
+		});
+
+		if (!sprint) {
+			return NextResponse.json({ error: "Board not found" }, { status: 404 });
+		}
+
+		// Get project settings
+		const settings = await prisma.projectSettings.findUnique({
+			where: { projectId: project.id },
+		});
+
+		const projectName = settings?.projectName || project.name;
+		const projectDescription =
+			settings?.projectDescription || project.description || "";
+		const techStack = settings?.techStackJson
+			? JSON.parse(settings.techStackJson)
+			: [];
+		const aiPreferences = settings?.aiPreferencesJson
+			? JSON.parse(settings.aiPreferencesJson)
+			: { defaultModel: "gpt-4-turbo" };
+
+		// Transform tasks for processing
+		const tasks = sprint.tasks.map((task) => ({
+			id: task.id,
+			category: task.category,
+			title: task.title,
+			description: task.description,
+			acceptanceCriteria: JSON.parse(task.acceptanceCriteriaJson),
+			status: task.status,
+			priority: task.priority,
+			passes: task.passes,
+			estimate: task.estimate,
+			tags: JSON.parse(task.tagsJson),
+		}));
 
 		switch (action) {
 			case "generate-tasks": {
 				const { description, count = 3, category = "functional" } = data;
 
-				// Read project README for context
-				const readme = await storage.readProjectReadme();
-				const readmeContext = readme
-					? `\n\nProject README (for context):\n${readme.slice(0, 2000)}${readme.length > 2000 ? "\n...(truncated)" : ""}`
-					: "";
-
 				const result = await generateText({
-					model: openai(settings.aiPreferences.defaultModel || "gpt-4-turbo"),
+					model: openai(aiPreferences.defaultModel || "gpt-4-turbo"),
 					output: Output.object({
 						schema: z.object({
 							tasks: z.array(
@@ -37,7 +73,7 @@ export async function POST(request: Request) {
 									priority: z.enum(["low", "medium", "high", "urgent"]),
 									estimate: z.number(),
 									tags: z.array(z.string()),
-								}),
+								})
 							),
 						}),
 					}),
@@ -46,9 +82,9 @@ export async function POST(request: Request) {
 "${description}"
 
 Project Context:
-- Project: ${settings.projectName}
-- Tech Stack: ${settings.techStack.join(", ")}
-- Description: ${settings.projectDescription || "Not provided"}${readmeContext}
+- Project: ${projectName}
+- Tech Stack: ${techStack.join(", ")}
+- Description: ${projectDescription}
 
 IMPORTANT Guidelines:
 - Generate FEWER tasks (prefer 1-3) with more Acceptance Criteria that are meaningful and well-scoped
@@ -66,26 +102,40 @@ Acceptance Criteria Guidelines:
 Category: ${category}`,
 				});
 
-				// Convert to full task objects
-				const now = new Date().toISOString();
-				const newTasks = result.output.tasks.map((t, idx) => ({
-					...t,
-					id: `task-${Date.now()}-${idx}`,
-					passes: false,
-					status: "backlog" as const,
-					createdAt: now,
-					updatedAt: now,
-					filesTouched: [],
-				}));
-
-				// Add to board
-				board.tasks.push(...newTasks);
-				board.updatedAt = now;
-				if (board.metrics) {
-					board.metrics.total = board.tasks.length;
-				}
-
-				await storage.writeBoard(board);
+				// Create tasks in database
+				const newTasks = await Promise.all(
+					result.output.tasks.map(async (t, idx) => {
+						const task = await prisma.task.create({
+							data: {
+								projectId: project.id,
+								sprintId: sprint.id,
+								category: t.category,
+								description: t.description,
+								acceptanceCriteriaJson: JSON.stringify(t.acceptanceCriteria),
+								priority: t.priority,
+								estimate: t.estimate,
+								tagsJson: JSON.stringify(t.tags),
+								status: "backlog",
+								passes: false,
+								filesTouchedJson: "[]",
+							},
+						});
+						return {
+							id: task.id,
+							category: task.category,
+							description: task.description,
+							acceptanceCriteria: JSON.parse(task.acceptanceCriteriaJson),
+							status: task.status,
+							priority: task.priority,
+							passes: task.passes,
+							estimate: task.estimate,
+							tags: JSON.parse(task.tagsJson),
+							filesTouched: [],
+							createdAt: task.createdAt.toISOString(),
+							updatedAt: task.updatedAt.toISOString(),
+						};
+					})
+				);
 
 				return NextResponse.json({ success: true, tasks: newTasks });
 			}
@@ -94,34 +144,33 @@ Category: ${category}`,
 				const { criteria } = data;
 
 				const result = await generateObject({
-					model: openai(settings.aiPreferences.defaultModel || "gpt-4-turbo"),
+					model: openai(aiPreferences.defaultModel || "gpt-4-turbo"),
 					schema: z.object({
 						prioritized: z.array(
 							z.object({
 								taskId: z.string(),
 								priority: z.enum(["low", "medium", "high", "urgent"]),
 								reasoning: z.string(),
-							}),
+							})
 						),
 					}),
 					prompt: `Prioritize these tasks based on: ${criteria || "business value, dependencies, and risk"}
 
 Tasks:
-${board.tasks.map((t) => `- [${t.id}] ${t.description} (current: ${t.priority})`).join("\n")}
+${tasks.map((t) => `- [${t.id}] ${t.description} (current: ${t.priority})`).join("\n")}
 
-Project context: ${settings.projectDescription}`,
+Project context: ${projectDescription}`,
 				});
 
-				// Update task priorities
-				result.object.prioritized.forEach(({ taskId, priority }) => {
-					const task = board.tasks.find((t) => t.id === taskId);
-					if (task) {
-						task.priority = priority;
-						task.updatedAt = new Date().toISOString();
-					}
-				});
-
-				await storage.writeBoard(board);
+				// Update task priorities in database
+				await Promise.all(
+					result.object.prioritized.map(({ taskId, priority }) =>
+						prisma.task.update({
+							where: { id: taskId },
+							data: { priority },
+						})
+					)
+				);
 
 				return NextResponse.json({
 					success: true,
@@ -131,7 +180,7 @@ Project context: ${settings.projectDescription}`,
 
 			case "split-sprints": {
 				const result = await generateObject({
-					model: openai(settings.aiPreferences.defaultModel || "gpt-4-turbo"),
+					model: openai(aiPreferences.defaultModel || "gpt-4-turbo"),
 					schema: z.object({
 						sprints: z.array(
 							z.object({
@@ -139,13 +188,13 @@ Project context: ${settings.projectDescription}`,
 								goal: z.string(),
 								taskIds: z.array(z.string()),
 								durationWeeks: z.number(),
-							}),
+							})
 						),
 					}),
-					prompt: `Split these ${board.tasks.length} tasks into logical sprints (2-3 week iterations).
+					prompt: `Split these ${tasks.length} tasks into logical sprints (2-3 week iterations).
 
 Tasks:
-${board.tasks.map((t) => `- [${t.id}] ${t.description} (${t.priority}, ${t.estimate || "?"} pts)`).join("\n")}
+${tasks.map((t) => `- [${t.id}] ${t.description} (${t.priority}, ${t.estimate || "?"} pts)`).join("\n")}
 
 Consider:
 - Dependencies between tasks
@@ -162,18 +211,18 @@ Consider:
 
 			case "improve-acceptance": {
 				const result = await generateText({
-					model: openai(settings.aiPreferences.defaultModel || "gpt-4-turbo"),
+					model: openai(aiPreferences.defaultModel || "gpt-4-turbo"),
 					prompt: `Review and improve the acceptance criteria for these tasks. Make them more specific, testable, and comprehensive.
 
 Tasks:
-${board.tasks
+${tasks
 	.slice(0, 10)
 	.map(
 		(t) => `
 Task: ${t.description}
 Current acceptance criteria:
-${t.acceptanceCriteria.map((s, i) => `${i + 1}. ${s}`).join("\n")}
-`,
+${t.acceptanceCriteria.map((s: string, i: number) => `${i + 1}. ${s}`).join("\n")}
+`
 	)
 	.join("\n---\n")}
 

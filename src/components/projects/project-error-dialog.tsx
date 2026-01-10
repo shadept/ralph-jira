@@ -18,7 +18,6 @@ export interface ProjectErrorDialogProps {
 	message: string;
 	details?: string;
 	onClose: () => void;
-	onRegenerate: () => Promise<void>;
 	onRemove: () => Promise<void>;
 }
 
@@ -28,36 +27,20 @@ export function ProjectErrorDialog({
 	message,
 	details,
 	onClose,
-	onRegenerate,
 	onRemove,
 }: ProjectErrorDialogProps) {
-	const [pendingAction, setPendingAction] = useState<
-		"regenerate" | "remove" | null
-	>(null);
-
-	const handleRegenerate = async () => {
-		try {
-			setPendingAction("regenerate");
-			await onRegenerate();
-		} catch (error) {
-			toast.error(
-				error instanceof Error ? error.message : "Failed to regenerate project",
-			);
-		} finally {
-			setPendingAction(null);
-		}
-	};
+	const [removing, setRemoving] = useState(false);
 
 	const handleRemove = async () => {
 		try {
-			setPendingAction("remove");
+			setRemoving(true);
 			await onRemove();
 		} catch (error) {
 			toast.error(
-				error instanceof Error ? error.message : "Failed to remove project",
+				error instanceof Error ? error.message : "Failed to remove project"
 			);
 		} finally {
-			setPendingAction(null);
+			setRemoving(false);
 		}
 	};
 
@@ -65,7 +48,7 @@ export function ProjectErrorDialog({
 		<Dialog
 			open
 			onOpenChange={(open) => {
-				if (!open && pendingAction === null) onClose();
+				if (!open && !removing) onClose();
 			}}
 		>
 			<DialogContent>
@@ -80,27 +63,11 @@ export function ProjectErrorDialog({
 					</pre>
 				)}
 				<DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-					<Button
-						variant="outline"
-						onClick={onClose}
-						disabled={pendingAction !== null}
-					>
+					<Button variant="outline" onClick={onClose} disabled={removing}>
 						Close
 					</Button>
-					<Button
-						variant="destructive"
-						onClick={handleRemove}
-						disabled={pendingAction === "regenerate"}
-					>
-						{pendingAction === "remove" ? "Removing..." : "Remove Project"}
-					</Button>
-					<Button
-						onClick={handleRegenerate}
-						disabled={pendingAction === "remove"}
-					>
-						{pendingAction === "regenerate"
-							? "Regenerating..."
-							: "Regenerate Project"}
+					<Button variant="destructive" onClick={handleRemove} disabled={removing}>
+						{removing ? "Removing..." : "Remove Project"}
 					</Button>
 				</DialogFooter>
 			</DialogContent>

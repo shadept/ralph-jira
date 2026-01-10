@@ -3,9 +3,9 @@ import { promisify } from "node:util";
 import { NextResponse } from "next/server";
 
 import {
-	getProjectStorage,
+	getProjectContext,
 	handleProjectRouteError,
-} from "@/lib/projects/server";
+} from "@/lib/projects/db-server";
 
 const execFileAsync = promisify(execFile);
 
@@ -30,7 +30,7 @@ async function runOpencodeModels(): Promise<string[]> {
 			const execError = error as NodeJS.ErrnoException & { stderr?: string };
 			if (execError.code === "ENOENT") {
 				throw new OpencodeModelsError(
-					"opencode CLI is not installed or not on the PATH.",
+					"opencode CLI is not installed or not on the PATH."
 				);
 			}
 			const stderr =
@@ -64,7 +64,8 @@ async function getCachedOpencodeModels(): Promise<string[]> {
 
 export async function GET(request: Request) {
 	try {
-		await getProjectStorage(request);
+		// Verify project access
+		await getProjectContext(request);
 		const models = await getCachedOpencodeModels();
 		return NextResponse.json({ models });
 	} catch (error) {

@@ -1,12 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { format } from "date-fns";
-import { Plus, FolderOpen, Sparkle, GearSix } from "@phosphor-icons/react";
-import { toast } from "sonner";
-
-import { Board } from "@/lib/schemas";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import {
+	Sparkle,
+	Kanban,
+	Users,
+	Lightning,
+	CheckCircle,
+	ArrowRight,
+	GithubLogo,
+	Robot,
+} from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
 import {
 	Card,
 	CardContent,
@@ -14,303 +20,512 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useProjectContext } from "@/components/projects/project-provider";
-import { AppLayout } from "@/components/layout/app-layout";
-import { BoardPropertiesDialog } from "@/components/board-properties-dialog";
+import { ThemeToggle } from "@/components/theme-toggle";
 
-export default function DashboardPage() {
-	const router = useRouter();
-	const {
-		currentProject,
-		loading: projectLoading,
-		apiFetch,
-	} = useProjectContext();
-	const [boards, setBoards] = useState<Board[]>([]);
+interface Plan {
+	id: string;
+	name: string;
+	displayName: string;
+	description: string | null;
+	maxUsers: number | null;
+	maxProjects: number | null;
+	maxAiRunsPerWeek: number | null;
+	maxIterationsPerRun: number;
+	monthlyPrice: number;
+	yearlyPrice: number;
+	features: Record<string, boolean>;
+}
+
+const features = [
+	{
+		icon: Robot,
+		title: "AI-Powered Task Execution",
+		description:
+			"Let AI autonomously work on your tasks with multi-iteration support and intelligent progress tracking.",
+	},
+	{
+		icon: Kanban,
+		title: "Intuitive Kanban Boards",
+		description:
+			"Visualize your workflow with drag-and-drop sprint boards, status tracking, and real-time updates.",
+	},
+	{
+		icon: Lightning,
+		title: "Sprint Planning",
+		description:
+			"Plan sprints efficiently with AI-assisted task generation, prioritization, and time estimation.",
+	},
+	{
+		icon: Users,
+		title: "Team Collaboration",
+		description:
+			"Invite team members, assign tasks, and collaborate seamlessly with role-based permissions.",
+	},
+	{
+		icon: Sparkle,
+		title: "AI Assistant",
+		description:
+			"Chat with AI to manage your project, generate acceptance criteria, and get intelligent suggestions.",
+	},
+	{
+		icon: CheckCircle,
+		title: "Progress Tracking",
+		description:
+			"Monitor task execution in real-time with detailed logs, metrics, and completion tracking.",
+	},
+];
+
+export default function HomePage() {
+	const [plans, setPlans] = useState<Plan[]>([]);
 	const [loading, setLoading] = useState(true);
-	const [createDialogOpen, setCreateDialogOpen] = useState(false);
-
-	const loadBoards = useCallback(async () => {
-		if (!currentProject) {
-			setBoards([]);
-			setLoading(false);
-			return;
-		}
-
-		setLoading(true);
-		try {
-			const res = await apiFetch("/api/boards");
-			const data = await res.json();
-			setBoards(data.boards);
-		} catch (error) {
-			toast.error("Failed to load boards");
-			console.error(error);
-		} finally {
-			setLoading(false);
-		}
-	}, [apiFetch, currentProject]);
 
 	useEffect(() => {
-		loadBoards();
-	}, [loadBoards]);
-
-	const handleCreateBoard = async (newBoard: Board) => {
-		if (!currentProject) return;
-
-		try {
-			const res = await apiFetch("/api/boards", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(newBoard),
-			});
-
-			if (!res.ok) throw new Error("Failed to create board");
-
-			toast.success("Board created");
-			setCreateDialogOpen(false);
-			router.push(`/board/${newBoard.id}`);
-		} catch (error) {
-			toast.error("Failed to create board");
-			console.error(error);
+		async function fetchPlans() {
+			try {
+				const res = await fetch("/api/plans");
+				const data = await res.json();
+				if (data.success) {
+					setPlans(data.data);
+				}
+			} catch (error) {
+				console.error("Failed to fetch plans:", error);
+			} finally {
+				setLoading(false);
+			}
 		}
-	};
+		fetchPlans();
+	}, []);
 
-	const getStatusColor = (status: Board["status"]) => {
-		switch (status) {
-			case "active":
-				return "bg-green-500/10 text-green-700 dark:text-green-300";
-			case "planned":
-				return "bg-blue-500/10 text-blue-700 dark:text-blue-300";
-			case "completed":
-				return "bg-gray-500/10 text-gray-700 dark:text-gray-300";
-			case "archived":
-				return "bg-slate-500/10 text-slate-700 dark:text-slate-300";
-			default:
-				return "";
-		}
-	};
-
-	const actions = (
-		<>
-			{currentProject && (
-				<Button onClick={() => setCreateDialogOpen(true)}>
-					<Plus className="w-4 h-4 mr-2" />
-					New Board
-				</Button>
-			)}
-			<Button
-				variant="ghost"
-				size="icon"
-				onClick={() => router.push("/settings")}
-			>
-				<GearSix className="w-5 h-5" />
-				<span className="sr-only">Settings</span>
-			</Button>
-		</>
-	);
-
-	const activeBoard = useMemo(
-		() => boards.find((b) => b.id === "prd" || b.id === "initial-sprint"),
-		[boards],
-	);
-
-	const renderContent = () => {
-		if (projectLoading) {
-			return (
-				<div className="flex h-64 items-center justify-center">
-					<p className="text-muted-foreground">Loading projects…</p>
-				</div>
-			);
-		}
-
-		if (!currentProject) {
-			return (
-				<div className="flex h-64 flex-col items-center justify-center gap-3 text-center">
-					<p className="text-lg font-semibold">No project selected</p>
-					<p className="text-sm text-muted-foreground max-w-md">
-						Use the project picker in the top right corner to add or switch
-						projects. Ralph will scaffold any missing planning files for you.
-					</p>
-				</div>
-			);
-		}
-
-		if (loading) {
-			return (
-				<div className="flex h-64 items-center justify-center">
-					<p className="text-muted-foreground">Loading boards…</p>
-				</div>
-			);
-		}
-
-		return (
-			<div className="space-y-10">
-				{activeBoard && (
-					<section>
-						<Card className="border-primary/40">
-							<CardHeader>
-								<div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-									<div className="flex-1">
-										<div className="flex items-center gap-2 mb-2">
-											<CardTitle>{activeBoard.name}</CardTitle>
-											<Badge className={getStatusColor(activeBoard.status)}>
-												{activeBoard.status}
-											</Badge>
-										</div>
-										<CardDescription>{activeBoard.goal}</CardDescription>
-									</div>
-									<Button
-										onClick={() => router.push(`/board/${activeBoard.id}`)}
-									>
-										<FolderOpen className="w-4 h-4 mr-2" />
-										Open Board
-									</Button>
-								</div>
-							</CardHeader>
-							<CardContent>
-								<div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
-									<Stat label="Total Tasks" value={activeBoard.tasks.length} />
-									<Stat
-										label="Completed"
-										value={
-											activeBoard.tasks.filter((t) => t.status === "done")
-												.length
-										}
-									/>
-									<Stat
-										label="In Progress"
-										value={
-											activeBoard.tasks.filter(
-												(t) => t.status === "in_progress",
-											).length
-										}
-									/>
-									<div>
-										<p className="text-muted-foreground">Deadline</p>
-										<p className="text-lg font-semibold">
-											{format(new Date(activeBoard.deadline), "MMM d, yyyy")}
-										</p>
-									</div>
-								</div>
-							</CardContent>
-						</Card>
-					</section>
-				)}
-
-				<section>
-					<div className="flex items-center justify-between mb-4">
-						<h2 className="text-2xl font-semibold">All Boards</h2>
-						<Button variant="ghost" size="sm" onClick={loadBoards}>
-							Refresh
-						</Button>
+	return (
+		<div className="min-h-screen bg-background">
+			{/* Header */}
+			<header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+				<div className="container mx-auto px-6 flex h-16 items-center justify-between">
+					<div className="flex items-center gap-2">
+						<Robot className="h-8 w-8 text-primary" weight="duotone" />
+						<span className="text-xl font-bold">Ralph</span>
 					</div>
-					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-						{boards.map((board) => (
+					<nav className="flex items-center gap-4">
+						<Link
+							href="#features"
+							className="text-sm font-medium text-muted-foreground hover:text-foreground"
+						>
+							Features
+						</Link>
+						<Link
+							href="#pricing"
+							className="text-sm font-medium text-muted-foreground hover:text-foreground"
+						>
+							Pricing
+						</Link>
+						<ThemeToggle />
+						<Button variant="ghost" asChild>
+							<Link href="/login">Log in</Link>
+						</Button>
+						<Button asChild>
+							<Link href="/register">Get Started</Link>
+						</Button>
+					</nav>
+				</div>
+			</header>
+
+			{/* Hero Section */}
+			<section className="relative overflow-hidden py-24 md:py-32">
+				<div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background to-background" />
+				<div className="container mx-auto px-6">
+					<div className="mx-auto max-w-3xl text-center">
+						<Badge variant="outline" className="mb-4">
+							AI-Powered Project Management
+						</Badge>
+						<h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
+							Ship faster with{" "}
+							<span className="text-primary">autonomous AI</span> task execution
+						</h1>
+						<p className="mt-6 text-lg text-muted-foreground md:text-xl">
+							Ralph is a local-first project management tool that combines
+							intuitive Kanban boards with AI-powered autonomous task execution.
+							Let AI handle the implementation while you focus on what matters.
+						</p>
+						<div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+							<Button size="lg" asChild>
+								<Link href="/register">
+									Start for Free
+									<ArrowRight className="ml-2 h-4 w-4" />
+								</Link>
+							</Button>
+							<Button size="lg" variant="outline" asChild>
+								<Link href="https://github.com/ralph-pm/ralph" target="_blank">
+									<GithubLogo className="mr-2 h-4 w-4" />
+									View on GitHub
+								</Link>
+							</Button>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			{/* Features Section */}
+			<section id="features" className="py-24 bg-muted/50">
+				<div className="container mx-auto px-6">
+					<div className="mx-auto max-w-2xl text-center">
+						<h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+							Everything you need to ship faster
+						</h2>
+						<p className="mt-4 text-lg text-muted-foreground">
+							Powerful features designed to streamline your development workflow
+							and let AI do the heavy lifting.
+						</p>
+					</div>
+					<div className="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+						{features.map((feature) => (
 							<Card
-								key={board.id}
-								className="cursor-pointer transition-shadow hover:shadow-lg"
-								onClick={() => router.push(`/board/${board.id}`)}
+								key={feature.title}
+								className="border-0 shadow-none bg-background"
 							>
 								<CardHeader>
-									<div className="flex items-center justify-between mb-2">
-										<CardTitle className="text-lg">{board.name}</CardTitle>
-										<Badge className={getStatusColor(board.status)}>
-											{board.status}
-										</Badge>
+									<div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+										<feature.icon
+											className="h-6 w-6 text-primary"
+											weight="duotone"
+										/>
 									</div>
-									<CardDescription className="line-clamp-2">
-										{board.goal}
-									</CardDescription>
+									<CardTitle className="text-lg">{feature.title}</CardTitle>
 								</CardHeader>
 								<CardContent>
-									<div className="flex justify-between text-sm text-muted-foreground">
-										<span>{board.tasks.length} tasks</span>
-										<span>
-											{board.tasks.filter((t) => t.status === "done").length}{" "}
-											done
-										</span>
-									</div>
+									<CardDescription className="text-base">
+										{feature.description}
+									</CardDescription>
 								</CardContent>
 							</Card>
 						))}
-						{boards.length === 0 && (
-							<Card className="border-dashed">
-								<CardHeader>
-									<CardTitle>No boards yet</CardTitle>
-									<CardDescription>
-										Kick off your first sprint by creating a new board.
-									</CardDescription>
-								</CardHeader>
-								<CardContent>
-									<Button onClick={() => setCreateDialogOpen(true)}>
-										<Plus className="w-4 h-4 mr-2" />
-										Create Board
-									</Button>
-								</CardContent>
-							</Card>
+					</div>
+				</div>
+			</section>
+
+			{/* Pricing Section */}
+			<section id="pricing" className="py-24">
+				<div className="container mx-auto px-6">
+					<div className="mx-auto max-w-2xl text-center">
+						<h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+							Simple, transparent pricing
+						</h2>
+						<p className="mt-4 text-lg text-muted-foreground">
+							Start free and scale as your team grows. No credit card required.
+						</p>
+					</div>
+					<div className="mt-16 grid gap-8 md:grid-cols-3">
+						{loading ? (
+							[1, 2, 3].map((i) => (
+								<Card key={i} className="animate-pulse">
+									<CardHeader>
+										<div className="h-6 w-20 bg-muted rounded" />
+										<div className="h-10 w-32 bg-muted rounded mt-4" />
+									</CardHeader>
+									<CardContent>
+										<div className="space-y-3">
+											{[1, 2, 3, 4].map((j) => (
+												<div key={j} className="h-4 bg-muted rounded" />
+											))}
+										</div>
+									</CardContent>
+								</Card>
+							))
+						) : plans.length > 0 ? (
+							plans.map((plan, index) => (
+								<Card
+									key={plan.id}
+									className={index === 1 ? "border-primary shadow-lg" : ""}
+								>
+									<CardHeader>
+										<div className="flex items-center justify-between">
+											<CardTitle>{plan.displayName}</CardTitle>
+											{index === 1 && <Badge variant="default">Popular</Badge>}
+										</div>
+										<div className="mt-4">
+											<span className="text-4xl font-bold">
+												${plan.monthlyPrice}
+											</span>
+											<span className="text-muted-foreground">/month</span>
+										</div>
+										{plan.description && (
+											<CardDescription className="mt-2">
+												{plan.description}
+											</CardDescription>
+										)}
+									</CardHeader>
+									<CardContent>
+										<ul className="space-y-3">
+											<li className="flex items-center gap-2">
+												<CheckCircle
+													className="h-5 w-5 text-primary"
+													weight="fill"
+												/>
+												<span>
+													{plan.maxUsers
+														? `Up to ${plan.maxUsers} team members`
+														: "Unlimited team members"}
+												</span>
+											</li>
+											<li className="flex items-center gap-2">
+												<CheckCircle
+													className="h-5 w-5 text-primary"
+													weight="fill"
+												/>
+												<span>
+													{plan.maxProjects
+														? `Up to ${plan.maxProjects} projects`
+														: "Unlimited projects"}
+												</span>
+											</li>
+											<li className="flex items-center gap-2">
+												<CheckCircle
+													className="h-5 w-5 text-primary"
+													weight="fill"
+												/>
+												<span>
+													{plan.maxAiRunsPerWeek
+														? `${plan.maxAiRunsPerWeek} AI runs/week`
+														: "Unlimited AI runs"}
+												</span>
+											</li>
+											<li className="flex items-center gap-2">
+												<CheckCircle
+													className="h-5 w-5 text-primary"
+													weight="fill"
+												/>
+												<span>
+													{plan.maxIterationsPerRun} iterations per run
+												</span>
+											</li>
+											{Object.entries(plan.features).map(([key, enabled]) => (
+												<li
+													key={key}
+													className={`flex items-center gap-2 ${
+														!enabled && "text-muted-foreground line-through"
+													}`}
+												>
+													<CheckCircle
+														className={`h-5 w-5 ${
+															enabled ? "text-primary" : "text-muted"
+														}`}
+														weight={enabled ? "fill" : "regular"}
+													/>
+													<span>
+														{key
+															.replace(/([A-Z])/g, " $1")
+															.replace(/^./, (str) => str.toUpperCase())}
+													</span>
+												</li>
+											))}
+										</ul>
+										<Button
+											className="mt-8 w-full"
+											variant={index === 1 ? "default" : "outline"}
+											asChild
+										>
+											<Link href="/register">
+												{plan.monthlyPrice === 0
+													? "Get Started Free"
+													: "Start Free Trial"}
+											</Link>
+										</Button>
+									</CardContent>
+								</Card>
+							))
+						) : (
+							// Default plans if none in database
+							<>
+								<Card>
+									<CardHeader>
+										<CardTitle>Free</CardTitle>
+										<div className="mt-4">
+											<span className="text-4xl font-bold">$0</span>
+											<span className="text-muted-foreground">/month</span>
+										</div>
+										<CardDescription className="mt-2">
+											Perfect for getting started
+										</CardDescription>
+									</CardHeader>
+									<CardContent>
+										<ul className="space-y-3">
+											<li className="flex items-center gap-2">
+												<CheckCircle
+													className="h-5 w-5 text-primary"
+													weight="fill"
+												/>
+												<span>Up to 3 team members</span>
+											</li>
+											<li className="flex items-center gap-2">
+												<CheckCircle
+													className="h-5 w-5 text-primary"
+													weight="fill"
+												/>
+												<span>2 projects</span>
+											</li>
+											<li className="flex items-center gap-2">
+												<CheckCircle
+													className="h-5 w-5 text-primary"
+													weight="fill"
+												/>
+												<span>10 AI runs/week</span>
+											</li>
+										</ul>
+										<Button className="mt-8 w-full" variant="outline" asChild>
+											<Link href="/register">Get Started Free</Link>
+										</Button>
+									</CardContent>
+								</Card>
+								<Card className="border-primary shadow-lg">
+									<CardHeader>
+										<div className="flex items-center justify-between">
+											<CardTitle>Pro</CardTitle>
+											<Badge variant="default">Popular</Badge>
+										</div>
+										<div className="mt-4">
+											<span className="text-4xl font-bold">$29</span>
+											<span className="text-muted-foreground">/month</span>
+										</div>
+										<CardDescription className="mt-2">
+											For growing teams
+										</CardDescription>
+									</CardHeader>
+									<CardContent>
+										<ul className="space-y-3">
+											<li className="flex items-center gap-2">
+												<CheckCircle
+													className="h-5 w-5 text-primary"
+													weight="fill"
+												/>
+												<span>Up to 10 team members</span>
+											</li>
+											<li className="flex items-center gap-2">
+												<CheckCircle
+													className="h-5 w-5 text-primary"
+													weight="fill"
+												/>
+												<span>Unlimited projects</span>
+											</li>
+											<li className="flex items-center gap-2">
+												<CheckCircle
+													className="h-5 w-5 text-primary"
+													weight="fill"
+												/>
+												<span>100 AI runs/week</span>
+											</li>
+										</ul>
+										<Button className="mt-8 w-full" asChild>
+											<Link href="/register">Start Free Trial</Link>
+										</Button>
+									</CardContent>
+								</Card>
+								<Card>
+									<CardHeader>
+										<CardTitle>Enterprise</CardTitle>
+										<div className="mt-4">
+											<span className="text-4xl font-bold">Custom</span>
+										</div>
+										<CardDescription className="mt-2">
+											For large organizations
+										</CardDescription>
+									</CardHeader>
+									<CardContent>
+										<ul className="space-y-3">
+											<li className="flex items-center gap-2">
+												<CheckCircle
+													className="h-5 w-5 text-primary"
+													weight="fill"
+												/>
+												<span>Unlimited team members</span>
+											</li>
+											<li className="flex items-center gap-2">
+												<CheckCircle
+													className="h-5 w-5 text-primary"
+													weight="fill"
+												/>
+												<span>Unlimited everything</span>
+											</li>
+											<li className="flex items-center gap-2">
+												<CheckCircle
+													className="h-5 w-5 text-primary"
+													weight="fill"
+												/>
+												<span>Priority support</span>
+											</li>
+										</ul>
+										<Button className="mt-8 w-full" variant="outline" asChild>
+											<Link href="mailto:sales@ralph.app">Contact Sales</Link>
+										</Button>
+									</CardContent>
+								</Card>
+							</>
 						)}
 					</div>
-				</section>
+				</div>
+			</section>
 
-				<section>
-					<div className="grid gap-4 md:grid-cols-2">
-						<Card
-							className="cursor-pointer transition-shadow hover:shadow-lg"
-							onClick={() => router.push("/files")}
-						>
-							<CardHeader>
-								<CardTitle className="text-lg">Files</CardTitle>
-								<CardDescription>
-									View planning artifacts and progress logs
-								</CardDescription>
-							</CardHeader>
-						</Card>
-
-						<Card
-							className="cursor-pointer transition-shadow hover:shadow-lg"
-							onClick={() => router.push("/assistant")}
-						>
-							<CardHeader>
-								<CardTitle className="text-lg flex items-center gap-2">
-									<Sparkle className="w-5 h-5" />
-									AI Assistant
-								</CardTitle>
-								<CardDescription>
-									Chat with AI to manage your project
-								</CardDescription>
-							</CardHeader>
-						</Card>
+			{/* CTA Section */}
+			<section className="py-24 bg-primary text-primary-foreground">
+				<div className="container mx-auto px-6">
+					<div className="mx-auto max-w-2xl text-center">
+						<h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+							Ready to supercharge your development?
+						</h2>
+						<p className="mt-4 text-lg opacity-90">
+							Join thousands of developers using Ralph to ship faster with AI.
+						</p>
+						<div className="mt-10">
+							<Button
+								size="lg"
+								variant="secondary"
+								className="text-primary"
+								asChild
+							>
+								<Link href="/register">
+									Get Started for Free
+									<ArrowRight className="ml-2 h-4 w-4" />
+								</Link>
+							</Button>
+						</div>
 					</div>
-				</section>
-			</div>
-		);
-	};
+				</div>
+			</section>
 
-	return (
-		<AppLayout
-			title="Project Management"
-			description="Manage your sprints and tasks with AI assistance"
-			actions={actions}
-		>
-			{renderContent()}
-
-			<BoardPropertiesDialog
-				board={null}
-				open={createDialogOpen}
-				onClose={() => setCreateDialogOpen(false)}
-				onSave={handleCreateBoard}
-				mode="create"
-			/>
-		</AppLayout>
-	);
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-	return (
-		<div>
-			<p className="text-muted-foreground">{label}</p>
-			<p className="text-2xl font-bold">{value}</p>
+			{/* Footer */}
+			<footer className="border-t py-12">
+				<div className="container mx-auto px-6">
+					<div className="flex flex-col items-center justify-between gap-4 md:flex-row">
+						<div className="flex items-center gap-2">
+							<Robot className="h-6 w-6 text-primary" weight="duotone" />
+							<span className="font-semibold">Ralph</span>
+						</div>
+						<p className="text-sm text-muted-foreground">
+							{new Date().getFullYear()} Ralph. All rights reserved.
+						</p>
+						<div className="flex gap-4">
+							<Link
+								href="/privacy"
+								className="text-sm text-muted-foreground hover:text-foreground"
+							>
+								Privacy
+							</Link>
+							<Link
+								href="/terms"
+								className="text-sm text-muted-foreground hover:text-foreground"
+							>
+								Terms
+							</Link>
+							<Link
+								href="https://github.com/ralph-pm/ralph"
+								target="_blank"
+								className="text-sm text-muted-foreground hover:text-foreground"
+							>
+								GitHub
+							</Link>
+						</div>
+					</div>
+				</div>
+			</footer>
 		</div>
 	);
 }

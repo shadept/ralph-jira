@@ -8,6 +8,7 @@ import {
 	useMemo,
 	useState,
 } from "react";
+import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import type { ProjectMetadata } from "@/lib/projects/types";
 import { ProjectErrorDialog } from "./project-error-dialog";
@@ -31,13 +32,12 @@ interface ProjectContextValue {
 	projectError: ProjectErrorState | null;
 	selectProject: (projectId: string) => void;
 	refreshProjects: () => Promise<void>;
-	addProject: (payload: { name: string; path: string }) => Promise<void>;
+	addProject: (payload: { name: string; repoUrl?: string }) => Promise<void>;
 	removeProject: (projectId: string) => Promise<void>;
-	regenerateProject: (projectId: string) => Promise<void>;
 	apiFetch: (
 		url: string,
 		init?: RequestInit,
-		options?: { projectId?: string },
+		options?: { projectId?: string }
 	) => Promise<Response>;
 	clearProjectError: () => void;
 	triggerProjectError: (error: ProjectErrorState) => void;
@@ -46,22 +46,96 @@ interface ProjectContextValue {
 const STORAGE_KEY = "ralph-current-project";
 
 const ProjectContext = createContext<ProjectContextValue | undefined>(
-	undefined,
+	undefined
 );
 
-const appendProjectQuery = (url: string, projectId: string) => {
-	const separator = url.includes("?") ? "&" : "?";
+/**
+ * Rewrites API URLs to use the new project-scoped hierarchy.
+ * - /api/settings -> /api/projects/{id}/settings
+ * - /api/sprints -> /api/projects/{id}/sprints
+ * - /api/sprints/{sprintId} -> /api/projects/{id}/sprints/{sprintId}
+ * - /api/boards -> /api/projects/{id}/sprints
+ * - /api/boards/{boardId} -> /api/projects/{id}/sprints/{boardId}
+ * - /api/runs -> /api/projects/{id}/runs
+ * - /api/runs/start -> /api/projects/{id}/runs/start
+ * - /api/runs/{runId}/* -> unchanged (direct run access)
+ */
+const rewriteApiUrl = (url: string, projectId: string): string => {
+	// Parse the URL to handle query params
+	const [path, queryString] = url.split("?");
+	const query = queryString ? `?${queryString}` : "";
+
+	// /api/settings -> /api/projects/{id}/settings
+	if (path === "/api/settings") {
+		return `/api/projects/${projectId}/settings${query}`;
+	}
+
+	// /api/sprints/* -> /api/projects/{id}/sprints/*
+	if (path === "/api/sprints") {
+		return `/api/projects/${projectId}/sprints${query}`;
+	}
+	const sprintsMatch = path.match(/^\/api\/sprints\/([^/]+)(\/.*)?$/);
+	if (sprintsMatch) {
+		const sprintId = sprintsMatch[1];
+		const rest = sprintsMatch[2] || "";
+		return `/api/projects/${projectId}/sprints/${sprintId}${rest}${query}`;
+	}
+
+	// /api/boards/* -> /api/projects/{id}/sprints/* (boards are sprints)
+	if (path === "/api/boards") {
+		return `/api/projects/${projectId}/sprints${query}`;
+	}
+	const boardsMatch = path.match(/^\/api\/boards\/([^/]+)(\/.*)?$/);
+	if (boardsMatch) {
+		const boardId = boardsMatch[1];
+		const rest = boardsMatch[2] || "";
+		return `/api/projects/${projectId}/sprints/${boardId}${rest}${query}`;
+	}
+
+	// /api/tasks -> /api/projects/{id}/tasks
+	if (path === "/api/tasks") {
+		return `/api/projects/${projectId}/tasks${query}`;
+	}
+	// /api/tasks/{taskId} -> /api/projects/{id}/tasks/{taskId}
+	const tasksMatch = path.match(/^\/api\/tasks\/([^/]+)(\/.*)?$/);
+	if (tasksMatch) {
+		const taskId = tasksMatch[1];
+		const rest = tasksMatch[2] || "";
+		return `/api/projects/${projectId}/tasks/${taskId}${rest}${query}`;
+	}
+
+	// /api/runs/start -> /api/projects/{id}/runs/start
+	if (path === "/api/runs/start") {
+		return `/api/projects/${projectId}/runs/start${query}`;
+	}
+
+	// /api/runs (list) -> /api/projects/{id}/runs
+	if (path === "/api/runs") {
+		return `/api/projects/${projectId}/runs${query}`;
+	}
+
+	// /api/runs/{runId}/* -> unchanged (direct run access, still needs projectId query)
+	const runsMatch = path.match(/^\/api\/runs\/([^/]+)(\/.*)?$/);
+	if (runsMatch) {
+		// Direct run access - keep projectId as query param for now
+		const separator = query ? "&" : "?";
+		return `${url}${separator}projectId=${encodeURIComponent(projectId)}`;
+	}
+
+	// Default: append projectId as query param for backward compatibility
+	const separator = query ? "&" : "?";
 	return `${url}${separator}projectId=${encodeURIComponent(projectId)}`;
 };
 
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
+	const { status: sessionStatus } = useSession();
 	const [projects, setProjects] = useState<ProjectMetadata[]>([]);
 	const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
-		null,
+		null
 	);
 	const [loading, setLoading] = useState(true);
 	const [projectError, setProjectError] = useState<ProjectErrorState | null>(
-		null,
+		null
 	);
 
 	const loadProjects = useCallback(async () => {
@@ -77,9 +151,18 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 		}
 	}, []);
 
+	// Wait for session to be authenticated before loading projects
 	useEffect(() => {
-		loadProjects();
-	}, [loadProjects]);
+		if (sessionStatus === "authenticated") {
+			loadProjects();
+		} else if (sessionStatus === "unauthenticated") {
+			// Clear projects when not authenticated
+			setProjects([]);
+			setSelectedProjectId(null);
+			setLoading(false);
+		}
+		// While session is "loading", keep our loading state true
+	}, [sessionStatus, loadProjects]);
 
 	useEffect(() => {
 		if (!projects.length) {
@@ -126,14 +209,14 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 		async (
 			url: string,
 			init?: RequestInit,
-			options?: { projectId?: string },
+			options?: { projectId?: string }
 		) => {
 			const projectId = options?.projectId || currentProject?.id;
 			if (!projectId) {
 				throw new Error("No project selected");
 			}
 
-			const targetUrl = appendProjectQuery(url, projectId);
+			const targetUrl = rewriteApiUrl(url, projectId);
 			const response = await fetch(targetUrl, init);
 
 			if (!response.ok) {
@@ -161,15 +244,15 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
 			return response;
 		},
-		[currentProject?.id, refreshProjects],
+		[currentProject?.id, refreshProjects]
 	);
 
 	const addProject = useCallback(
-		async ({ name, path }: { name: string; path: string }) => {
+		async ({ name, repoUrl }: { name: string; repoUrl?: string }) => {
 			const res = await fetch("/api/projects", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ name, path }),
+				body: JSON.stringify({ name, repoUrl }),
 			});
 
 			if (!res.ok) {
@@ -182,7 +265,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 			selectProject(data.project.id);
 			toast.success("Project added");
 		},
-		[refreshProjects, selectProject],
+		[refreshProjects, selectProject]
 	);
 
 	const removeProject = useCallback(
@@ -210,30 +293,13 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 				}
 			}
 		},
-		[projects, refreshProjects, selectProject, selectedProjectId],
+		[projects, refreshProjects, selectProject, selectedProjectId]
 	);
-
-	const regenerateProject = useCallback(async (projectId: string) => {
-		const res = await fetch(`/api/projects/${projectId}/regenerate`, {
-			method: "POST",
-		});
-		if (!res.ok) {
-			const payload = await res.json().catch(() => ({}));
-			throw new Error(payload.error || "Failed to regenerate project");
-		}
-
-		const data = await res.json().catch(() => ({}));
-		const backupSuffix = data?.backupPath
-			? ` (backup: ${data.backupPath})`
-			: "";
-		toast.success(`Project regenerated${backupSuffix}`);
-		setProjectError(null);
-	}, []);
 
 	const clearProjectError = useCallback(() => setProjectError(null), []);
 	const triggerProjectError = useCallback(
 		(error: ProjectErrorState) => setProjectError(error),
-		[],
+		[]
 	);
 
 	const value: ProjectContextValue = {
@@ -245,7 +311,6 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 		refreshProjects,
 		addProject,
 		removeProject,
-		regenerateProject,
 		apiFetch,
 		clearProjectError,
 		triggerProjectError,
@@ -265,7 +330,6 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 					message={projectError.message}
 					details={projectError.details}
 					onClose={clearProjectError}
-					onRegenerate={() => regenerateProject(projectError.projectId)}
 					onRemove={async () => {
 						await removeProject(projectError.projectId);
 						clearProjectError();

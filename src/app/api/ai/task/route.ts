@@ -2,29 +2,53 @@ import { NextResponse } from "next/server";
 import { openai } from "@ai-sdk/openai";
 import { generateObject, generateText } from "ai";
 import { z } from "zod";
+import { prisma } from "@/lib/db";
 import {
-	getProjectStorage,
+	getProjectContext,
 	handleProjectRouteError,
-} from "@/lib/projects/server";
+} from "@/lib/projects/db-server";
 
 export async function POST(request: Request) {
 	try {
-		const { storage } = await getProjectStorage(request);
+		const { project } = await getProjectContext(request);
 		const { action, boardId, taskId, data } = await request.json();
 
-		const board = await storage.readBoard(boardId);
-		const task = board.tasks.find((t) => t.id === taskId);
+		// Get task
+		const task = await prisma.task.findFirst({
+			where: {
+				id: taskId,
+				projectId: project.id,
+			},
+		});
 
 		if (!task) {
 			return NextResponse.json({ error: "Task not found" }, { status: 404 });
 		}
 
-		const settings = await storage.readSettings();
+		// Get project settings
+		const settings = await prisma.projectSettings.findUnique({
+			where: { projectId: project.id },
+		});
+
+		const techStack = settings?.techStackJson
+			? JSON.parse(settings.techStackJson)
+			: [];
+		const howToTest = settings?.howToTestJson
+			? JSON.parse(settings.howToTestJson)
+			: { commands: [], notes: "" };
+		const repoConventions = settings?.repoConventionsJson
+			? JSON.parse(settings.repoConventionsJson)
+			: { folders: {}, naming: "" };
+		const aiPreferences = settings?.aiPreferencesJson
+			? JSON.parse(settings.aiPreferencesJson)
+			: { defaultModel: "gpt-4-turbo" };
+
+		const acceptanceCriteria = JSON.parse(task.acceptanceCriteriaJson);
 
 		switch (action) {
 			case "improve-acceptance-criteria": {
 				const result = await generateObject({
-					model: openai(settings.aiPreferences.defaultModel || "gpt-4-turbo"),
+					model: openai(aiPreferences.defaultModel || "gpt-4-turbo"),
 					schema: z.object({
 						acceptanceCriteria: z.array(z.string()),
 						reasoning: z.string(),
@@ -35,10 +59,10 @@ Task: ${task.description}
 Category: ${task.category}
 
 Current acceptance criteria:
-${task.acceptanceCriteria.map((s, i) => `${i + 1}. ${s}`).join("\n")}
+${acceptanceCriteria.map((s: string, i: number) => `${i + 1}. ${s}`).join("\n")}
 
-Tech stack: ${settings.techStack.join(", ")}
-Testing approach: ${settings.howToTest.notes}
+Tech stack: ${techStack.join(", ")}
+Testing approach: ${howToTest.notes}
 
 Provide improved acceptance criteria that cover:
 - Happy path scenarios
@@ -48,10 +72,15 @@ Provide improved acceptance criteria that cover:
 - Testing validation`,
 				});
 
-				task.acceptanceCriteria = result.object.acceptanceCriteria;
-				task.updatedAt = new Date().toISOString();
-
-				await storage.writeBoard(board);
+				// Update task in database
+				await prisma.task.update({
+					where: { id: task.id },
+					data: {
+						acceptanceCriteriaJson: JSON.stringify(
+							result.object.acceptanceCriteria
+						),
+					},
+				});
 
 				return NextResponse.json({
 					success: true,
@@ -62,14 +91,14 @@ Provide improved acceptance criteria that cover:
 
 			case "add-edge-cases": {
 				const result = await generateObject({
-					model: openai(settings.aiPreferences.defaultModel || "gpt-4-turbo"),
+					model: openai(aiPreferences.defaultModel || "gpt-4-turbo"),
 					schema: z.object({
 						edgeCases: z.array(z.string()),
 					}),
 					prompt: `Identify edge cases and additional test scenarios for this task:
 
 Task: ${task.description}
-Acceptance Criteria: ${task.acceptanceCriteria.join("; ")}
+Acceptance Criteria: ${acceptanceCriteria.join("; ")}
 
 Consider:
 - Boundary conditions
@@ -81,12 +110,17 @@ Consider:
 				});
 
 				// Append edge cases to acceptance criteria
-				task.acceptanceCriteria.push(
+				const updatedCriteria = [
+					...acceptanceCriteria,
 					...result.object.edgeCases.map((ec) => `[Edge case] ${ec}`),
-				);
-				task.updatedAt = new Date().toISOString();
+				];
 
-				await storage.writeBoard(board);
+				await prisma.task.update({
+					where: { id: task.id },
+					data: {
+						acceptanceCriteriaJson: JSON.stringify(updatedCriteria),
+					},
+				});
 
 				return NextResponse.json({
 					success: true,
@@ -96,7 +130,7 @@ Consider:
 
 			case "estimate": {
 				const result = await generateObject({
-					model: openai(settings.aiPreferences.defaultModel || "gpt-4-turbo"),
+					model: openai(aiPreferences.defaultModel || "gpt-4-turbo"),
 					schema: z.object({
 						estimate: z.number(),
 						reasoning: z.string(),
@@ -104,14 +138,14 @@ Consider:
 							z.object({
 								component: z.string(),
 								points: z.number(),
-							}),
+							})
 						),
 					}),
 					prompt: `Estimate the effort for this task in story points (Fibonacci: 1, 2, 3, 5, 8, 13).
 
 Task: ${task.description}
-Acceptance Criteria: ${task.acceptanceCriteria.length} items
-Tech stack: ${settings.techStack.join(", ")}
+Acceptance Criteria: ${acceptanceCriteria.length} items
+Tech stack: ${techStack.join(", ")}
 
 Consider:
 - Implementation complexity
@@ -122,10 +156,10 @@ Consider:
 Provide a detailed breakdown.`,
 				});
 
-				task.estimate = result.object.estimate;
-				task.updatedAt = new Date().toISOString();
-
-				await storage.writeBoard(board);
+				await prisma.task.update({
+					where: { id: task.id },
+					data: { estimate: result.object.estimate },
+				});
 
 				return NextResponse.json({
 					success: true,
@@ -137,25 +171,25 @@ Provide a detailed breakdown.`,
 
 			case "suggest-files": {
 				const result = await generateObject({
-					model: openai(settings.aiPreferences.defaultModel || "gpt-4-turbo"),
+					model: openai(aiPreferences.defaultModel || "gpt-4-turbo"),
 					schema: z.object({
 						files: z.array(
 							z.object({
 								path: z.string(),
 								purpose: z.string(),
 								changes: z.string(),
-							}),
+							})
 						),
 					}),
 					prompt: `Suggest which files would need to be modified to implement this task:
 
 Task: ${task.description}
-Acceptance Criteria: ${task.acceptanceCriteria.join("; ")}
+Acceptance Criteria: ${acceptanceCriteria.join("; ")}
 
 Project structure (conventions):
-${JSON.stringify(settings.repoConventions, null, 2)}
+${JSON.stringify(repoConventions, null, 2)}
 
-Tech stack: ${settings.techStack.join(", ")}
+Tech stack: ${techStack.join(", ")}
 
 Provide specific file paths and what changes would be needed.`,
 				});
@@ -168,14 +202,14 @@ Provide specific file paths and what changes would be needed.`,
 
 			case "to-test-cases": {
 				const result = await generateText({
-					model: openai(settings.aiPreferences.defaultModel || "gpt-4-turbo"),
+					model: openai(aiPreferences.defaultModel || "gpt-4-turbo"),
 					prompt: `Convert this task into automated test cases using the project's testing approach.
 
 Task: ${task.description}
-Acceptance Criteria: ${task.acceptanceCriteria.join("\n")}
+Acceptance Criteria: ${acceptanceCriteria.join("\n")}
 
-Testing framework: ${settings.howToTest.commands.join(", ")}
-Testing notes: ${settings.howToTest.notes}
+Testing framework: ${howToTest.commands.join(", ")}
+Testing notes: ${howToTest.notes}
 
 Generate test code snippets or pseudocode.`,
 				});

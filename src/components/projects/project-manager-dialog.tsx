@@ -1,6 +1,7 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useRef, useState } from "react";
+import { ChangeEvent, useRef, useState } from "react";
+import { useForm } from "@tanstack/react-form";
 
 const BROWSER_FOLDER_LIMITATION_MESSAGE = `Chrome can't share the exact folder path. After you approve the "Upload folder" prompt, copy the full path from File Explorer (Alt + D → Ctrl + C) or Finder (⌘ + ⌥ + C) and paste it here.`;
 import {
@@ -30,34 +31,36 @@ export function ProjectManagerDialog({
 }: ProjectManagerDialogProps) {
 	const { projects, addProject, removeProject, currentProject } =
 		useProjectContext();
-	const [formName, setFormName] = useState("");
-	const [formPath, setFormPath] = useState("");
 	const [submitting, setSubmitting] = useState(false);
 	const [removingId, setRemovingId] = useState<string | null>(null);
 	const [needsManualPathEntry, setNeedsManualPathEntry] = useState(false);
 	const folderInputRef = useRef<HTMLInputElement | null>(null);
 	const manualEntryToastShownRef = useRef(false);
 
-	const handleSubmit = async (event: FormEvent) => {
-		event.preventDefault();
-		if (!formName.trim() || !formPath.trim()) {
-			toast.error("Please provide both project name and path");
-			return;
-		}
+	const form = useForm({
+		defaultValues: {
+			name: "",
+			path: "",
+		},
+		onSubmit: async ({ value }) => {
+			if (!value.name.trim() || !value.path.trim()) {
+				toast.error("Please provide both project name and path");
+				return;
+			}
 
-		try {
-			setSubmitting(true);
-			await addProject({ name: formName.trim(), path: formPath.trim() });
-			setFormName("");
-			setFormPath("");
-		} catch (error) {
-			toast.error(
-				error instanceof Error ? error.message : "Failed to create project",
-			);
-		} finally {
-			setSubmitting(false);
-		}
-	};
+			try {
+				setSubmitting(true);
+				await addProject({ name: value.name.trim(), repoUrl: value.path.trim() });
+				form.reset();
+			} catch (error) {
+				toast.error(
+					error instanceof Error ? error.message : "Failed to create project"
+				);
+			} finally {
+				setSubmitting(false);
+			}
+		},
+	});
 
 	const handleRemove = async (id: string, name: string) => {
 		if (typeof window !== "undefined") {
@@ -70,7 +73,7 @@ export function ProjectManagerDialog({
 			await removeProject(id);
 		} catch (error) {
 			toast.error(
-				error instanceof Error ? error.message : "Failed to remove project",
+				error instanceof Error ? error.message : "Failed to remove project"
 			);
 		} finally {
 			setRemovingId(null);
@@ -92,7 +95,7 @@ export function ProjectManagerDialog({
 		const fallbackName = relativeRoot || firstFile.name;
 
 		if (absolutePath) {
-			setFormPath(absolutePath);
+			form.setFieldValue("path", absolutePath);
 			setNeedsManualPathEntry(false);
 			manualEntryToastShownRef.current = false;
 		} else {
@@ -101,10 +104,11 @@ export function ProjectManagerDialog({
 				manualEntryToastShownRef.current = true;
 			}
 			setNeedsManualPathEntry(true);
-			setFormPath((prev) => (prev ? prev : fallbackName));
+			const currentPath = form.getFieldValue("path");
+			form.setFieldValue("path", currentPath || fallbackName);
 			if (typeof window !== "undefined") {
 				window.requestAnimationFrame(() => {
-					document.getElementById("project-path")?.focus();
+					document.getElementById("path")?.focus();
 				});
 			}
 		}
@@ -166,67 +170,80 @@ export function ProjectManagerDialog({
 
 					<form
 						className="space-y-4 flex flex-col h-full"
-						onSubmit={handleSubmit}
+						onSubmit={(e) => {
+							e.preventDefault();
+							form.handleSubmit();
+						}}
 					>
-						<div>
-							<Label htmlFor="project-name">Project Name</Label>
-							<Input
-								id="project-name"
-								value={formName}
-								onChange={(event) => setFormName(event.target.value)}
-								placeholder="My Project"
-								className="mt-1"
-							/>
-						</div>
-						<div>
-							<Label htmlFor="project-path">Project Root Path</Label>
-							<div className="mt-1 flex gap-2">
-								<Input
-									id="project-path"
-									value={formPath}
-									onChange={(event) => setFormPath(event.target.value)}
-									placeholder="C:\\Projects\\my-project"
-									className="font-mono text-xs"
-									aria-describedby="project-path-help"
-									autoComplete="off"
-								/>
-								<Button
-									type="button"
-									variant="outline"
-									onClick={openFolderPicker}
-									title="Chrome may label this action as 'Upload folder'. Ralph never uploads your files."
-								>
-									Browse…
-								</Button>
-								<input
-									ref={folderInputRef}
-									type="file"
-									className="hidden"
-									onChange={handleFolderSelected}
-									{...({
-										webkitdirectory: "true",
-										directory: "true",
-										mozdirectory: "true",
-									} as Record<string, string>)}
-								/>
-							</div>
-							<p
-								id="project-path-help"
-								className="text-xs text-muted-foreground mt-2"
-							>
-								Chrome will show an &ldquo;Upload folder&rdquo; prompt because
-								it scans the folder to infer its path. Ralph never uploads your
-								files—everything stays on this device. If the picker only
-								returns the folder name, copy the full path from your file
-								manager and paste it above.
-							</p>
-
-							{needsManualPathEntry && (
-								<div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-									{BROWSER_FOLDER_LIMITATION_MESSAGE}
+						<form.Field name="name">
+							{(field) => (
+								<div>
+									<Label htmlFor={field.name}>Project Name</Label>
+									<Input
+										id={field.name}
+										value={field.state.value}
+										onChange={(e) => field.handleChange(e.target.value)}
+										placeholder="My Project"
+										className="mt-1"
+									/>
 								</div>
 							)}
-						</div>
+						</form.Field>
+
+						<form.Field name="path">
+							{(field) => (
+								<div>
+									<Label htmlFor={field.name}>Project Root Path</Label>
+									<div className="mt-1 flex gap-2">
+										<Input
+											id={field.name}
+											value={field.state.value}
+											onChange={(e) => field.handleChange(e.target.value)}
+											placeholder="C:\\Projects\\my-project"
+											className="font-mono text-xs"
+											aria-describedby="project-path-help"
+											autoComplete="off"
+										/>
+										<Button
+											type="button"
+											variant="outline"
+											onClick={openFolderPicker}
+											title="Chrome may label this action as 'Upload folder'. Ralph never uploads your files."
+										>
+											Browse…
+										</Button>
+										<input
+											ref={folderInputRef}
+											type="file"
+											className="hidden"
+											onChange={handleFolderSelected}
+											{...({
+												webkitdirectory: "true",
+												directory: "true",
+												mozdirectory: "true",
+											} as Record<string, string>)}
+										/>
+									</div>
+									<p
+										id="project-path-help"
+										className="text-xs text-muted-foreground mt-2"
+									>
+										Chrome will show an &ldquo;Upload folder&rdquo; prompt because
+										it scans the folder to infer its path. Ralph never uploads your
+										files—everything stays on this device. If the picker only
+										returns the folder name, copy the full path from your file
+										manager and paste it above.
+									</p>
+
+									{needsManualPathEntry && (
+										<div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+											{BROWSER_FOLDER_LIMITATION_MESSAGE}
+										</div>
+									)}
+								</div>
+							)}
+						</form.Field>
+
 						<DialogFooter className="mt-auto">
 							<Button type="submit" disabled={submitting}>
 								{submitting ? "Adding..." : "Add Project"}
