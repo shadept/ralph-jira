@@ -92,7 +92,10 @@ export async function GET(
 			},
 			include: {
 				columns: { orderBy: { order: "asc" } },
-				tasks: { orderBy: { createdAt: "asc" } },
+				tasks: {
+					where: { archivedAt: null },
+					orderBy: { createdAt: "asc" },
+				},
 			},
 		});
 

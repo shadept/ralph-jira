@@ -2,7 +2,6 @@
 
 import {
 	BuildingsIcon,
-	CaretDownIcon,
 	GearSixIcon,
 	MonitorIcon,
 	MoonIcon,
@@ -13,9 +12,9 @@ import {
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -27,48 +26,56 @@ import {
 	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { getInitials } from "@/lib/utils";
 
 export function UserMenu() {
+	const { data: session } = useSession();
 	const router = useRouter();
 	const { setTheme, theme } = useTheme();
-	const { data: session, status } = useSession();
-	const selectedTheme = theme ?? "system";
+	const [mounted, setMounted] = useState(false);
+
+	useEffect(() => {
+		setMounted(true);
+	}, []);
+
+	if (!session?.user) {
+		return null;
+	}
+
+	const user = session.user;
+
+	const selectedTheme = mounted ? (theme ?? "system") : "system";
 
 	const handleSignOut = () => {
 		signOut({ callbackUrl: "/" });
 	};
 
-	// Don't render if not authenticated
-	if (status === "loading") {
-		return (
-			<Button variant="outline" size="sm" className="gap-2" disabled>
-				<div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted animate-pulse" />
-			</Button>
-		);
-	}
-
-	if (status === "unauthenticated" || !session?.user) {
-		return null;
-	}
-
-	const user = session.user;
 	const initials = getInitials(user.name, user.email);
 	const displayName = user.name || user.email || "User";
 
 	return (
 		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<Button variant="outline" size="sm" className="gap-2">
-					<Avatar className="h-8 w-8">
-						<AvatarImage src={user.image || undefined} alt={displayName} />
-						<AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
-							{initials}
-						</AvatarFallback>
-					</Avatar>
-					<CaretDownIcon className="h-4 w-4 text-muted-foreground" />
-				</Button>
-			</DropdownMenuTrigger>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<DropdownMenuTrigger asChild>
+						<Button className="relative h-9 w-9 rounded-full ring-offset-background transition-all hover:ring-2 hover:ring-ring hover:ring-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+							<Avatar className="h-9 w-9">
+								<AvatarImage src={user.image || undefined} alt={displayName} />
+								<AvatarFallback className="bg-primary text-primary-foreground text-sm font-medium">
+									{initials}
+								</AvatarFallback>
+							</Avatar>
+						</Button>
+					</DropdownMenuTrigger>
+				</TooltipTrigger>
+				<TooltipContent side="bottom">Open user navigation menu</TooltipContent>
+			</Tooltip>
 			<DropdownMenuContent align="end" className="w-64">
 				<DropdownMenuLabel>
 					<div className="flex items-center gap-3">

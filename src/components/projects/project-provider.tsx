@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import Cookies from "js-cookie";
 import {
 	createContext,
 	useCallback,
@@ -43,7 +43,7 @@ interface ProjectContextValue {
 	triggerProjectError: (error: ProjectErrorState) => void;
 }
 
-const STORAGE_KEY = "ralph-current-project";
+export const PROJECT_COOKIE_KEY = "ralph-selected-project";
 
 const ProjectContext = createContext<ProjectContextValue | undefined>(
 	undefined,
@@ -51,26 +51,15 @@ const ProjectContext = createContext<ProjectContextValue | undefined>(
 
 /**
  * Rewrites API URLs to use the new project-scoped hierarchy.
- * - /api/settings -> /api/projects/{id}/settings
- * - /api/sprints -> /api/projects/{id}/sprints
- * - /api/sprints/{sprintId} -> /api/projects/{id}/sprints/{sprintId}
- * - /api/boards -> /api/projects/{id}/sprints
- * - /api/boards/{boardId} -> /api/projects/{id}/sprints/{boardId}
- * - /api/runs -> /api/projects/{id}/runs
- * - /api/runs/start -> /api/projects/{id}/runs/start
- * - /api/runs/{runId}/* -> unchanged (direct run access)
  */
 const rewriteApiUrl = (url: string, projectId: string): string => {
-	// Parse the URL to handle query params
 	const [path, queryString] = url.split("?");
 	const query = queryString ? `?${queryString}` : "";
 
-	// /api/settings -> /api/projects/{id}/settings
 	if (path === "/api/settings") {
 		return `/api/projects/${projectId}/settings${query}`;
 	}
 
-	// /api/sprints/* -> /api/projects/{id}/sprints/*
 	if (path === "/api/sprints") {
 		return `/api/projects/${projectId}/sprints${query}`;
 	}
@@ -81,7 +70,6 @@ const rewriteApiUrl = (url: string, projectId: string): string => {
 		return `/api/projects/${projectId}/sprints/${sprintId}${rest}${query}`;
 	}
 
-	// /api/boards/* -> /api/projects/{id}/sprints/* (boards are sprints)
 	if (path === "/api/boards") {
 		return `/api/projects/${projectId}/sprints${query}`;
 	}
@@ -92,11 +80,9 @@ const rewriteApiUrl = (url: string, projectId: string): string => {
 		return `/api/projects/${projectId}/sprints/${boardId}${rest}${query}`;
 	}
 
-	// /api/tasks -> /api/projects/{id}/tasks
 	if (path === "/api/tasks") {
 		return `/api/projects/${projectId}/tasks${query}`;
 	}
-	// /api/tasks/{taskId} -> /api/projects/{id}/tasks/{taskId}
 	const tasksMatch = path.match(/^\/api\/tasks\/([^/]+)(\/.*)?$/);
 	if (tasksMatch) {
 		const taskId = tasksMatch[1];
@@ -104,45 +90,67 @@ const rewriteApiUrl = (url: string, projectId: string): string => {
 		return `/api/projects/${projectId}/tasks/${taskId}${rest}${query}`;
 	}
 
-	// /api/runs/start -> /api/projects/{id}/runs/start
 	if (path === "/api/runs/start") {
 		return `/api/projects/${projectId}/runs/start${query}`;
 	}
 
-	// /api/runs (list) -> /api/projects/{id}/runs
 	if (path === "/api/runs") {
 		return `/api/projects/${projectId}/runs${query}`;
 	}
 
-	// /api/runs/{runId}/* -> unchanged (direct run access, still needs projectId query)
 	const runsMatch = path.match(/^\/api\/runs\/([^/]+)(\/.*)?$/);
 	if (runsMatch) {
-		// Direct run access - keep projectId as query param for now
 		const separator = query ? "&" : "?";
 		return `${url}${separator}projectId=${encodeURIComponent(projectId)}`;
 	}
 
-	// Default: append projectId as query param for backward compatibility
 	const separator = query ? "&" : "?";
 	return `${url}${separator}projectId=${encodeURIComponent(projectId)}`;
 };
 
-export function ProjectProvider({ children }: { children: React.ReactNode }) {
-	const { status: sessionStatus } = useSession();
-	const [projects, setProjects] = useState<ProjectMetadata[]>([]);
-	const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
-		null,
-	);
-	const [loading, setLoading] = useState(true);
-	const [projectError, setProjectError] = useState<ProjectErrorState | null>(
-		null,
-	);
+interface ProjectProviderProps {
+	children: React.ReactNode;
+	/** Projects fetched server-side. If not provided, will fetch client-side. */
+	initialProjects?: ProjectMetadata[];
+	/** Selected project ID from cookie, read server-side. */
+	initialSelectedProjectId?: string | null;
+}
+
+export function ProjectProvider({
+	children,
+	initialProjects,
+	initialSelectedProjectId,
+}: ProjectProviderProps) {
+	// Determine initial selected project ID
+	const getInitialSelectedId = (): string | null => {
+		if (initialSelectedProjectId && initialProjects?.some(p => p.id === initialSelectedProjectId)) {
+			return initialSelectedProjectId;
+		}
+		if (initialProjects?.length) {
+			return initialProjects[0].id;
+		}
+		return null;
+	};
+
+	const [projects, setProjects] = useState<ProjectMetadata[]>(initialProjects ?? []);
+	const [selectedProjectId, setSelectedProjectId] = useState<string | null>(getInitialSelectedId);
+	const [loading, setLoading] = useState(!initialProjects);
+	const [projectError, setProjectError] = useState<ProjectErrorState | null>(null);
 
 	const loadProjects = useCallback(async () => {
 		try {
 			const res = await fetch("/api/projects");
 			const data = await res.json();
-			setProjects(data.projects || []);
+			const newProjects = data.projects || [];
+			setProjects(newProjects);
+
+			// Update selected project if current one is no longer valid
+			setSelectedProjectId(prev => {
+				if (prev && newProjects.some((p: ProjectMetadata) => p.id === prev)) {
+					return prev;
+				}
+				return newProjects.length > 0 ? newProjects[0].id : null;
+			});
 		} catch (error) {
 			console.error("Failed to load projects:", error);
 			toast.error("Failed to load projects");
@@ -151,42 +159,12 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 		}
 	}, []);
 
-	// Wait for session to be authenticated before loading projects
+	// If no initial projects provided, fetch on mount
 	useEffect(() => {
-		if (sessionStatus === "authenticated") {
+		if (!initialProjects) {
 			loadProjects();
-		} else if (sessionStatus === "unauthenticated") {
-			// Clear projects when not authenticated
-			setProjects([]);
-			setSelectedProjectId(null);
-			setLoading(false);
 		}
-		// While session is "loading", keep our loading state true
-	}, [sessionStatus, loadProjects]);
-
-	useEffect(() => {
-		if (!projects.length) {
-			setSelectedProjectId(null);
-			return;
-		}
-
-		setSelectedProjectId((prev) => {
-			if (prev && projects.some((project) => project.id === prev)) {
-				return prev;
-			}
-
-			let storedId: string | null = null;
-			if (typeof window !== "undefined") {
-				storedId = window.localStorage.getItem(STORAGE_KEY);
-			}
-
-			if (storedId && projects.some((project) => project.id === storedId)) {
-				return storedId;
-			}
-
-			return projects[0].id;
-		});
-	}, [projects]);
+	}, [initialProjects, loadProjects]);
 
 	const currentProject = useMemo(() => {
 		if (!selectedProjectId) return null;
@@ -195,9 +173,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
 	const selectProject = useCallback((projectId: string) => {
 		setSelectedProjectId(projectId);
-		if (typeof window !== "undefined") {
-			window.localStorage.setItem(STORAGE_KEY, projectId);
-		}
+		// Store in cookie for server-side access
+		Cookies.set(PROJECT_COOKIE_KEY, projectId, { expires: 365 });
 	}, []);
 
 	const refreshProjects = useCallback(async () => {
@@ -287,9 +264,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 					selectProject(fallback.id);
 				} else {
 					setSelectedProjectId(null);
-					if (typeof window !== "undefined") {
-						window.localStorage.removeItem(STORAGE_KEY);
-					}
+					Cookies.remove(PROJECT_COOKIE_KEY);
 				}
 			}
 		},

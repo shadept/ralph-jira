@@ -319,34 +319,110 @@ export const DEFAULT_AUTOMATION_SETTINGS: AutomationSettings = {
 	codingStyle: "",
 };
 
+// AI Preferences schema (extracted for reuse)
+export const AiPreferencesSchema = z.object({
+	defaultModel: z.string().default("gpt-4-turbo"),
+	provider: z.string().default("openai"),
+	temperature: z.number().optional(),
+	maxTokens: z.number().optional(),
+	guardrails: z.array(z.string()).default([]),
+});
+
+export type AiPreferences = z.infer<typeof AiPreferencesSchema>;
+
+export const DEFAULT_AI_PREFERENCES: AiPreferences = {
+	defaultModel: "gpt-4-turbo",
+	provider: "openai",
+	guardrails: [],
+};
+
+// Tech stack schema
+export const TechStackSchema = z.array(z.string()).default([]);
+
+// How to test/run schemas
+export const HowToSchema = z.object({
+	commands: z.array(z.string()).default([]),
+	notes: z.string().default(""),
+});
+
+export type HowTo = z.infer<typeof HowToSchema>;
+
+// Repo conventions schema
+export const RepoConventionsSchema = z.object({
+	folders: z.record(z.string(), z.string()).default({}),
+	naming: z.string().default(""),
+	commitStyle: z.string().optional(),
+});
+
+export type RepoConventions = z.infer<typeof RepoConventionsSchema>;
+
 export const ProjectSettingsSchema = z.object({
 	projectName: z.string(),
 	projectDescription: z.string(),
-	techStack: z.array(z.string()),
-	howToTest: z.object({
-		commands: z.array(z.string()),
-		notes: z.string(),
-	}),
-	howToRun: z.object({
-		commands: z.array(z.string()),
-		notes: z.string(),
-	}),
-	aiPreferences: z.object({
-		defaultModel: z.string(),
-		provider: z.string(),
-		temperature: z.number().optional(),
-		maxTokens: z.number().optional(),
-		guardrails: z.array(z.string()),
-	}),
-	repoConventions: z.object({
-		folders: z.record(z.string(), z.string()),
-		naming: z.string(),
-		commitStyle: z.string().optional(),
-	}),
+	techStack: TechStackSchema,
+	howToTest: HowToSchema,
+	howToRun: HowToSchema,
+	aiPreferences: AiPreferencesSchema,
+	repoConventions: RepoConventionsSchema,
 	automation: AutomationSettingsSchema.optional(),
 });
 
 export type ProjectSettings = z.infer<typeof ProjectSettingsSchema>;
+
+/**
+ * Safely parse AI preferences from JSON string with defaults
+ */
+export function parseAiPreferences(
+	json: string | null | undefined,
+): AiPreferences {
+	if (!json) return DEFAULT_AI_PREFERENCES;
+	try {
+		const parsed = JSON.parse(json);
+		return AiPreferencesSchema.parse(parsed);
+	} catch {
+		return DEFAULT_AI_PREFERENCES;
+	}
+}
+
+/**
+ * Safely parse tech stack from JSON string
+ */
+export function parseTechStack(json: string | null | undefined): string[] {
+	if (!json) return [];
+	try {
+		return TechStackSchema.parse(JSON.parse(json));
+	} catch {
+		return [];
+	}
+}
+
+/**
+ * Safely parse HowTo (test/run) from JSON string
+ */
+export function parseHowTo(json: string | null | undefined): HowTo {
+	const defaults: HowTo = { commands: [], notes: "" };
+	if (!json) return defaults;
+	try {
+		return HowToSchema.parse(JSON.parse(json));
+	} catch {
+		return defaults;
+	}
+}
+
+/**
+ * Safely parse repo conventions from JSON string
+ */
+export function parseRepoConventions(
+	json: string | null | undefined,
+): RepoConventions {
+	const defaults: RepoConventions = { folders: {}, naming: "" };
+	if (!json) return defaults;
+	try {
+		return RepoConventionsSchema.parse(JSON.parse(json));
+	} catch {
+		return defaults;
+	}
+}
 
 export function isKnownClaudeModel(
 	value?: string | null,

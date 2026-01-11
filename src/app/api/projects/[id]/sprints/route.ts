@@ -88,11 +88,15 @@ export async function GET(
 		const dbSprints = await prisma.sprint.findMany({
 			where: {
 				projectId: project.id,
-				archivedAt: null,
 			},
 			include: {
 				columns: { orderBy: { order: "asc" } },
-				tasks: { orderBy: { createdAt: "asc" } },
+				// Note: nested includes don't go through Prisma extensions,
+				// so we need to manually filter archived tasks here
+				tasks: {
+					where: { archivedAt: null },
+					orderBy: { createdAt: "asc" },
+				},
 			},
 			orderBy: { createdAt: "desc" },
 		});

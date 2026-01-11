@@ -7,6 +7,12 @@ import {
 	getProjectContext,
 	handleProjectRouteError,
 } from "@/lib/projects/db-server";
+import {
+	parseAiPreferences,
+	parseHowTo,
+	parseRepoConventions,
+	parseTechStack,
+} from "@/lib/schemas";
 
 export async function POST(request: Request) {
 	try {
@@ -30,18 +36,10 @@ export async function POST(request: Request) {
 			where: { projectId: project.id },
 		});
 
-		const techStack = settings?.techStackJson
-			? JSON.parse(settings.techStackJson)
-			: [];
-		const howToTest = settings?.howToTestJson
-			? JSON.parse(settings.howToTestJson)
-			: { commands: [], notes: "" };
-		const repoConventions = settings?.repoConventionsJson
-			? JSON.parse(settings.repoConventionsJson)
-			: { folders: {}, naming: "" };
-		const aiPreferences = settings?.aiPreferencesJson
-			? JSON.parse(settings.aiPreferencesJson)
-			: { defaultModel: "gpt-4-turbo" };
+		const techStack = parseTechStack(settings?.techStackJson);
+		const howToTest = parseHowTo(settings?.howToTestJson);
+		const repoConventions = parseRepoConventions(settings?.repoConventionsJson);
+		const aiPreferences = parseAiPreferences(settings?.aiPreferencesJson);
 
 		const acceptanceCriteria = JSON.parse(task.acceptanceCriteriaJson);
 
