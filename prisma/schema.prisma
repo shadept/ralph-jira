@@ -441,11 +441,18 @@ model Run {
   selectedTaskIdsJson     String    // JSON array
   lastTaskId              String?
 
+  // AI Model & Token tracking
+  aiModel                 String?   // e.g., "claude-3-opus", "gpt-4"
+  promptTokens            Int       @default(0)
+  completionTokens        Int       @default(0)
+  totalTokens             Int       @default(0)
+
   // Execution details
   lastMessage             String?
   lastCommand             String?
   lastCommandExitCode     Int?
   errorsJson              String    @default("[]")
+  errorMessage            String?   // Simple error string for display
 
   // Process tracking
   pid                     Int?
@@ -490,8 +497,9 @@ model RunCommand {
 
 model RunLog {
   id        String   @id @default(cuid())
-  runId     String   // Logs belong to runs
-  entry     String
+  runId     String
+  level     String   @default("info") // info, warn, error, debug
+  message   String
   createdAt DateTime @default(now())
 
   run       Run      @relation(fields: [runId], references: [id], onDelete: Cascade)

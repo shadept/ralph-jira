@@ -91,12 +91,7 @@ export async function GET(
 			},
 			include: {
 				columns: { orderBy: { order: "asc" } },
-				// Note: nested includes don't go through Prisma extensions,
-				// so we need to manually filter archived tasks here
-				tasks: {
-					where: { archivedAt: null },
-					orderBy: { createdAt: "asc" },
-				},
+				tasks: { orderBy: { createdAt: "asc" } },
 			},
 			orderBy: { createdAt: "desc" },
 		});

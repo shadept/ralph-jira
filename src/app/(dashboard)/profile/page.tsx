@@ -42,8 +42,11 @@ async function getProfile(userId: string): Promise<UserProfile | null> {
 
 export default async function ProfilePage() {
 	const session = await auth();
-	const profile = await getProfile(session?.user?.id);
+	if (!session?.user?.id) {
+		redirect("/login");
+	}
 
+	const profile = await getProfile(session.user.id);
 	if (!profile) {
 		redirect("/login");
 	}

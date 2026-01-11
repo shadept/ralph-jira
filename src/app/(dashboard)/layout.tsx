@@ -34,7 +34,6 @@ async function getProjects(userId: string): Promise<ProjectMetadata[]> {
 		},
 		orderBy: { updatedAt: "desc" },
 	});
-
 	return projects.map((p) => ({
 		id: p.id,
 		name: p.name,
@@ -63,7 +62,10 @@ export default async function DashboardLayout({
 
 	return (
 		<SessionProvider session={session}>
-			<ProjectProvider projects={projects} selectedProjectId={selectedProjectId}>
+			<ProjectProvider
+				projects={projects}
+				selectedProjectId={selectedProjectId}
+			>
 				<DashboardShell user={{ ...user, id: user.id, email: user.email }}>
 					{children}
 				</DashboardShell>

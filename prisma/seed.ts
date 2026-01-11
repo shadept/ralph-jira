@@ -1,3 +1,5 @@
+import assert from "node:assert";
+import crypto from "node:crypto";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClient } from "../generated/prisma";
 import bcrypt from "bcryptjs";
@@ -216,7 +218,18 @@ async function main() {
 	console.log("Created organization:", acmeOrg.name);
 
 	// Add all test users to the organization with different roles
-	const roles = ["owner", "admin", "member", "member", "member", "member", "member", "member", "viewer", "viewer"];
+	const roles = [
+		"owner",
+		"admin",
+		"member",
+		"member",
+		"member",
+		"member",
+		"member",
+		"member",
+		"viewer",
+		"viewer",
+	];
 	for (let i = 0; i < createdTestUsers.length; i++) {
 		await prisma.organizationMember.upsert({
 			where: {
@@ -258,8 +271,17 @@ async function main() {
 		{
 			name: "Phoenix Platform",
 			slug: "phoenix-platform",
-			description: "Next-generation cloud platform with microservices architecture",
-			techStack: ["TypeScript", "Node.js", "React", "PostgreSQL", "Redis", "Docker", "Kubernetes"],
+			description:
+				"Next-generation cloud platform with microservices architecture",
+			techStack: [
+				"TypeScript",
+				"Node.js",
+				"React",
+				"PostgreSQL",
+				"Redis",
+				"Docker",
+				"Kubernetes",
+			],
 		},
 		{
 			name: "Mobile App",
@@ -271,7 +293,13 @@ async function main() {
 			name: "Data Pipeline",
 			slug: "data-pipeline",
 			description: "Real-time data processing and analytics pipeline",
-			techStack: ["Python", "Apache Kafka", "Apache Spark", "Airflow", "Snowflake"],
+			techStack: [
+				"Python",
+				"Apache Kafka",
+				"Apache Spark",
+				"Airflow",
+				"Snowflake",
+			],
 		},
 		{
 			name: "Marketing Website",
@@ -327,10 +355,19 @@ async function main() {
 					projectName: proj.name,
 					projectDescription: proj.description,
 					techStackJson: JSON.stringify(proj.techStack),
-					howToTestJson: JSON.stringify({ commands: ["npm test", "npm run e2e"], notes: "Run all tests before merging" }),
-					howToRunJson: JSON.stringify({ commands: ["npm install", "npm run dev"], notes: "Requires Node 20+" }),
+					howToTestJson: JSON.stringify({
+						commands: ["npm test", "npm run e2e"],
+						notes: "Run all tests before merging",
+					}),
+					howToRunJson: JSON.stringify({
+						commands: ["npm install", "npm run dev"],
+						notes: "Requires Node 20+",
+					}),
 					aiPreferencesJson: JSON.stringify({ defaultModel: "gpt-4" }),
-					repoConventionsJson: JSON.stringify({ folders: { src: "Source code", tests: "Test files" }, naming: "camelCase" }),
+					repoConventionsJson: JSON.stringify({
+						folders: { src: "Source code", tests: "Test files" },
+						naming: "camelCase",
+					}),
 				},
 			});
 
@@ -346,56 +383,223 @@ async function main() {
 	// ============================================================================
 
 	const sprintNames = [
-		{ name: "Sprint 1 - Foundation", goal: "Set up core infrastructure and basic features", status: "completed" },
-		{ name: "Sprint 2 - MVP", goal: "Complete minimum viable product features", status: "completed" },
-		{ name: "Sprint 3 - Beta Launch", goal: "Prepare for beta testing and feedback", status: "active" },
-		{ name: "Sprint 4 - Polish", goal: "Bug fixes and UX improvements", status: "planned" },
-		{ name: "Sprint 5 - Scale", goal: "Performance optimization and scaling", status: "planned" },
+		{
+			name: "Sprint 1 - Foundation",
+			goal: "Set up core infrastructure and basic features",
+			status: "completed",
+		},
+		{
+			name: "Sprint 2 - MVP",
+			goal: "Complete minimum viable product features",
+			status: "completed",
+		},
+		{
+			name: "Sprint 3 - Beta Launch",
+			goal: "Prepare for beta testing and feedback",
+			status: "active",
+		},
+		{
+			name: "Sprint 4 - Polish",
+			goal: "Bug fixes and UX improvements",
+			status: "planned",
+		},
+		{
+			name: "Sprint 5 - Scale",
+			goal: "Performance optimization and scaling",
+			status: "planned",
+		},
 	];
 
-	const taskCategories = ["feature", "bug", "chore", "docs", "refactor", "test", "design", "research"];
+	const taskCategories = [
+		"feature",
+		"bug",
+		"chore",
+		"docs",
+		"refactor",
+		"test",
+		"design",
+		"research",
+	];
 	const taskStatuses = ["backlog", "todo", "in_progress", "review", "done"];
 	const priorities = ["low", "medium", "high", "critical"];
 
 	const taskTemplates = [
-		{ title: "Implement user authentication", description: "Add login, registration, and password reset flows", category: "feature" },
-		{ title: "Set up CI/CD pipeline", description: "Configure GitHub Actions for automated testing and deployment", category: "chore" },
-		{ title: "Design system components", description: "Create reusable UI components with Storybook", category: "design" },
-		{ title: "API rate limiting", description: "Implement rate limiting to prevent abuse", category: "feature" },
-		{ title: "Fix memory leak in worker", description: "Investigate and fix memory leak in background worker process", category: "bug" },
-		{ title: "Database migrations", description: "Create migration scripts for schema changes", category: "chore" },
-		{ title: "Unit test coverage", description: "Increase unit test coverage to 80%", category: "test" },
-		{ title: "API documentation", description: "Write OpenAPI spec and generate documentation", category: "docs" },
-		{ title: "Refactor auth module", description: "Improve code structure and reduce duplication", category: "refactor" },
-		{ title: "Research caching strategies", description: "Evaluate Redis vs Memcached for our use case", category: "research" },
-		{ title: "Implement search functionality", description: "Add full-text search with Elasticsearch", category: "feature" },
-		{ title: "Fix pagination bug", description: "Pagination returns duplicate items on edge cases", category: "bug" },
-		{ title: "Add logging middleware", description: "Implement structured logging for all API requests", category: "chore" },
-		{ title: "Create onboarding flow", description: "Design and implement new user onboarding experience", category: "design" },
-		{ title: "Performance profiling", description: "Profile slow endpoints and identify bottlenecks", category: "research" },
-		{ title: "Implement webhooks", description: "Add webhook support for external integrations", category: "feature" },
-		{ title: "Fix timezone handling", description: "Dates display incorrectly for non-UTC users", category: "bug" },
-		{ title: "Security audit", description: "Review code for common security vulnerabilities", category: "chore" },
-		{ title: "E2E test suite", description: "Set up Playwright for end-to-end testing", category: "test" },
-		{ title: "Deployment documentation", description: "Document deployment process and runbooks", category: "docs" },
-		{ title: "Implement notifications", description: "Add in-app and email notifications", category: "feature" },
-		{ title: "Fix race condition", description: "Race condition in concurrent order processing", category: "bug" },
-		{ title: "Database optimization", description: "Add indexes and optimize slow queries", category: "refactor" },
-		{ title: "Mobile responsive design", description: "Ensure all pages work on mobile devices", category: "design" },
-		{ title: "Evaluate GraphQL", description: "Research benefits of migrating to GraphQL", category: "research" },
-		{ title: "File upload feature", description: "Implement file upload with S3 storage", category: "feature" },
-		{ title: "Fix CORS issues", description: "CORS errors when calling API from subdomain", category: "bug" },
-		{ title: "Set up monitoring", description: "Configure Datadog for application monitoring", category: "chore" },
-		{ title: "Integration tests", description: "Add integration tests for critical flows", category: "test" },
-		{ title: "Update README", description: "Update README with latest setup instructions", category: "docs" },
+		{
+			title: "Implement user authentication",
+			description: "Add login, registration, and password reset flows",
+			category: "feature",
+		},
+		{
+			title: "Set up CI/CD pipeline",
+			description:
+				"Configure GitHub Actions for automated testing and deployment",
+			category: "chore",
+		},
+		{
+			title: "Design system components",
+			description: "Create reusable UI components with Storybook",
+			category: "design",
+		},
+		{
+			title: "API rate limiting",
+			description: "Implement rate limiting to prevent abuse",
+			category: "feature",
+		},
+		{
+			title: "Fix memory leak in worker",
+			description:
+				"Investigate and fix memory leak in background worker process",
+			category: "bug",
+		},
+		{
+			title: "Database migrations",
+			description: "Create migration scripts for schema changes",
+			category: "chore",
+		},
+		{
+			title: "Unit test coverage",
+			description: "Increase unit test coverage to 80%",
+			category: "test",
+		},
+		{
+			title: "API documentation",
+			description: "Write OpenAPI spec and generate documentation",
+			category: "docs",
+		},
+		{
+			title: "Refactor auth module",
+			description: "Improve code structure and reduce duplication",
+			category: "refactor",
+		},
+		{
+			title: "Research caching strategies",
+			description: "Evaluate Redis vs Memcached for our use case",
+			category: "research",
+		},
+		{
+			title: "Implement search functionality",
+			description: "Add full-text search with Elasticsearch",
+			category: "feature",
+		},
+		{
+			title: "Fix pagination bug",
+			description: "Pagination returns duplicate items on edge cases",
+			category: "bug",
+		},
+		{
+			title: "Add logging middleware",
+			description: "Implement structured logging for all API requests",
+			category: "chore",
+		},
+		{
+			title: "Create onboarding flow",
+			description: "Design and implement new user onboarding experience",
+			category: "design",
+		},
+		{
+			title: "Performance profiling",
+			description: "Profile slow endpoints and identify bottlenecks",
+			category: "research",
+		},
+		{
+			title: "Implement webhooks",
+			description: "Add webhook support for external integrations",
+			category: "feature",
+		},
+		{
+			title: "Fix timezone handling",
+			description: "Dates display incorrectly for non-UTC users",
+			category: "bug",
+		},
+		{
+			title: "Security audit",
+			description: "Review code for common security vulnerabilities",
+			category: "chore",
+		},
+		{
+			title: "E2E test suite",
+			description: "Set up Playwright for end-to-end testing",
+			category: "test",
+		},
+		{
+			title: "Deployment documentation",
+			description: "Document deployment process and runbooks",
+			category: "docs",
+		},
+		{
+			title: "Implement notifications",
+			description: "Add in-app and email notifications",
+			category: "feature",
+		},
+		{
+			title: "Fix race condition",
+			description: "Race condition in concurrent order processing",
+			category: "bug",
+		},
+		{
+			title: "Database optimization",
+			description: "Add indexes and optimize slow queries",
+			category: "refactor",
+		},
+		{
+			title: "Mobile responsive design",
+			description: "Ensure all pages work on mobile devices",
+			category: "design",
+		},
+		{
+			title: "Evaluate GraphQL",
+			description: "Research benefits of migrating to GraphQL",
+			category: "research",
+		},
+		{
+			title: "File upload feature",
+			description: "Implement file upload with S3 storage",
+			category: "feature",
+		},
+		{
+			title: "Fix CORS issues",
+			description: "CORS errors when calling API from subdomain",
+			category: "bug",
+		},
+		{
+			title: "Set up monitoring",
+			description: "Configure Datadog for application monitoring",
+			category: "chore",
+		},
+		{
+			title: "Integration tests",
+			description: "Add integration tests for critical flows",
+			category: "test",
+		},
+		{
+			title: "Update README",
+			description: "Update README with latest setup instructions",
+			category: "docs",
+		},
 	];
 
 	const acceptanceCriteriaTemplates = [
 		["Feature works as expected", "Unit tests pass", "Documentation updated"],
-		["Bug is fixed and verified", "No regression in related features", "Test case added"],
-		["Code follows style guide", "PR approved by reviewer", "Changes deployed to staging"],
-		["Performance meets requirements", "Load testing completed", "Monitoring in place"],
-		["Design approved by team", "Accessibility requirements met", "Responsive on all devices"],
+		[
+			"Bug is fixed and verified",
+			"No regression in related features",
+			"Test case added",
+		],
+		[
+			"Code follows style guide",
+			"PR approved by reviewer",
+			"Changes deployed to staging",
+		],
+		[
+			"Performance meets requirements",
+			"Load testing completed",
+			"Monitoring in place",
+		],
+		[
+			"Design approved by team",
+			"Accessibility requirements met",
+			"Responsive on all devices",
+		],
 	];
 
 	let totalTasksCreated = 0;
@@ -446,12 +650,22 @@ async function main() {
 
 				// Create 5-10 tasks per sprint
 				const numTasks = 5 + Math.floor(Math.random() * 6);
-				const shuffledTasks = [...taskTemplates].sort(() => Math.random() - 0.5).slice(0, numTasks);
+				const shuffledTasks = [...taskTemplates]
+					.sort(() => Math.random() - 0.5)
+					.slice(0, numTasks);
 
 				for (let j = 0; j < shuffledTasks.length; j++) {
 					const taskTemplate = shuffledTasks[j];
-					const randomUser = createdTestUsers[Math.floor(Math.random() * createdTestUsers.length)];
-					const assignee = Math.random() > 0.3 ? createdTestUsers[Math.floor(Math.random() * createdTestUsers.length)] : null;
+					const randomUser =
+						createdTestUsers[
+							Math.floor(Math.random() * createdTestUsers.length)
+						];
+					const assignee =
+						Math.random() > 0.3
+							? createdTestUsers[
+									Math.floor(Math.random() * createdTestUsers.length)
+								]
+							: null;
 
 					// Determine status based on sprint status
 					let status: string;
@@ -460,14 +674,19 @@ async function main() {
 						status = "done";
 						passes = true;
 					} else if (sprintData.status === "active") {
-						status = taskStatuses[Math.floor(Math.random() * taskStatuses.length)];
+						status =
+							taskStatuses[Math.floor(Math.random() * taskStatuses.length)];
 						passes = status === "done";
 					} else {
 						status = Math.random() > 0.5 ? "backlog" : "todo";
 					}
 
-					const priority = priorities[Math.floor(Math.random() * priorities.length)];
-					const criteria = acceptanceCriteriaTemplates[Math.floor(Math.random() * acceptanceCriteriaTemplates.length)];
+					const priority =
+						priorities[Math.floor(Math.random() * priorities.length)];
+					const criteria =
+						acceptanceCriteriaTemplates[
+							Math.floor(Math.random() * acceptanceCriteriaTemplates.length)
+						];
 
 					await prisma.task.create({
 						data: {
@@ -489,7 +708,11 @@ async function main() {
 			}
 		}
 	}
-	console.log("Created sprints and", totalTasksCreated, "tasks across all projects");
+	console.log(
+		"Created sprints and",
+		totalTasksCreated,
+		"tasks across all projects",
+	);
 
 	// ============================================================================
 	// TEST AI RUNS
@@ -508,36 +731,62 @@ async function main() {
 			take: 5,
 		});
 
-		const runStatuses = ["completed", "completed", "completed", "failed", "running", "queued"];
-		const aiModels = ["gpt-4", "gpt-4-turbo", "claude-3-opus", "claude-3-sonnet"];
+		const runStatuses = [
+			"completed",
+			"completed",
+			"completed",
+			"failed",
+			"running",
+			"queued",
+		];
+		const aiModels = [
+			"gpt-4",
+			"gpt-4-turbo",
+			"claude-3-opus",
+			"claude-3-sonnet",
+		];
 
 		for (let i = 0; i < Math.min(phoenixTasks.length, 5); i++) {
 			const task = phoenixTasks[i];
+			assert(task.sprintId !== null);
 			const status = runStatuses[i % runStatuses.length];
 			const model = aiModels[Math.floor(Math.random() * aiModels.length)];
+			const iterationCount = Math.floor(Math.random() * 10) + 1;
 
-			const existingRun = await prisma.aiRun.findFirst({
-				where: { taskId: task.id },
+			const existingRun = await prisma.run.findFirst({
+				where: { sprintId: task.sprintId || undefined },
 			});
 
 			if (!existingRun) {
-				const run = await prisma.aiRun.create({
+				const run = await prisma.run.create({
 					data: {
-						taskId: task.id,
+						runId: `run-${crypto.randomUUID()}`,
+						projectId: phoenixProject.id,
+						sprintId: task.sprintId,
 						status: status,
+						maxIterations: iterationCount,
+						currentIteration:
+							status === "completed" || status === "failed"
+								? iterationCount
+								: Math.floor(iterationCount / 2),
+						sandboxPath: process.cwd(),
+						selectedTaskIdsJson: JSON.stringify([task.id]),
 						aiModel: model,
 						promptTokens: Math.floor(Math.random() * 5000) + 1000,
 						completionTokens: Math.floor(Math.random() * 10000) + 2000,
 						totalTokens: 0,
-						iterations: Math.floor(Math.random() * 10) + 1,
-						startedAt: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000),
-						completedAt: status === "completed" || status === "failed" ? new Date() : null,
-						errorMessage: status === "failed" ? "API rate limit exceeded" : null,
+						startedAt: new Date(
+							Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000,
+						),
+						finishedAt:
+							status === "completed" || status === "failed" ? new Date() : null,
+						errorMessage:
+							status === "failed" ? "API rate limit exceeded" : null,
 					},
 				});
 
 				// Update total tokens
-				await prisma.aiRun.update({
+				await prisma.run.update({
 					where: { id: run.id },
 					data: { totalTokens: run.promptTokens + run.completionTokens },
 				});
@@ -551,12 +800,18 @@ async function main() {
 						{ level: "info", message: "Writing code..." },
 						{ level: "info", message: "Running tests..." },
 						status === "completed"
-							? { level: "info", message: "All tests passed! Run completed successfully." }
-							: { level: "error", message: "API rate limit exceeded. Please try again later." },
+							? {
+									level: "info",
+									message: "All tests passed! Run completed successfully.",
+								}
+							: {
+									level: "error",
+									message: "API rate limit exceeded. Please try again later.",
+								},
 					];
 
 					for (const log of logMessages) {
-						await prisma.aiRunLog.create({
+						await prisma.runLog.create({
 							data: {
 								runId: run.id,
 								level: log.level,

@@ -39,7 +39,8 @@ export async function GET(
 			logs: logs.map((l) => ({
 				id: l.id,
 				runId: l.runId,
-				entry: l.entry,
+				level: l.level,
+				message: l.message,
 				createdAt: l.createdAt.toISOString(),
 			})),
 		});
@@ -58,9 +59,9 @@ export async function POST(
 		const { project } = await getProjectContext(request);
 		const body = await request.json();
 
-		if (typeof body.entry !== "string") {
+		if (typeof body.message !== "string") {
 			return NextResponse.json(
-				{ error: "Missing or invalid entry field" },
+				{ error: "Missing or invalid message field" },
 				{ status: 400 },
 			);
 		}
@@ -78,7 +79,8 @@ export async function POST(
 		await prisma.runLog.create({
 			data: {
 				runId: run.id,
-				entry: body.entry,
+				level: body.level || "info",
+				message: body.message,
 			},
 		});
 

@@ -1,13 +1,15 @@
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import { PrismaClient } from "../generated/prisma";
 import bcrypt from "bcryptjs";
+import { PrismaClient } from "../generated/prisma";
 
 const email = process.argv[2];
 const password = process.argv[3];
 
 if (!email || !password) {
 	console.error("Usage: npx tsx scripts/set-password.ts <email> <password>");
-	console.error("Example: npx tsx scripts/set-password.ts user@example.com MyPassword123");
+	console.error(
+		"Example: npx tsx scripts/set-password.ts user@example.com MyPassword123",
+	);
 	process.exit(1);
 }
 

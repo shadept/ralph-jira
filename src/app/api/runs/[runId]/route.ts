@@ -61,9 +61,13 @@ export async function GET(
 		};
 
 		// Format logs
-		const log = run.logs.map((l) => l.entry);
+		const logs = run.logs.map((l) => ({
+			level: l.level,
+			message: l.message,
+			createdAt: l.createdAt.toISOString(),
+		}));
 
-		return NextResponse.json({ run: formattedRun, log });
+		return NextResponse.json({ run: formattedRun, logs });
 	} catch (error) {
 		console.error("Failed to fetch run details", error);
 		return handleProjectRouteError(error);

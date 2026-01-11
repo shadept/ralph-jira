@@ -16,7 +16,6 @@ import {
 } from "@phosphor-icons/react";
 import { useForm } from "@tanstack/react-form";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -102,6 +101,7 @@ export type OrgData = {
 		maxUsers: number | null;
 		maxProjects: number | null;
 	};
+	currentUserId: string;
 	currentUserRole: "owner" | "admin" | "member";
 };
 
@@ -432,11 +432,10 @@ type OrganizationClientProps = {
 };
 
 export function OrganizationClient({ initialData }: OrganizationClientProps) {
-	const { data: session } = useSession();
 	const router = useRouter();
 	const { selectProject } = useProjectContext();
-	const currentUserId = session?.user?.id;
 	const [data, setData] = useState<OrgData>(initialData);
+	const currentUserId = data.currentUserId;
 	const [saving, setSaving] = useState(false);
 	const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
 	const [inviting, setInviting] = useState(false);

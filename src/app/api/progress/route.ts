@@ -26,9 +26,9 @@ export async function GET(request: Request) {
 			.reverse()
 			.map(
 				(log) =>
-					`[${log.createdAt.toISOString()}] [${log.run.runId}]\n${log.entry}`,
+					`[${log.createdAt.toISOString()}] [${log.run.runId}] [${log.level}] ${log.message}`,
 			)
-			.join("\n\n");
+			.join("\n");
 
 		return NextResponse.json({
 			progress: progress || "# Project Progress Log\n",
@@ -42,10 +42,13 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
 	try {
 		const { project } = await getProjectContext(request);
-		const { entry, runId } = await request.json();
+		const { message, level = "info", runId } = await request.json();
 
-		if (!entry) {
-			return NextResponse.json({ error: "Entry is required" }, { status: 400 });
+		if (!message) {
+			return NextResponse.json(
+				{ error: "Message is required" },
+				{ status: 400 },
+			);
 		}
 
 		// If runId is provided, attach to that run
@@ -58,7 +61,8 @@ export async function POST(request: Request) {
 				await prisma.runLog.create({
 					data: {
 						runId: run.id,
-						entry,
+						level,
+						message,
 					},
 				});
 			}

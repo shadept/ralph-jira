@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
@@ -99,14 +100,18 @@ async function getOrganizationData(userId: string): Promise<OrgData | null> {
 			maxUsers: subscription?.plan.maxUsers ?? null,
 			maxProjects: subscription?.plan.maxProjects ?? null,
 		},
+		currentUserId: userId,
 		currentUserRole: membership.role as "owner" | "admin" | "member",
 	};
 }
 
 export default async function OrganizationPage() {
 	const session = await auth();
-	const orgData = await getOrganizationData(session?.user?.id);
+	if (!session?.user?.id) {
+		redirect("/login");
+	}
 
+	const orgData = await getOrganizationData(session.user.id);
 	if (!orgData) {
 		return <NoOrganization />;
 	}
