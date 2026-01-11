@@ -71,7 +71,18 @@ export async function proxy(request: NextRequest) {
 		return NextResponse.next();
 	}
 
-	// Apply rate limiting for API routes
+	// Allow runner tokens (rk_) to pass through without rate limiting
+	// User API keys (ck_) are still rate limited like session auth
+	// Actual validation happens in route handlers via getProjectContext
+	const authHeader = request.headers.get("Authorization");
+	if (
+		pathname.startsWith("/api/") &&
+		authHeader?.startsWith("Bearer rk_")
+	) {
+		return NextResponse.next();
+	}
+
+	// Apply rate limiting for API routes (session auth and user API keys)
 	const rateLimitConfig = getRateLimitConfig(pathname);
 	if (rateLimitConfig) {
 		const clientId = getClientIdentifier(request);
@@ -90,7 +101,7 @@ export async function proxy(request: NextRequest) {
 		return response;
 	}
 
-	// Check authentication
+	// Check session authentication
 	const session = await auth();
 
 	if (!session?.user) {

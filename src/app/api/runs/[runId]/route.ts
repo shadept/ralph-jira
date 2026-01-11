@@ -24,6 +24,9 @@ export async function GET(
 					orderBy: { createdAt: "desc" },
 					take: 100,
 				},
+				commands: {
+					orderBy: { startedAt: "asc" },
+				},
 			},
 		});
 
@@ -67,7 +70,21 @@ export async function GET(
 			createdAt: l.createdAt.toISOString(),
 		}));
 
-		return NextResponse.json({ run: formattedRun, logs });
+		// Format commands
+		const commands = run.commands.map((c) => ({
+			id: c.id,
+			command: c.command,
+			args: JSON.parse(c.argsJson),
+			cwd: c.cwd,
+			exitCode: c.exitCode,
+			startedAt: c.startedAt.toISOString(),
+			finishedAt: c.finishedAt?.toISOString() || null,
+		}));
+
+		return NextResponse.json({
+			run: { ...formattedRun, commands },
+			logs,
+		});
 	} catch (error) {
 		console.error("Failed to fetch run details", error);
 		return handleProjectRouteError(error);

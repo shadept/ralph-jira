@@ -6,12 +6,12 @@ import {
 } from "@/lib/projects/db-server";
 
 export async function GET(
-	_request: Request,
+	request: Request,
 	{ params }: { params: Promise<{ id: string }> },
 ) {
 	try {
 		const { id } = await params;
-		const { project } = await getProjectContextFromParams(id);
+		const { project } = await getProjectContextFromParams(id, request);
 
 		const runs = await prisma.run.findMany({
 			where: { projectId: project.id },

@@ -184,20 +184,37 @@ export class WorkspaceManager {
    * @returns {Promise<void>}
    */
   async checkoutWorkspace() {
+    console.log('[workspace-manager:checkoutWorkspace] Starting...');
+    console.log('[workspace-manager:checkoutWorkspace] sandboxDir:', this.sandboxDir);
+    console.log('[workspace-manager:checkoutWorkspace] projectPath:', this.projectPath);
+
+    console.log('[workspace-manager:checkoutWorkspace] Ensuring sandbox parent exists...');
     await this.ensureSandboxParent();
+
+    console.log('[workspace-manager:checkoutWorkspace] Removing any existing worktree...');
     await this.removeWorktree({ silent: true });
+
     const branchName = this.getEffectiveBranchName();
+    console.log('[workspace-manager:checkoutWorkspace] Branch name:', branchName);
     this.worktreeBranch = branchName;
+
     const branchAlreadyExists = await this.branchExists(branchName);
+    console.log('[workspace-manager:checkoutWorkspace] Branch already exists:', branchAlreadyExists);
+
     const args = branchAlreadyExists
       ? ['worktree', 'add', '--force', this.sandboxDir, branchName]
       : ['worktree', 'add', '--force', '-b', branchName, this.sandboxDir];
+    console.log('[workspace-manager:checkoutWorkspace] Running git worktree add with args:', args.join(' '));
+
     const result = await this.runCommand('git', args, this.projectPath);
+    console.log('[workspace-manager:checkoutWorkspace] git worktree add result code:', result.code);
     if (result.code !== 0) {
       const snippet = limitOutput(result.stderr || result.stdout || '');
+      console.error('[workspace-manager:checkoutWorkspace] git worktree add failed:', snippet);
       throw new Error(`git worktree add failed (code ${result.code}). ${snippet}`.trim());
     }
     this.worktreeAdded = true;
+    console.log('[workspace-manager:checkoutWorkspace] Worktree added successfully');
     return branchName;
   }
 
@@ -541,30 +558,48 @@ export class WorkspaceManager {
    * @returns {Promise<void>}
    */
   async prepareSandboxPlan(boardId) {
+    console.log('[workspace-manager:prepareSandboxPlan] Starting for boardId:', boardId);
+
     // Always write filtered board to sandbox (worktree has main branch version)
+    console.log('[workspace-manager:prepareSandboxPlan] Reading board from backend...');
     const board = await this.backend.readBoard(boardId);
+    console.log('[workspace-manager:prepareSandboxPlan] Board loaded, tasks count:', board?.tasks?.length || 0);
+
     const filteredTasks = board.tasks.filter(task => PENDING_STATUSES.has(task.status));
+    console.log('[workspace-manager:prepareSandboxPlan] Filtered to pending tasks:', filteredTasks.length);
+
     const sandboxBoard = { ...board, tasks: filteredTasks };
+    console.log('[workspace-manager:prepareSandboxPlan] Creating plans directory...');
     await fs.mkdir(path.dirname(this.sandboxBoardPath), { recursive: true });
+
+    console.log('[workspace-manager:prepareSandboxPlan] Writing sandbox board to:', this.sandboxBoardPath);
     await writeJson(this.sandboxBoardPath, sandboxBoard);
 
     // Always write settings to sandbox
+    console.log('[workspace-manager:prepareSandboxPlan] Creating settings directory...');
     await fs.mkdir(path.dirname(this.sandboxSettingsPath), { recursive: true });
+
+    console.log('[workspace-manager:prepareSandboxPlan] Writing settings to:', this.sandboxSettingsPath);
     await writeJson(this.sandboxSettingsPath, this.settings);
 
     if (!(await fileExists(this.sandboxLogPath))) {
+      console.log('[workspace-manager:prepareSandboxPlan] Creating new log file:', this.sandboxLogPath);
       await fs.writeFile(this.sandboxLogPath, `# Run ${this.runId} progress\n`, 'utf-8');
     } else {
+      console.log('[workspace-manager:prepareSandboxPlan] Appending to existing log file');
       await fs.appendFile(this.sandboxLogPath, `\n# Run ${this.runId} resumed\n`, 'utf-8');
     }
 
     // Sandbox log is now ready
+    console.log('[workspace-manager:prepareSandboxPlan] Marking sandbox as ready...');
     await this.markSandboxReady();
 
     // Decouple PRD, settings, and logs from git tracking in the sandbox to avoid conflicts
+    console.log('[workspace-manager:prepareSandboxPlan] Decoupling files from git tracking...');
     await this.runCommand('git', ['update-index', '--skip-worktree', 'plans/prd.json'], this.sandboxDir);
     await this.runCommand('git', ['update-index', '--skip-worktree', 'plans/settings.json'], this.sandboxDir);
     await this.runCommand('git', ['update-index', '--skip-worktree', 'progress.txt'], this.sandboxDir);
+    console.log('[workspace-manager:prepareSandboxPlan] Complete');
   }
 
   /**

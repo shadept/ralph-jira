@@ -82,10 +82,6 @@ function rewriteApiUrl(url: string, projectId: string): string {
 		return `/api/projects/${projectId}/tasks/${taskId}${rest}${query}`;
 	}
 
-	if (path === "/api/runs/start") {
-		return `/api/projects/${projectId}/runs/start${query}`;
-	}
-
 	if (path === "/api/runs") {
 		return `/api/projects/${projectId}/runs${query}`;
 	}

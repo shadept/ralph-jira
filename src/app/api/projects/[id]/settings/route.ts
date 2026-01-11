@@ -53,12 +53,12 @@ function formatSettings(settings: {
 }
 
 export async function GET(
-	_request: Request,
+	request: Request,
 	{ params }: { params: Promise<{ id: string }> },
 ) {
 	try {
 		const { id } = await params;
-		const { project } = await getProjectContextFromParams(id);
+		const { project } = await getProjectContextFromParams(id, request);
 
 		const settings = await prisma.projectSettings.findUnique({
 			where: { projectId: project.id },
@@ -87,7 +87,7 @@ export async function PUT(
 ) {
 	try {
 		const { id } = await params;
-		const { project } = await getProjectContextFromParams(id);
+		const { project } = await getProjectContextFromParams(id, request);
 		const updates = await request.json();
 
 		const existing = await prisma.projectSettings.findUnique({

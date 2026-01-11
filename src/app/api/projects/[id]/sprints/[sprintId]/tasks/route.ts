@@ -6,12 +6,12 @@ import {
 } from "@/lib/projects/db-server";
 
 export async function GET(
-	_request: Request,
+	request: Request,
 	{ params }: { params: Promise<{ id: string; sprintId: string }> },
 ) {
 	try {
 		const { id, sprintId } = await params;
-		const { project } = await getProjectContextFromParams(id);
+		const { project } = await getProjectContextFromParams(id, request);
 
 		const sprint = await prisma.sprint.findFirst({
 			where: { id: sprintId, projectId: project.id },

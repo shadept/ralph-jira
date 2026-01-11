@@ -62,10 +62,25 @@ export class BackendClient {
   /**
    * @param {string} baseUrl
    * @param {string} projectId
+   * @param {string} [authToken] - Optional auth token for API authentication
    */
-  constructor(baseUrl, projectId) {
+  constructor(baseUrl, projectId, authToken = null) {
     this.baseUrl = baseUrl;
     this.projectId = projectId;
+    this.authToken = authToken || process.env.RUN_LOOP_AUTH_TOKEN || null;
+  }
+
+  /**
+   * Get headers for fetch requests, including auth if available.
+   * @param {object} [additionalHeaders]
+   * @returns {object}
+   */
+  #getHeaders(additionalHeaders = {}) {
+    const headers = { ...additionalHeaders };
+    if (this.authToken) {
+      headers['Authorization'] = `Bearer ${this.authToken}`;
+    }
+    return headers;
   }
 
   /**
@@ -73,14 +88,18 @@ export class BackendClient {
    * @returns {Promise<RunRecord>}
    */
   async readRun(runId) {
-    const response = await fetch(
-      `${this.baseUrl}/api/runs/${runId}?projectId=${this.projectId}`
-    );
+    const url = `${this.baseUrl}/api/runs/${runId}?projectId=${this.projectId}`;
+    console.log('[backend-client] readRun fetching:', url);
+    const response = await fetch(url, { headers: this.#getHeaders() });
+    console.log('[backend-client] readRun response status:', response.status);
     if (!response.ok) {
-      throw new Error(`Failed to read run ${runId}: ${response.status}`);
+      const text = await response.text().catch(() => '(no body)');
+      console.error('[backend-client] readRun failed:', response.status, text);
+      throw new Error(`Failed to read run ${runId}: ${response.status} - ${text}`);
     }
-    const { run } = await response.json();
-    return run;
+    const data = await response.json();
+    console.log('[backend-client] readRun success, run status:', data.run?.status);
+    return data.run;
   }
 
   /**
@@ -92,7 +111,7 @@ export class BackendClient {
       `${this.baseUrl}/api/runs/${run.runId}?projectId=${this.projectId}`,
       {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.#getHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(run),
       }
     );
@@ -105,13 +124,18 @@ export class BackendClient {
    * @returns {Promise<ProjectSettings>}
    */
   async readSettings() {
-    const response = await fetch(
-      `${this.baseUrl}/api/projects/${this.projectId}/settings`
-    );
+    const url = `${this.baseUrl}/api/projects/${this.projectId}/settings`;
+    console.log('[backend-client] readSettings fetching:', url);
+    const response = await fetch(url, { headers: this.#getHeaders() });
+    console.log('[backend-client] readSettings response status:', response.status);
     if (!response.ok) {
-      throw new Error(`Failed to read settings: ${response.status}`);
+      const text = await response.text().catch(() => '(no body)');
+      console.error('[backend-client] readSettings failed:', response.status, text);
+      throw new Error(`Failed to read settings: ${response.status} - ${text}`);
     }
-    return response.json();
+    const data = await response.json();
+    console.log('[backend-client] readSettings success');
+    return data;
   }
 
   /**
@@ -119,13 +143,18 @@ export class BackendClient {
    * @returns {Promise<Sprint>}
    */
   async readSprint(sprintId) {
-    const response = await fetch(
-      `${this.baseUrl}/api/sprints/${sprintId}?projectId=${this.projectId}`
-    );
+    const url = `${this.baseUrl}/api/projects/${this.projectId}/sprints/${sprintId}`;
+    console.log('[backend-client] readSprint fetching:', url);
+    const response = await fetch(url, { headers: this.#getHeaders() });
+    console.log('[backend-client] readSprint response status:', response.status);
     if (!response.ok) {
-      throw new Error(`Failed to read sprint ${sprintId}: ${response.status}`);
+      const text = await response.text().catch(() => '(no body)');
+      console.error('[backend-client] readSprint failed:', response.status, text);
+      throw new Error(`Failed to read sprint ${sprintId}: ${response.status} - ${text}`);
     }
-    return response.json();
+    const data = await response.json();
+    console.log('[backend-client] readSprint success, tasks count:', data?.sprint?.tasks?.length || 0);
+    return data.sprint;
   }
 
   /**
@@ -134,10 +163,10 @@ export class BackendClient {
    */
   async writeSprint(sprint) {
     const response = await fetch(
-      `${this.baseUrl}/api/sprints/${sprint.id}?projectId=${this.projectId}`,
+      `${this.baseUrl}/api/projects/${this.projectId}/sprints/${sprint.id}`,
       {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.#getHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(sprint),
       }
     );
@@ -152,7 +181,8 @@ export class BackendClient {
    */
   async checkCancellation(runId) {
     const response = await fetch(
-      `${this.baseUrl}/api/runs/${runId}/cancellation?projectId=${this.projectId}`
+      `${this.baseUrl}/api/runs/${runId}/cancellation?projectId=${this.projectId}`,
+      { headers: this.#getHeaders() }
     );
     if (!response.ok) {
       throw new Error(`Failed to check cancellation for ${runId}: ${response.status}`);
@@ -167,18 +197,62 @@ export class BackendClient {
    * @param {string} entry
    * @returns {Promise<void>}
    */
-  async appendLog(runId, entry) {
+  async appendLog(runId, message) {
     const response = await fetch(
       `${this.baseUrl}/api/runs/${runId}/logs?projectId=${this.projectId}`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entry }),
+        headers: this.#getHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ message }),
       }
     );
     if (!response.ok) {
       throw new Error(`Failed to append log for ${runId}: ${response.status}`);
     }
+  }
+
+  /**
+   * Creates a command record for a run.
+   * @param {string} runId
+   * @param {object} commandData
+   * @returns {Promise<object>}
+   */
+  async createCommand(runId, commandData) {
+    const response = await fetch(
+      `${this.baseUrl}/api/runs/${runId}/commands?projectId=${this.projectId}`,
+      {
+        method: 'POST',
+        headers: this.#getHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(commandData),
+      }
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to create command for ${runId}: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.command;
+  }
+
+  /**
+   * Updates a command record for a run.
+   * @param {string} runId
+   * @param {object} commandData
+   * @returns {Promise<object>}
+   */
+  async updateCommand(runId, commandData) {
+    const response = await fetch(
+      `${this.baseUrl}/api/runs/${runId}/commands?projectId=${this.projectId}`,
+      {
+        method: 'PUT',
+        headers: this.#getHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(commandData),
+      }
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to update command for ${runId}: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.command;
   }
 
   // Legacy compatibility methods - map board to sprint
@@ -208,17 +282,24 @@ let _backendClient = null;
 /**
  * Initializes the global backend client singleton.
  * Only HTTP mode is supported - local mode is deprecated.
- * @param {{baseUrl: string, projectId: string}} options
+ * @param {{baseUrl: string, projectId: string, authToken?: string}} options
  * @returns {BackendClient}
  */
 export function initBackendClient(options) {
+  const authToken = options.authToken || process.env.RUN_LOOP_AUTH_TOKEN || null;
+  console.log('[backend-client] initBackendClient called with:', {
+    baseUrl: options.baseUrl,
+    projectId: options.projectId,
+    hasAuthToken: !!authToken,
+  });
   if (!options.baseUrl) {
-    throw new Error('BackendClient requires baseUrl');
+    throw new Error('BackendClient requires baseUrl (set RUN_LOOP_API_URL environment variable)');
   }
   if (!options.projectId) {
-    throw new Error('BackendClient requires projectId');
+    throw new Error('BackendClient requires projectId (set RUN_LOOP_PROJECT_ID environment variable)');
   }
-  _backendClient = new BackendClient(options.baseUrl, options.projectId);
+  _backendClient = new BackendClient(options.baseUrl, options.projectId, authToken);
+  console.log('[backend-client] BackendClient initialized successfully');
   return _backendClient;
 }
 

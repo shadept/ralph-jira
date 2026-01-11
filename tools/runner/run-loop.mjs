@@ -7,6 +7,26 @@ import { createAgent } from './agents.mjs';
 import { initBackendClient, getBackendClient } from './backend-client.mjs';
 import { WorkspaceManager } from './workspace-manager.mjs';
 
+// Global error handlers to prevent silent exits
+process.on('uncaughtException', (error) => {
+  console.error('[run-loop] UNCAUGHT EXCEPTION:', error.message);
+  console.error('[run-loop] Stack:', error.stack);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[run-loop] UNHANDLED REJECTION at:', promise);
+  console.error('[run-loop] Reason:', reason);
+  if (reason instanceof Error) {
+    console.error('[run-loop] Stack:', reason.stack);
+  }
+  process.exit(1);
+});
+
+process.on('exit', (code) => {
+  console.log('[run-loop] Process exiting with code:', code);
+});
+
 const MAX_LOG_SNIPPET = 1200;
 const DEFAULT_SETUP = Object.freeze([]);
 const DEFAULT_AGENT_NAME = 'claude';
@@ -139,8 +159,18 @@ class RunLoop {
    * @returns {Promise<void>}
    */
   async init() {
+    console.log('[run-loop:init] Starting init for runId:', this.runId);
+
+    console.log('[run-loop:init] Reading run from backend...');
     this.run = await this.backend.readRun(this.runId);
-    this.sandboxDir = path.join(this.projectPath, this.run.sandboxPath);
+    console.log('[run-loop:init] Run record:', JSON.stringify(this.run, null, 2));
+
+    // sandboxPath can be relative (new style: .worktrees/run-xxx) or absolute (legacy)
+    // If absolute (legacy), compute worktree path from runId
+    // If relative, join with projectPath
+    this.sandboxDir = path.isAbsolute(this.run.sandboxPath)
+      ? path.join(this.projectPath, '.worktrees', this.runId)
+      : path.join(this.projectPath, this.run.sandboxPath);
     this.sandboxBoardPath = path.join(this.sandboxDir, 'plans', 'prd.json');
     this.sandboxSettingsPath = path.join(this.sandboxDir, 'plans', 'settings.json');
     this.sandboxLogPath = path.join(this.sandboxDir, 'progress.txt');
@@ -150,17 +180,32 @@ class RunLoop {
       'runs',
       `${this.runId}.progress.txt`,
     );
+    console.log('[run-loop:init] Paths configured:', {
+      sandboxDir: this.sandboxDir,
+      sandboxBoardPath: this.sandboxBoardPath,
+      sandboxLogPath: this.sandboxLogPath,
+    });
+
     const configuredBranch =
       typeof this.run.sandboxBranch === 'string' && this.run.sandboxBranch.trim().length
         ? this.run.sandboxBranch.trim()
         : `run-${this.runId}`;
+    console.log('[run-loop:init] Branch:', configuredBranch);
+
     if (this.run.sandboxBranch !== configuredBranch) {
+      console.log('[run-loop:init] Updating run with branch name...');
       await this.updateRun({ sandboxBranch: configuredBranch });
     }
+
+    console.log('[run-loop:init] Reading settings from backend...');
     this.settings = await this.backend.readSettings();
+    console.log('[run-loop:init] Settings loaded');
+
     this.applyAutomationSettings();
+    console.log('[run-loop:init] Automation settings applied, agent:', this.agentName);
 
     // Create WorkspaceManager instance
+    console.log('[run-loop:init] Creating WorkspaceManager...');
     this.workspace = new WorkspaceManager({
       runId: this.runId,
       projectPath: this.projectPath,
@@ -176,6 +221,7 @@ class RunLoop {
       agentName: this.agentName,
     });
     this.workspace.setBranchName(configuredBranch);
+    console.log('[run-loop:init] Init complete');
   }
 
   /**
@@ -369,27 +415,27 @@ class RunLoop {
 
     console.log("runCommand", command, args)
     const startedAt = new Date().toISOString();
-    const commandRecord = {
-      command,
-      args,
-      cwd,
-      startedAt,
-    };
-
-    if (!Array.isArray(this.run.commands)) {
-      this.run.commands = [];
-    }
-    this.run.commands.push(commandRecord);
-
     const cmdString = [command, ...args].map(escapeForDisplay).join(' ');
 
     // Log timestamp and command to sandbox log
     await this.appendSandboxLog(`\n[${startedAt}] ${cmdString}\n`);
 
+    // Create command record in database
+    let commandRecord = null;
+    try {
+      commandRecord = await this.backend.createCommand(this.runId, {
+        command,
+        args,
+        cwd,
+        startedAt,
+      });
+    } catch (err) {
+      console.warn('Unable to create command record', err.message);
+    }
+
     await this.updateRun({
       lastCommand: cmdString,
       lastCommandExitCode: undefined,
-      commands: this.run.commands
     });
 
     return new Promise((resolve, reject) => {
@@ -413,6 +459,18 @@ class RunLoop {
       const stdoutChunks = [];
       const stderrChunks = [];
 
+      const updateCommandFinished = (exitCode) => {
+        const finishedAt = new Date().toISOString();
+        if (commandRecord?.id) {
+          this.backend.updateCommand(this.runId, {
+            id: commandRecord.id,
+            exitCode,
+            finishedAt,
+          }).catch(err => console.warn('Unable to update command record', err.message));
+        }
+        this.updateRun({ lastCommandExitCode: exitCode }).catch(() => { });
+      };
+
       if (timeoutMs > 0) {
         timer = setTimeout(() => {
           child.kill('SIGKILL');
@@ -421,13 +479,7 @@ class RunLoop {
           err.stdout = Buffer.concat(stdoutChunks).toString('utf-8');
           err.stderr = Buffer.concat(stderrChunks).toString('utf-8');
 
-          commandRecord.exitCode = -2; // Custom code for timeout
-          commandRecord.finishedAt = new Date().toISOString();
-          this.updateRun({
-            lastCommandExitCode: -2,
-            commands: this.run.commands
-          }).catch(() => { });
-
+          updateCommandFinished(-2);
           reject(err);
         }, timeoutMs);
       }
@@ -454,30 +506,16 @@ class RunLoop {
         if (timer) clearTimeout(timer);
         const stdout = Buffer.concat(stdoutChunks).toString('utf-8');
         const stderr = Buffer.concat(stderrChunks).toString('utf-8');
-        const finishedAt = new Date().toISOString();
-        commandRecord.exitCode = -1;
-        commandRecord.finishedAt = finishedAt;
 
-        this.updateRun({
-          lastCommandExitCode: -1,
-          commands: this.run.commands
-        }).catch(() => { });
-
+        updateCommandFinished(-1);
         reject(Object.assign(err, { stdout, stderr, code: -1 }));
       });
       child.on('close', code => {
         if (timer) clearTimeout(timer);
         const stdout = Buffer.concat(stdoutChunks).toString('utf-8');
         const stderr = Buffer.concat(stderrChunks).toString('utf-8');
-        const finishedAt = new Date().toISOString();
-        commandRecord.exitCode = code ?? null;
-        commandRecord.finishedAt = finishedAt;
 
-        this.updateRun({
-          lastCommandExitCode: code ?? null,
-          commands: this.run.commands
-        }).catch(() => { });
-
+        updateCommandFinished(code ?? null);
         resolve({ code, stdout, stderr });
       });
     });
@@ -613,6 +651,7 @@ class RunLoop {
    * @returns {Promise<void>}
    */
   async runLoop() {
+    console.log('[run-loop:runLoop] Starting runLoop');
     this.status = 'running';
     this.reason = 'completed';
     await this.updateRun({
@@ -620,30 +659,45 @@ class RunLoop {
       startedAt: new Date().toISOString(),
       lastMessage: 'Preparing sandbox…',
     });
+    console.log('[run-loop:runLoop] Status set to running');
 
     // Checkout workspace and prepare sandbox plan via WorkspaceManager
+    console.log('[run-loop:runLoop] Calling workspace.checkoutWorkspace()...');
     const branchName = await this.workspace.checkoutWorkspace();
+    console.log('[run-loop:runLoop] Workspace checked out, branch:', branchName);
+
     if (branchName && this.run.sandboxBranch !== branchName) {
       await this.updateRun({ sandboxBranch: branchName });
     }
     const sprintId = this.run.sprintId || this.run.boardId || 'prd';
+    console.log('[run-loop:runLoop] Calling workspace.prepareSandboxPlan() for sprint:', sprintId);
     await this.workspace.prepareSandboxPlan(sprintId);
+    console.log('[run-loop:runLoop] Sandbox plan prepared');
 
     // Reload settings from sandbox after prepareSandboxPlan
+    console.log('[run-loop:runLoop] Loading settings from:', this.sandboxSettingsPath);
     await this.loadSettingsFrom(this.sandboxSettingsPath);
+    console.log('[run-loop:runLoop] Settings reloaded');
 
+    console.log('[run-loop:runLoop] Reading sandbox board...');
     const sandboxBoard = await this.workspace.readSandboxBoard();
+    console.log('[run-loop:runLoop] Sandbox board tasks count:', sandboxBoard?.tasks?.length || 0);
+
     if (!sandboxBoard?.tasks?.length) {
       this.status = 'completed';
       this.reason = 'completed';
       await this.updateRun({ status: 'completed', lastMessage: 'No todo/in-progress tasks found', currentIteration: 0 });
       await this.appendSandboxLog('No pending tasks found in sandbox PRD. Exiting.');
+      console.log('[run-loop:runLoop] No tasks found, exiting early');
       return;
     }
 
     try {
+      console.log('[run-loop:runLoop] Running setup commands:', this.setupCommands.length);
       await this.workspace.runSetup(this.setupCommands, this.verifyCancellation.bind(this));
+      console.log('[run-loop:runLoop] Setup completed');
     } catch (error) {
+      console.error('[run-loop:runLoop] Setup failed:', error.message);
       if (error instanceof CancellationSignal || error.message?.includes('Cancellation')) {
         this.status = 'canceled';
         this.reason = 'canceled';
@@ -653,8 +707,12 @@ class RunLoop {
       throw error;
     }
 
+    console.log('[run-loop:runLoop] Starting iterations, max:', this.run.maxIterations);
     for (let iteration = 1; iteration <= this.run.maxIterations; iteration += 1) {
+      console.log(`[run-loop:runLoop] Iteration ${iteration}/${this.run.maxIterations}`);
+
       if (await this.verifyCancellation()) {
+        console.log('[run-loop:runLoop] Cancellation detected');
         break;
       }
 
@@ -666,8 +724,11 @@ class RunLoop {
 
       let result;
       try {
+        console.log(`[run-loop:runLoop] Running agent iteration ${iteration}...`);
         result = await this.runAgentIteration(iteration);
+        console.log(`[run-loop:runLoop] Agent iteration ${iteration} completed, exitCode:`, result.exitCode);
       } catch (error) {
+        console.error(`[run-loop:runLoop] Agent iteration ${iteration} threw:`, error.message);
         if (error instanceof CancellationSignal) {
           this.status = 'canceled';
           this.reason = 'canceled';
@@ -680,6 +741,7 @@ class RunLoop {
       const { output, exitCode } = result;
 
       if (exitCode !== 0) {
+        console.log(`[run-loop:runLoop] Agent exited with non-zero code: ${exitCode}`);
         if (exitCode === 2) {
           this.status = 'stopped';
           this.reason = 'usage_limit';
@@ -693,6 +755,7 @@ class RunLoop {
       }
 
       if (output?.includes('<promise>COMPLETE</promise>')) {
+        console.log('[run-loop:runLoop] Received COMPLETE signal from agent');
         this.status = 'completed';
         this.reason = 'completed';
         await this.appendSandboxLog('Received <promise>COMPLETE</promise> from agent.');
@@ -701,10 +764,12 @@ class RunLoop {
     }
 
     if (this.status === 'running') {
+      console.log('[run-loop:runLoop] Max iterations reached');
       this.status = 'stopped';
       this.reason = 'max_iterations';
       await this.appendSandboxLog('Reached max iterations without completion.');
     }
+    console.log('[run-loop:runLoop] runLoop finished with status:', this.status);
   }
 
   /**
@@ -732,10 +797,21 @@ class RunLoop {
     }
 
     // Capture stats and update workspace
-    const stats = await this.workspace.captureSandboxStats();
+    let stats = { passed: 0, failed: 0 };
+    try {
+      stats = await this.workspace.captureSandboxStats();
+    } catch (statsError) {
+      console.error('Unable to capture sandbox stats', statsError);
+    }
 
     // Run workspace finalization (auto-save, push, PR, cleanup)
-    const { prUrl } = await this.workspace.finalize();
+    let prUrl = null;
+    try {
+      const result = await this.workspace.finalize();
+      prUrl = result.prUrl;
+    } catch (workspaceError) {
+      console.error('Unable to finalize workspace', workspaceError);
+    }
 
     const finishedAt = new Date().toISOString();
     const existingErrors = Array.isArray(this.run.errors) ? this.run.errors : [];
@@ -778,31 +854,75 @@ class RunLoop {
  * CLI entry point.
  */
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
+  console.log('[run-loop] Starting run-loop.mjs...');
+  console.log('[run-loop] Node version:', process.version);
+  console.log('[run-loop] Working directory:', process.cwd());
+  console.log('[run-loop] Arguments:', process.argv.slice(2).join(' '));
+
+  let args;
+  try {
+    args = parseArgs(process.argv.slice(2));
+    console.log('[run-loop] Parsed args:', JSON.stringify(args));
+  } catch (parseError) {
+    console.error('[run-loop] Failed to parse arguments:', parseError.message);
+    process.exit(1);
+  }
+
+  const apiUrl = process.env.RUN_LOOP_API_URL || 'http://localhost:3000';
+  const projectId = process.env.RUN_LOOP_PROJECT_ID;
+  console.log('[run-loop] API URL:', apiUrl);
+  console.log('[run-loop] Project ID:', projectId || '(not set)');
+  console.log('[run-loop] Agent:', process.env.RUN_LOOP_AGENT || 'claude (default)');
+  console.log('[run-loop] Agent bin:', process.env.RUN_LOOP_AGENT_BIN || '(not set)');
+  console.log('[run-loop] Agent model:', process.env.RUN_LOOP_AGENT_MODEL || '(not set)');
 
   // Initialize backend client singleton - HTTP mode only
-  initBackendClient({
-    baseUrl: process.env.RUN_LOOP_API_URL || 'http://localhost:3000',
-    projectId: process.env.RUN_LOOP_PROJECT_ID,
-  });
+  try {
+    initBackendClient({
+      baseUrl: apiUrl,
+      projectId: projectId,
+    });
+    console.log('[run-loop] Backend client initialized');
+  } catch (initError) {
+    console.error('[run-loop] Failed to initialize backend client:', initError.message);
+    console.error(initError.stack);
+    process.exit(1);
+  }
 
   const runner = new RunLoop(args);
+  console.log('[run-loop] RunLoop instance created');
   let finalized = false;
 
   try {
+    console.log('[run-loop] Calling runner.init()...');
     await runner.init();
+    console.log('[run-loop] runner.init() completed');
+
+    console.log('[run-loop] Calling runner.runLoop()...');
     await runner.runLoop();
+    console.log('[run-loop] runner.runLoop() completed with status:', runner.status);
+
     finalized = true;
+    console.log('[run-loop] Calling runner.finalize()...');
     await runner.finalize();
+    console.log('[run-loop] runner.finalize() completed');
+    console.log('[run-loop] Run completed successfully');
   } catch (error) {
-    console.error('Runner failed', error);
+    console.error('[run-loop] Runner failed:', error.message);
+    console.error('[run-loop] Error stack:', error.stack);
+    if (error.stdout) console.error('[run-loop] stdout:', error.stdout);
+    if (error.stderr) console.error('[run-loop] stderr:', error.stderr);
+
     runner.status = 'failed';
     runner.reason = runner.reason === 'completed' ? 'error' : runner.reason;
     if (!finalized) {
       try {
+        console.log('[run-loop] Calling runner.finalize() after error...');
         await runner.finalize(error);
+        console.log('[run-loop] runner.finalize() completed after error');
       } catch (finalizeError) {
-        console.error('Critical failure in finalize during error handling', finalizeError);
+        console.error('[run-loop] Critical failure in finalize during error handling:', finalizeError.message);
+        console.error('[run-loop] Finalize error stack:', finalizeError.stack);
       }
     }
     process.exit(1);

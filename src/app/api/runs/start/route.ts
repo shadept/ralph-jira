@@ -1,10 +1,13 @@
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 
 import { NextResponse } from "next/server";
+import { createRunnerToken } from "@/lib/api-keys";
 import { prisma } from "@/lib/db";
 import {
-	getProjectContextFromParams,
+	getProjectContext,
 	handleProjectRouteError,
 } from "@/lib/projects/db-server";
 import { resolveRunnerCommand } from "@/lib/runs/runner-command";
@@ -42,14 +45,10 @@ function isValidBranchName(name: string) {
 	return /^[A-Za-z0-9._/-]+$/.test(name);
 }
 
-export async function POST(
-	request: Request,
-	{ params }: { params: Promise<{ id: string }> },
-) {
+export async function POST(request: Request) {
 	try {
-		const { id } = await params;
 		const payload: RunRequestPayload = await request.json().catch(() => ({}));
-		const { project, userId } = await getProjectContextFromParams(id);
+		const { project, userId } = await getProjectContext(request);
 
 		const requestedSprintId = payload.sprintId || payload.boardId;
 
@@ -110,7 +109,10 @@ export async function POST(
 			.filter((task) => PRIORITY_STATUSES.has(task.status))
 			.map((task) => task.id);
 
-		const sandboxPath = project.repoUrl || process.cwd();
+		// sandboxPath is relative to project root - the worktree location
+		const sandboxPath = `.worktrees/${runId}`;
+		// projectPath is the absolute path to the main repo
+		const projectPath = project.repoUrl || process.cwd();
 
 		const run = await prisma.run.create({
 			data: {
@@ -130,34 +132,72 @@ export async function POST(
 			include: { sprint: { select: { name: true } } },
 		});
 
-		const { command, args, cwd } = resolveRunnerCommand({
-			mode: executorMode,
-			projectPath: sandboxPath,
-			runId,
-		});
-
+		// Wrap runner startup in try-catch to mark run as failed on any error
 		let child: ReturnType<typeof spawn>;
+		let logFd: number | null = null;
+
 		try {
+			const { command, args, cwd } = resolveRunnerCommand({
+				mode: executorMode,
+				projectPath,
+				runId,
+			});
+
+			// Generate runner token for API authentication
+			const authToken = await createRunnerToken(
+				userId,
+				project.id,
+				sprint.id,
+				runId,
+			);
+
+			// Create log file for runner stdout/stderr
+			const logsDir = path.join(projectPath, "plans", "runs");
+			fs.mkdirSync(logsDir, { recursive: true });
+			const logFilePath = path.join(logsDir, `${runId}.runner.log`);
+			logFd = fs.openSync(logFilePath, "a");
+
 			console.log("Starting run process", command, args);
+			console.log("Runner log file:", logFilePath);
+			console.log("Project ID for runner:", project.id);
+
 			child = spawn(command, args, {
 				cwd,
 				detached: true,
-				stdio: "ignore",
-				env: { ...process.env },
+				stdio: ["ignore", logFd, logFd],
+				env: {
+					...process.env,
+					RUN_LOOP_PROJECT_ID: project.id,
+					RUN_LOOP_AUTH_TOKEN: authToken,
+				},
 				windowsHide: true,
 			});
 			child.unref();
-		} catch (spawnError) {
+
+			// Close the file descriptor in the parent process
+			fs.closeSync(logFd);
+			logFd = null;
+		} catch (startupError) {
+			// Close file descriptor if open
+			if (logFd !== null) {
+				try {
+					fs.closeSync(logFd);
+				} catch {}
+			}
+
+			// Mark run as failed
 			await prisma.run.update({
 				where: { id: run.id },
 				data: {
 					status: "failed",
 					reason: "error",
-					errorsJson: JSON.stringify([`Runner spawn failed: ${spawnError}`]),
-					lastMessage: "Failed to spawn runner process",
+					errorsJson: JSON.stringify([
+						`Runner startup failed: ${startupError instanceof Error ? startupError.message : startupError}`,
+					]),
+					lastMessage: "Failed to start runner process",
 				},
 			});
-			throw spawnError;
+			throw startupError;
 		}
 
 		const updatedRun = await prisma.run.update({
@@ -165,6 +205,8 @@ export async function POST(
 			data: { pid: child.pid ?? null },
 			include: { sprint: { select: { name: true } } },
 		});
+
+		console.log("Runner process started with PID:", child.pid);
 
 		const formattedRun = {
 			runId: updatedRun.runId,
