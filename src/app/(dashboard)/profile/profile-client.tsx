@@ -14,7 +14,6 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/layout/page-header";
-import { LocalDate, LocalDateTime } from "@/components/ui/local-date";
 import {
 	AlertDialog,
 	AlertDialogCancel,
@@ -35,6 +34,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LocalDate, LocalDateTime } from "@/components/ui/local-date";
 import { PasswordInput } from "@/components/ui/password-input";
 import { getInitials } from "@/lib/utils";
 
@@ -49,7 +49,6 @@ export type UserProfile = {
 	hasPassword: boolean;
 	isOrgOwner: boolean;
 };
-
 
 function ProfileForm({
 	user,

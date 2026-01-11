@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LocalDate } from "@/components/ui/local-date";
 import {
 	Select,
 	SelectContent,
@@ -840,7 +841,7 @@ export function OrganizationClient({ initialData }: OrganizationClientProps) {
 							<div>
 								<dt className="text-muted-foreground">Created</dt>
 								<dd className="font-medium">
-									{new Date(data.organization.createdAt).toLocaleDateString()}
+									<LocalDate date={data.organization.createdAt} />
 								</dd>
 							</div>
 							<div>

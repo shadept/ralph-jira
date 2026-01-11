@@ -17,11 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function FilesPage() {
-	const {
-		currentProject,
-		loading: projectLoading,
-		apiFetch,
-	} = useProjectContext();
+	const { currentProject, apiFetch } = useProjectContext();
 	const [progress, setProgress] = useState("");
 	const [loading, setLoading] = useState(true);
 
@@ -50,14 +46,6 @@ export default function FilesPage() {
 	}, [loadProgress]);
 
 	const renderContent = () => {
-		if (projectLoading) {
-			return (
-				<div className="flex h-64 items-center justify-center">
-					<p className="text-muted-foreground">Loading projects…</p>
-				</div>
-			);
-		}
-
 		if (!currentProject) {
 			return (
 				<div className="flex h-64 flex-col items-center justify-center gap-3 text-center">

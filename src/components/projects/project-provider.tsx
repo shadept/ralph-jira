@@ -1,14 +1,8 @@
 "use client";
 
 import Cookies from "js-cookie";
-import {
-	createContext,
-	useCallback,
-	useContext,
-	useEffect,
-	useMemo,
-	useState,
-} from "react";
+import { useRouter } from "next/navigation";
+import { createContext, useCallback, useContext, useState } from "react";
 import { toast } from "sonner";
 import type { ProjectMetadata } from "@/lib/projects/types";
 import { ProjectErrorDialog } from "./project-error-dialog";
@@ -28,10 +22,8 @@ interface ProjectErrorPayload {
 interface ProjectContextValue {
 	projects: ProjectMetadata[];
 	currentProject: ProjectMetadata | null;
-	loading: boolean;
 	projectError: ProjectErrorState | null;
 	selectProject: (projectId: string) => void;
-	refreshProjects: () => Promise<void>;
 	addProject: (payload: { name: string; repoUrl?: string }) => Promise<void>;
 	removeProject: (projectId: string) => Promise<void>;
 	apiFetch: (
@@ -50,9 +42,9 @@ const ProjectContext = createContext<ProjectContextValue | undefined>(
 );
 
 /**
- * Rewrites API URLs to use the new project-scoped hierarchy.
+ * Rewrites API URLs to use the project-scoped hierarchy.
  */
-const rewriteApiUrl = (url: string, projectId: string): string => {
+function rewriteApiUrl(url: string, projectId: string): string {
 	const [path, queryString] = url.split("?");
 	const query = queryString ? `?${queryString}` : "";
 
@@ -106,81 +98,44 @@ const rewriteApiUrl = (url: string, projectId: string): string => {
 
 	const separator = query ? "&" : "?";
 	return `${url}${separator}projectId=${encodeURIComponent(projectId)}`;
-};
+}
+
+function getInitialProjectId(
+	projects: ProjectMetadata[],
+	selectedId: string | null,
+): string | null {
+	if (selectedId && projects.some((p) => p.id === selectedId)) {
+		return selectedId;
+	}
+	return projects[0]?.id ?? null;
+}
 
 interface ProjectProviderProps {
 	children: React.ReactNode;
-	/** Projects fetched server-side. If not provided, will fetch client-side. */
-	initialProjects?: ProjectMetadata[];
-	/** Selected project ID from cookie, read server-side. */
-	initialSelectedProjectId?: string | null;
+	projects: ProjectMetadata[];
+	selectedProjectId: string | null;
 }
 
 export function ProjectProvider({
 	children,
-	initialProjects,
-	initialSelectedProjectId,
+	projects,
+	selectedProjectId: initialSelectedProjectId,
 }: ProjectProviderProps) {
-	// Determine initial selected project ID
-	const getInitialSelectedId = (): string | null => {
-		if (initialSelectedProjectId && initialProjects?.some(p => p.id === initialSelectedProjectId)) {
-			return initialSelectedProjectId;
-		}
-		if (initialProjects?.length) {
-			return initialProjects[0].id;
-		}
-		return null;
-	};
+	const router = useRouter();
+	const [selectedProjectId, setSelectedProjectId] = useState(
+		getInitialProjectId(projects, initialSelectedProjectId),
+	);
+	const [projectError, setProjectError] = useState<ProjectErrorState | null>(
+		null,
+	);
 
-	const [projects, setProjects] = useState<ProjectMetadata[]>(initialProjects ?? []);
-	const [selectedProjectId, setSelectedProjectId] = useState<string | null>(getInitialSelectedId);
-	const [loading, setLoading] = useState(!initialProjects);
-	const [projectError, setProjectError] = useState<ProjectErrorState | null>(null);
-
-	const loadProjects = useCallback(async () => {
-		try {
-			const res = await fetch("/api/projects");
-			const data = await res.json();
-			const newProjects = data.projects || [];
-			setProjects(newProjects);
-
-			// Update selected project if current one is no longer valid
-			setSelectedProjectId(prev => {
-				if (prev && newProjects.some((p: ProjectMetadata) => p.id === prev)) {
-					return prev;
-				}
-				return newProjects.length > 0 ? newProjects[0].id : null;
-			});
-		} catch (error) {
-			console.error("Failed to load projects:", error);
-			toast.error("Failed to load projects");
-		} finally {
-			setLoading(false);
-		}
-	}, []);
-
-	// If no initial projects provided, fetch on mount
-	useEffect(() => {
-		if (!initialProjects) {
-			loadProjects();
-		}
-	}, [initialProjects, loadProjects]);
-
-	const currentProject = useMemo(() => {
-		if (!selectedProjectId) return null;
-		return projects.find((project) => project.id === selectedProjectId) || null;
-	}, [projects, selectedProjectId]);
+	const currentProject =
+		projects.find((p) => p.id === selectedProjectId) ?? null;
 
 	const selectProject = useCallback((projectId: string) => {
 		setSelectedProjectId(projectId);
-		// Store in cookie for server-side access
 		Cookies.set(PROJECT_COOKIE_KEY, projectId, { expires: 365 });
 	}, []);
-
-	const refreshProjects = useCallback(async () => {
-		setLoading(true);
-		await loadProjects();
-	}, [loadProjects]);
 
 	const apiFetch = useCallback(
 		async (
@@ -212,7 +167,7 @@ export function ProjectProvider({
 					});
 				} else if (payload?.code === "PROJECT_NOT_FOUND") {
 					toast.error("Selected project no longer exists");
-					await refreshProjects();
+					router.refresh();
 				}
 
 				const message = payload?.error || "Request failed";
@@ -221,7 +176,7 @@ export function ProjectProvider({
 
 			return response;
 		},
-		[currentProject?.id, refreshProjects],
+		[currentProject?.id, router],
 	);
 
 	const addProject = useCallback(
@@ -238,11 +193,11 @@ export function ProjectProvider({
 			}
 
 			const data = await res.json();
-			await refreshProjects();
 			selectProject(data.project.id);
 			toast.success("Project added");
+			router.refresh();
 		},
-		[refreshProjects, selectProject],
+		[router, selectProject],
 	);
 
 	const removeProject = useCallback(
@@ -255,11 +210,11 @@ export function ProjectProvider({
 				throw new Error(payload.error || "Failed to delete project");
 			}
 
-			await refreshProjects();
 			toast.success("Project removed");
 
+			// Select another project if we deleted the current one
 			if (selectedProjectId === projectId) {
-				const fallback = projects.find((project) => project.id !== projectId);
+				const fallback = projects.find((p) => p.id !== projectId);
 				if (fallback) {
 					selectProject(fallback.id);
 				} else {
@@ -267,8 +222,10 @@ export function ProjectProvider({
 					Cookies.remove(PROJECT_COOKIE_KEY);
 				}
 			}
+
+			router.refresh();
 		},
-		[projects, refreshProjects, selectProject, selectedProjectId],
+		[projects, router, selectProject, selectedProjectId],
 	);
 
 	const clearProjectError = useCallback(() => setProjectError(null), []);
@@ -280,10 +237,8 @@ export function ProjectProvider({
 	const value: ProjectContextValue = {
 		projects,
 		currentProject,
-		loading,
 		projectError,
 		selectProject,
-		refreshProjects,
 		addProject,
 		removeProject,
 		apiFetch,
@@ -292,7 +247,7 @@ export function ProjectProvider({
 	};
 
 	const errorProjectMeta = projectError
-		? projects.find((project) => project.id === projectError.projectId)
+		? projects.find((p) => p.id === projectError.projectId)
 		: null;
 
 	return (

@@ -6,6 +6,7 @@ import {
 	GithubLogoIcon,
 } from "@phosphor-icons/react";
 import { useForm, useStore } from "@tanstack/react-form";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -711,12 +712,8 @@ function RepoSetupCard({
 }
 
 export default function SettingsPage() {
-	const {
-		currentProject,
-		loading: projectLoading,
-		apiFetch,
-		refreshProjects,
-	} = useProjectContext();
+	const { currentProject, apiFetch } = useProjectContext();
+	const router = useRouter();
 	const [settings, setSettings] = useState<ProjectSettings | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
@@ -790,7 +787,7 @@ export default function SettingsPage() {
 			});
 
 			setSettings(newSettings);
-			await refreshProjects();
+			router.refresh();
 			toast.success("Settings saved");
 		} catch (error) {
 			toast.error("Failed to save settings");
@@ -811,7 +808,7 @@ export default function SettingsPage() {
 				body: JSON.stringify({ repoUrl }),
 			});
 
-			await refreshProjects();
+			router.refresh();
 			toast.success("Repository path saved");
 		} catch (error) {
 			toast.error("Failed to save repository path");
@@ -822,14 +819,6 @@ export default function SettingsPage() {
 	};
 
 	const renderContent = () => {
-		if (projectLoading) {
-			return (
-				<div className="flex h-64 items-center justify-center">
-					<p className="text-muted-foreground">Loading projects…</p>
-				</div>
-			);
-		}
-
 		if (!currentProject) {
 			return (
 				<div className="flex h-64 flex-col items-center justify-center gap-3 text-center">

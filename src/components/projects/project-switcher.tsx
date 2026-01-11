@@ -15,23 +15,16 @@ import { ProjectManagerDialog } from "./project-manager-dialog";
 import { useProjectContext } from "./project-provider";
 
 export function ProjectSwitcher() {
-	const { projects, currentProject, selectProject, loading } =
-		useProjectContext();
+	const { projects, currentProject, selectProject } = useProjectContext();
 	const [managerOpen, setManagerOpen] = useState(false);
-
-	const _hasProjects = projects.length > 0;
 
 	return (
 		<div className="flex items-center gap-2">
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
-					<Button variant="outline" className="gap-2" disabled={loading}>
+					<Button variant="outline" className="gap-2">
 						<span className="text-sm font-medium">
-							{currentProject
-								? currentProject.name
-								: loading
-									? "Loading projects..."
-									: "No project"}
+							{currentProject?.name ?? "No project"}
 						</span>
 						<CaretDownIcon className="w-4 h-4" />
 					</Button>

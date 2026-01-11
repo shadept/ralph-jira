@@ -121,7 +121,7 @@ async function getSubscriptionData(
 
 export default async function SubscriptionPage() {
 	const session = await auth();
-	const data = await getSubscriptionData(session!.user!.id);
+	const data = await getSubscriptionData(session?.user?.id);
 
 	if (!data) {
 		return <NoSubscription />;

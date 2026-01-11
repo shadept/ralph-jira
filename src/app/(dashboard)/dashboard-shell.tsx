@@ -4,7 +4,19 @@ import { RobotIcon } from "@phosphor-icons/react";
 import { UserMenu } from "@/components/layout/user-menu";
 import { ProjectSwitcher } from "@/components/projects/project-switcher";
 
-export function DashboardShell({ children }: { children: React.ReactNode }) {
+interface User {
+	id: string;
+	email: string;
+	name?: string | null;
+	image?: string | null;
+}
+
+interface DashboardShellProps {
+	children: React.ReactNode;
+	user: User;
+}
+
+export function DashboardShell({ children, user }: DashboardShellProps) {
 	return (
 		<div className="min-h-screen bg-background flex flex-col">
 			<header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -13,7 +25,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 						<RobotIcon className="h-8 w-8 text-primary" weight="duotone" />
 						<ProjectSwitcher />
 					</nav>
-					<UserMenu />
+					<UserMenu user={user} />
 				</div>
 			</header>
 			<main className="flex-1 container mx-auto px-6 py-6">{children}</main>

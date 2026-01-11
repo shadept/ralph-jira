@@ -105,7 +105,7 @@ async function getOrganizationData(userId: string): Promise<OrgData | null> {
 
 export default async function OrganizationPage() {
 	const session = await auth();
-	const orgData = await getOrganizationData(session!.user!.id);
+	const orgData = await getOrganizationData(session?.user?.id);
 
 	if (!orgData) {
 		return <NoOrganization />;

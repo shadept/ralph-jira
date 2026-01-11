@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LocalDateTime } from "@/components/ui/local-date";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
 	Sheet,
@@ -64,15 +65,6 @@ const RUN_STATUS_BADGES: Record<RunRecord["status"], string> = {
 	completed: "bg-blue-200 text-blue-900 dark:bg-blue-500/20 dark:text-blue-200",
 	failed: "bg-red-200 text-red-900 dark:bg-red-500/20 dark:text-red-200",
 	canceled: "bg-gray-200 text-gray-900 dark:bg-gray-500/20 dark:text-gray-200",
-};
-
-const formatTimestamp = (value?: string | null) => {
-	if (!value) return "—";
-	try {
-		return new Date(value).toLocaleString();
-	} catch {
-		return value;
-	}
 };
 
 function StartRunDialog({
@@ -306,11 +298,7 @@ export default function SprintPage({
 }) {
 	const { id } = use(params);
 	const router = useRouter();
-	const {
-		currentProject,
-		loading: projectLoading,
-		apiFetch,
-	} = useProjectContext();
+	const { currentProject, apiFetch } = useProjectContext();
 
 	const [sprint, setSprint] = useState<Sprint | null>(null);
 	const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -736,14 +724,6 @@ export default function SprintPage({
 	);
 
 	const renderContent = () => {
-		if (projectLoading) {
-			return (
-				<div className="flex h-64 items-center justify-center">
-					<p className="text-muted-foreground">Loading projects…</p>
-				</div>
-			);
-		}
-
 		if (!currentProject) {
 			return (
 				<div className="flex h-64 flex-col items-center justify-center gap-3 text-center">
@@ -888,13 +868,13 @@ export default function SprintPage({
 								<div>
 									<p className="text-muted-foreground">Started</p>
 									<p className="font-medium">
-										{formatTimestamp(activeRun.startedAt)}
+										<LocalDateTime date={activeRun.startedAt} fallback="—" />
 									</p>
 								</div>
 								<div>
 									<p className="text-muted-foreground">Finished</p>
 									<p className="font-medium">
-										{formatTimestamp(activeRun.finishedAt)}
+										<LocalDateTime date={activeRun.finishedAt} fallback="—" />
 									</p>
 								</div>
 							</div>

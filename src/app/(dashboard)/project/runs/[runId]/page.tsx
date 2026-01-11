@@ -15,6 +15,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { LocalDateTime } from "@/components/ui/local-date";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { RunRecord } from "@/lib/schemas";
 
@@ -28,15 +29,6 @@ const RUN_STATUS_STYLES: Record<RunRecord["status"], string> = {
 	completed: "bg-blue-200 text-blue-900 dark:bg-blue-500/20 dark:text-blue-100",
 	failed: "bg-red-200 text-red-900 dark:bg-red-500/20 dark:text-red-100",
 	canceled: "bg-gray-200 text-gray-900 dark:bg-gray-500/20 dark:text-gray-100",
-};
-
-const formatDate = (value?: string | null) => {
-	if (!value) return "—";
-	try {
-		return new Date(value).toLocaleString();
-	} catch {
-		return value;
-	}
 };
 
 const formatReason = (reason?: string | null) => {
@@ -60,11 +52,7 @@ export default function RunDetailPage({
 }) {
 	const { runId } = use(params);
 	const router = useRouter();
-	const {
-		currentProject,
-		loading: projectLoading,
-		apiFetch,
-	} = useProjectContext();
+	const { currentProject, apiFetch } = useProjectContext();
 	const [run, setRun] = useState<RunRecord | null>(null);
 	const [logLines, setLogLines] = useState<string[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -175,14 +163,6 @@ export default function RunDetailPage({
 	) : undefined;
 
 	const renderContent = () => {
-		if (projectLoading) {
-			return (
-				<div className="flex h-64 items-center justify-center">
-					<p className="text-muted-foreground">Loading projects…</p>
-				</div>
-			);
-		}
-
 		if (!currentProject) {
 			return (
 				<div className="flex h-64 flex-col items-center justify-center gap-3 text-center">
@@ -257,15 +237,21 @@ export default function RunDetailPage({
 							</div>
 							<div>
 								<p className="text-muted-foreground">Created</p>
-								<p className="font-medium">{formatDate(run.createdAt)}</p>
+								<p className="font-medium">
+									<LocalDateTime date={run.createdAt} fallback="—" />
+								</p>
 							</div>
 							<div>
 								<p className="text-muted-foreground">Started</p>
-								<p className="font-medium">{formatDate(run.startedAt)}</p>
+								<p className="font-medium">
+									<LocalDateTime date={run.startedAt} fallback="—" />
+								</p>
 							</div>
 							<div>
 								<p className="text-muted-foreground">Finished</p>
-								<p className="font-medium">{formatDate(run.finishedAt)}</p>
+								<p className="font-medium">
+									<LocalDateTime date={run.finishedAt} fallback="—" />
+								</p>
 							</div>
 							<div>
 								<p className="text-muted-foreground">Last Task</p>
@@ -335,9 +321,15 @@ export default function RunDetailPage({
 												</Badge>
 											</div>
 											<div className="mt-1 flex gap-4 text-[10px] text-muted-foreground">
-												<span>Started: {formatDate(cmd.startedAt)}</span>
+												<span>
+													Started:{" "}
+													<LocalDateTime date={cmd.startedAt} fallback="—" />
+												</span>
 												{cmd.finishedAt && (
-													<span>Finished: {formatDate(cmd.finishedAt)}</span>
+													<span>
+														Finished:{" "}
+														<LocalDateTime date={cmd.finishedAt} fallback="—" />
+													</span>
 												)}
 												<span>CWD: {cmd.cwd}</span>
 											</div>

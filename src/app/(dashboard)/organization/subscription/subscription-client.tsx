@@ -25,6 +25,8 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { LocalCurrency } from "@/components/ui/local-currency";
+import { LocalDate } from "@/components/ui/local-date";
 import { Progress } from "@/components/ui/progress";
 
 export type Plan = {
@@ -84,21 +86,6 @@ const statusLabels: Record<string, string> = {
 	canceled: "Canceled",
 	paused: "Paused",
 };
-
-function formatPrice(cents: number): string {
-	return new Intl.NumberFormat("en-US", {
-		style: "currency",
-		currency: "USD",
-	}).format(cents / 100);
-}
-
-function formatDate(dateString: string): string {
-	return new Date(dateString).toLocaleDateString("en-US", {
-		year: "numeric",
-		month: "long",
-		day: "numeric",
-	});
-}
 
 function getDaysRemaining(endDate: string): number {
 	const end = new Date(endDate);
@@ -173,9 +160,7 @@ type SubscriptionClientProps = {
 	initialData: SubscriptionData;
 };
 
-export function SubscriptionClient({
-	initialData,
-}: SubscriptionClientProps) {
+export function SubscriptionClient({ initialData }: SubscriptionClientProps) {
 	const _router = useRouter();
 	const [data] = useState<SubscriptionData>(initialData);
 
@@ -255,8 +240,8 @@ export function SubscriptionClient({
 								</p>
 								<p className="text-sm text-muted-foreground">
 									Your subscription will end on{" "}
-									{formatDate(sub.currentPeriodEnd)}. You'll lose access to
-									premium features after this date.
+									<LocalDate date={sub.currentPeriodEnd} />. You'll lose access
+									to premium features after this date.
 								</p>
 							</div>
 							{isOwner && (
@@ -304,8 +289,8 @@ export function SubscriptionClient({
 							<div className="space-y-1">
 								<p className="text-sm text-muted-foreground">Current Period</p>
 								<p className="font-medium">
-									{formatDate(sub.currentPeriodStart)} -{" "}
-									{formatDate(sub.currentPeriodEnd)}
+									<LocalDate date={sub.currentPeriodStart} /> -{" "}
+									<LocalDate date={sub.currentPeriodEnd} />
 								</p>
 							</div>
 							<div className="space-y-1">
@@ -313,7 +298,8 @@ export function SubscriptionClient({
 									{isCanceling ? "Access Ends In" : "Next Billing Date"}
 								</p>
 								<p className="font-medium">
-									{daysRemaining} days ({formatDate(sub.currentPeriodEnd)})
+									{daysRemaining} days (
+									<LocalDate date={sub.currentPeriodEnd} />)
 								</p>
 							</div>
 							<div className="space-y-1">
@@ -321,13 +307,17 @@ export function SubscriptionClient({
 									{sub.billingPeriod === "yearly" ? "Yearly" : "Monthly"} Cost
 								</p>
 								<p className="font-medium">
-									{plan && plan.monthlyPriceCents === 0
-										? "Free"
-										: formatPrice(
+									{plan && plan.monthlyPriceCents === 0 ? (
+										"Free"
+									) : (
+										<LocalCurrency
+											cents={
 												sub.billingPeriod === "yearly"
 													? plan?.yearlyPriceCents || 0
-													: plan?.monthlyPriceCents || 0,
-											)}
+													: plan?.monthlyPriceCents || 0
+											}
+										/>
+									)}
 									{plan && plan.monthlyPriceCents > 0 && (
 										<span className="text-muted-foreground text-sm">
 											/{sub.billingPeriod === "yearly" ? "year" : "month"}
@@ -341,8 +331,8 @@ export function SubscriptionClient({
 							<div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
 								<p className="text-sm text-blue-700 dark:text-blue-400">
 									<ClockIcon className="w-4 h-4 inline mr-1" />
-									Trial ends on {formatDate(sub.trialEndsAt)}. Add a payment
-									method to continue after your trial.
+									Trial ends on <LocalDate date={sub.trialEndsAt} />. Add a
+									payment method to continue after your trial.
 								</p>
 							</div>
 						)}
@@ -483,12 +473,16 @@ export function SubscriptionClient({
 							</div>
 							<div>
 								<dt className="text-muted-foreground">Created</dt>
-								<dd>{formatDate(sub.createdAt)}</dd>
+								<dd>
+									<LocalDate date={sub.createdAt} />
+								</dd>
 							</div>
 							{sub.canceledAt && (
 								<div>
 									<dt className="text-muted-foreground">Canceled On</dt>
-									<dd>{formatDate(sub.canceledAt)}</dd>
+									<dd>
+										<LocalDate date={sub.canceledAt} />
+									</dd>
 								</div>
 							)}
 						</dl>

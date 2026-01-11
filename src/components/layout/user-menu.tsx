@@ -10,11 +10,11 @@ import {
 	UserIcon,
 } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
-import { signOut, useSession } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -26,7 +26,6 @@ import {
 	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
 import {
 	Tooltip,
 	TooltipContent,
@@ -34,37 +33,38 @@ import {
 } from "@/components/ui/tooltip";
 import { getInitials } from "@/lib/utils";
 
-export function UserMenu() {
-	const { data: session } = useSession();
+interface User {
+	id: string;
+	email: string;
+	name?: string | null;
+	image?: string | null;
+}
+
+interface UserMenuProps {
+	user: User;
+}
+
+export function UserMenu({ user }: UserMenuProps) {
 	const router = useRouter();
-	const { setTheme, theme } = useTheme();
-	const [mounted, setMounted] = useState(false);
-
-	useEffect(() => {
-		setMounted(true);
-	}, []);
-
-	if (!session?.user) {
-		return null;
-	}
-
-	const user = session.user;
-
-	const selectedTheme = mounted ? (theme ?? "system") : "system";
+	const { setTheme, theme, resolvedTheme } = useTheme();
+	const selectedTheme = theme ?? "system";
 
 	const handleSignOut = () => {
 		signOut({ callbackUrl: "/" });
 	};
 
 	const initials = getInitials(user.name, user.email);
-	const displayName = user.name || user.email || "User";
+	const displayName = user.name || user.email;
 
 	return (
 		<DropdownMenu>
 			<Tooltip>
 				<TooltipTrigger asChild>
 					<DropdownMenuTrigger asChild>
-						<Button className="relative h-9 w-9 rounded-full ring-offset-background transition-all hover:ring-2 hover:ring-ring hover:ring-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+						<Button
+							className="relative h-9 w-9 rounded-full ring-offset-background transition-all hover:ring-2 hover:ring-ring hover:ring-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+							asChild
+						>
 							<Avatar className="h-9 w-9">
 								<AvatarImage src={user.image || undefined} alt={displayName} />
 								<AvatarFallback className="bg-primary text-primary-foreground text-sm font-medium">
@@ -79,9 +79,9 @@ export function UserMenu() {
 			<DropdownMenuContent align="end" className="w-64">
 				<DropdownMenuLabel>
 					<div className="flex items-center gap-3">
-						<Avatar className="h-10 w-10">
+						<Avatar className="h-9 w-9">
 							<AvatarImage src={user.image || undefined} alt={displayName} />
-							<AvatarFallback className="bg-primary/10 text-primary">
+							<AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
 								{initials}
 							</AvatarFallback>
 						</Avatar>
@@ -113,7 +113,8 @@ export function UserMenu() {
 				<DropdownMenuSeparator />
 				<DropdownMenuSub>
 					<DropdownMenuSubTrigger>
-						<SunIcon className="mr-2 h-4 w-4" />
+						{resolvedTheme === "light" && <SunIcon className="mr-2 h-4 w-4" />}
+						{resolvedTheme === "dark" && <MoonIcon className="mr-2 h-4 w-4" />}
 						Theme
 					</DropdownMenuSubTrigger>
 					<DropdownMenuSubContent>

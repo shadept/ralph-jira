@@ -203,11 +203,7 @@ function TaskGroupSection({
 }
 
 export default function AllTasksPage() {
-	const {
-		currentProject,
-		loading: projectLoading,
-		apiFetch,
-	} = useProjectContext();
+	const { currentProject, apiFetch } = useProjectContext();
 
 	const [data, setData] = useState<TasksResponse | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -337,14 +333,6 @@ export default function AllTasksPage() {
 	) : null;
 
 	const renderContent = () => {
-		if (projectLoading) {
-			return (
-				<div className="flex h-64 items-center justify-center">
-					<p className="text-muted-foreground">Loading projects...</p>
-				</div>
-			);
-		}
-
 		if (!currentProject) {
 			return (
 				<div className="flex h-64 flex-col items-center justify-center gap-3 text-center">

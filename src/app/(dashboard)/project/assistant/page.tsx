@@ -16,11 +16,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 
 export default function AssistantPage() {
-	const {
-		currentProject,
-		loading: projectLoading,
-		apiFetch,
-	} = useProjectContext();
+	const { currentProject, apiFetch } = useProjectContext();
 	const [prompt, setPrompt] = useState("");
 	const [generating, setGenerating] = useState(false);
 
@@ -67,14 +63,6 @@ export default function AssistantPage() {
 	};
 
 	const renderContent = () => {
-		if (projectLoading) {
-			return (
-				<div className="flex h-64 items-center justify-center">
-					<p className="text-muted-foreground">Loading projects…</p>
-				</div>
-			);
-		}
-
 		if (!currentProject) {
 			return (
 				<div className="flex h-64 flex-col items-center justify-center gap-3 text-center">
