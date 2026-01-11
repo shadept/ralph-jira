@@ -44,6 +44,7 @@ interface TaskEditorDialogProps {
 }
 
 type FormValues = {
+	title: string;
 	description: string;
 	category: string;
 	priority: Task["priority"];
@@ -73,7 +74,8 @@ function TaskForm({
 
 	const form = useForm({
 		defaultValues: {
-			description: task.description,
+			title: task.title,
+			description: task.description ?? "",
 			category: task.category,
 			priority: task.priority,
 			estimate: task.estimate?.toString() ?? "",
@@ -85,7 +87,8 @@ function TaskForm({
 		onSubmit: async ({ value }) => {
 			const updatedTask: Task = {
 				...task,
-				description: value.description,
+				title: value.title,
+				description: value.description || null,
 				category: value.category,
 				priority: value.priority,
 				estimate: value.estimate ? parseInt(value.estimate, 10) : undefined,
@@ -102,7 +105,8 @@ function TaskForm({
 	const isDirty = useStore(form.store, (state) => {
 		const v = state.values;
 		return (
-			v.description !== task.description ||
+			v.title !== task.title ||
+			v.description !== (task.description ?? "") ||
 			v.category !== task.category ||
 			v.priority !== task.priority ||
 			v.estimate !== (task.estimate?.toString() ?? "") ||
@@ -207,76 +211,173 @@ function TaskForm({
 						}}
 						className="space-y-4"
 					>
-						<form.Field name="description">
-							{(field) => (
-								<div>
-									<Label htmlFor={field.name}>Description</Label>
-									<Textarea
-										id={field.name}
-										value={field.state.value}
-										onChange={(e) => field.handleChange(e.target.value)}
-										rows={2}
-										className="mt-1"
-									/>
+						{/* Two-column layout: Left = Title + Description, Right = Metadata */}
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+							{/* Left Column: Title and Description/Plan */}
+							<div className="space-y-4">
+								<form.Field name="title">
+									{(field) => (
+										<div>
+											<Label htmlFor={field.name}>Title</Label>
+											<Input
+												id={field.name}
+												value={field.state.value}
+												onChange={(e) => field.handleChange(e.target.value)}
+												placeholder="Short summary of the task"
+												className="mt-1"
+											/>
+										</div>
+									)}
+								</form.Field>
+
+								<form.Field name="description">
+									{(field) => (
+										<div>
+											<Label htmlFor={field.name}>Plan / Description</Label>
+											<Textarea
+												id={field.name}
+												value={field.state.value}
+												onChange={(e) => field.handleChange(e.target.value)}
+												placeholder="Detailed description or implementation plan..."
+												rows={8}
+												className="mt-1"
+											/>
+											<p className="text-xs text-muted-foreground mt-1">
+												Long-form description, implementation details, or notes
+											</p>
+										</div>
+									)}
+								</form.Field>
+							</div>
+
+							{/* Right Column: Metadata fields */}
+							<div className="space-y-4">
+								<div className="grid grid-cols-2 gap-4">
+									<form.Field name="category">
+										{(field) => (
+											<div>
+												<Label htmlFor={field.name}>Category</Label>
+												<Input
+													id={field.name}
+													value={field.state.value}
+													onChange={(e) => field.handleChange(e.target.value)}
+													className="mt-1"
+												/>
+											</div>
+										)}
+									</form.Field>
+
+									<form.Field name="priority">
+										{(field) => (
+											<div>
+												<Label htmlFor={field.name}>Priority</Label>
+												<Select
+													value={field.state.value}
+													onValueChange={(value) =>
+														field.handleChange(value as Task["priority"])
+													}
+												>
+													<SelectTrigger className="mt-1">
+														<SelectValue />
+													</SelectTrigger>
+													<SelectContent>
+														<SelectItem value="low">Low</SelectItem>
+														<SelectItem value="medium">Medium</SelectItem>
+														<SelectItem value="high">High</SelectItem>
+														<SelectItem value="urgent">Urgent</SelectItem>
+													</SelectContent>
+												</Select>
+											</div>
+										)}
+									</form.Field>
 								</div>
-							)}
-						</form.Field>
 
-						<div className="grid grid-cols-3 gap-4">
-							<form.Field name="category">
-								{(field) => (
-									<div>
-										<Label htmlFor={field.name}>Category</Label>
+								<div className="grid grid-cols-2 gap-4">
+									<form.Field name="estimate">
+										{(field) => (
+											<div>
+												<Label htmlFor={field.name}>Estimate (points)</Label>
+												<Input
+													id={field.name}
+													type="number"
+													value={field.state.value}
+													onChange={(e) => field.handleChange(e.target.value)}
+													className="mt-1"
+												/>
+											</div>
+										)}
+									</form.Field>
+
+									<form.Field name="assigneeId">
+										{(field) => (
+											<div>
+												<Label htmlFor={field.name}>Assignee</Label>
+												<Input
+													id={field.name}
+													value={field.state.value}
+													onChange={(e) => field.handleChange(e.target.value)}
+													placeholder="Optional"
+													className="mt-1"
+												/>
+											</div>
+										)}
+									</form.Field>
+								</div>
+
+								<div>
+									<Label>Tags</Label>
+									<div className="flex flex-wrap gap-2 mt-2 mb-2">
+										{tags.map((tag) => (
+											<Badge key={tag} variant="secondary">
+												{tag}
+												<button
+													type="button"
+													onClick={() => removeTag(tag)}
+													className="ml-1 hover:text-destructive"
+												>
+													<XIcon className="w-3 h-3" />
+												</button>
+											</Badge>
+										))}
+									</div>
+									<div className="flex gap-2">
 										<Input
-											id={field.name}
-											value={field.state.value}
-											onChange={(e) => field.handleChange(e.target.value)}
-											className="mt-1"
+											placeholder="Add tag..."
+											value={newTag}
+											onChange={(e) => setNewTag(e.target.value)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter") {
+													e.preventDefault();
+													addTag();
+												}
+											}}
 										/>
+										<Button type="button" size="sm" onClick={addTag}>
+											<PlusIcon className="w-4 h-4" />
+										</Button>
 									</div>
-								)}
-							</form.Field>
+								</div>
 
-							<form.Field name="priority">
-								{(field) => (
-									<div>
-										<Label htmlFor={field.name}>Priority</Label>
-										<Select
-											value={field.state.value}
-											onValueChange={(value) =>
-												field.handleChange(value as Task["priority"])
-											}
-										>
-											<SelectTrigger className="mt-1">
-												<SelectValue />
-											</SelectTrigger>
-											<SelectContent>
-												<SelectItem value="low">Low</SelectItem>
-												<SelectItem value="medium">Medium</SelectItem>
-												<SelectItem value="high">High</SelectItem>
-												<SelectItem value="urgent">Urgent</SelectItem>
-											</SelectContent>
-										</Select>
-									</div>
+								{failureNotes && (
+									<form.Field name="failureNotes">
+										{(field) => (
+											<div>
+												<Label htmlFor={field.name}>Failure Notes</Label>
+												<Textarea
+													id={field.name}
+													value={field.state.value}
+													onChange={(e) => field.handleChange(e.target.value)}
+													className="mt-1 text-red-600"
+													rows={2}
+												/>
+											</div>
+										)}
+									</form.Field>
 								)}
-							</form.Field>
-
-							<form.Field name="estimate">
-								{(field) => (
-									<div>
-										<Label htmlFor={field.name}>Estimate (points)</Label>
-										<Input
-											id={field.name}
-											type="number"
-											value={field.state.value}
-											onChange={(e) => field.handleChange(e.target.value)}
-											className="mt-1"
-										/>
-									</div>
-								)}
-							</form.Field>
+							</div>
 						</div>
 
+						{/* Acceptance Criteria - Full width below the columns */}
 						<div>
 							<div className="flex items-center justify-between mb-2">
 								<Label>Acceptance Criteria</Label>
@@ -334,72 +435,6 @@ function TaskForm({
 								</div>
 							</div>
 						</div>
-
-						<div>
-							<Label>Tags</Label>
-							<div className="flex flex-wrap gap-2 mt-2 mb-2">
-								{tags.map((tag) => (
-									<Badge key={tag} variant="secondary">
-										{tag}
-										<button
-											type="button"
-											onClick={() => removeTag(tag)}
-											className="ml-1 hover:text-destructive"
-										>
-											<XIcon className="w-3 h-3" />
-										</button>
-									</Badge>
-								))}
-							</div>
-							<div className="flex gap-2">
-								<Input
-									placeholder="Add tag..."
-									value={newTag}
-									onChange={(e) => setNewTag(e.target.value)}
-									onKeyDown={(e) => {
-										if (e.key === "Enter") {
-											e.preventDefault();
-											addTag();
-										}
-									}}
-								/>
-								<Button type="button" onClick={addTag}>
-									<PlusIcon className="w-4 h-4" />
-								</Button>
-							</div>
-						</div>
-
-						<form.Field name="assigneeId">
-							{(field) => (
-								<div>
-									<Label htmlFor={field.name}>Assignee</Label>
-									<Input
-										id={field.name}
-										value={field.state.value}
-										onChange={(e) => field.handleChange(e.target.value)}
-										placeholder="Optional"
-										className="mt-1"
-									/>
-								</div>
-							)}
-						</form.Field>
-
-						{failureNotes && (
-							<form.Field name="failureNotes">
-								{(field) => (
-									<div>
-										<Label htmlFor={field.name}>Failure Notes</Label>
-										<Textarea
-											id={field.name}
-											value={field.state.value}
-											onChange={(e) => field.handleChange(e.target.value)}
-											className="mt-1 text-red-600"
-											rows={2}
-										/>
-									</div>
-								)}
-							</form.Field>
-						)}
 
 						<DialogFooter className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
 							<div className="w-full sm:w-auto">
