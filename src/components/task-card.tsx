@@ -69,7 +69,14 @@ export function TaskCard({
 					)}
 				</button>
 				<div className="flex-1 min-w-0">
-					<p className="text-sm font-medium line-clamp-2">{task.description}</p>
+					<p className="text-sm font-medium line-clamp-2">
+						{task.title || "Untitled"}
+					</p>
+					{task.description && (
+						<p className="text-xs text-muted-foreground line-clamp-1 mt-1">
+							{task.description}
+						</p>
+					)}
 				</div>
 			</div>
 

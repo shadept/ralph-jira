@@ -106,7 +106,14 @@ function TaskRow({
 							{task.priority}
 						</Badge>
 					</div>
-					<p className="text-sm font-medium line-clamp-2">{task.description}</p>
+					<p className="text-sm font-medium line-clamp-2">
+						{task.title || "Untitled"}
+					</p>
+					{task.description && (
+						<p className="text-xs text-muted-foreground line-clamp-1 mt-1">
+							{task.description}
+						</p>
+					)}
 					<div className="flex items-center gap-2 flex-wrap mt-2">
 						{task.estimate && (
 							<Badge variant="secondary" className="text-xs">
