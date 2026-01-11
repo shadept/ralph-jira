@@ -20,8 +20,8 @@ function formatSprint(sprint: {
 		projectId: string;
 		sprintId: string | null;
 		category: string;
-		title: string | null;
-		description: string;
+		title: string;
+		description: string | null;
 		acceptanceCriteriaJson: string;
 		status: string;
 		priority: string;
@@ -78,12 +78,12 @@ function formatSprint(sprint: {
 }
 
 export async function GET(
-	_request: Request,
+	request: Request,
 	{ params }: { params: Promise<{ id: string; sprintId: string }> },
 ) {
 	try {
 		const { id, sprintId } = await params;
-		const { project } = await getProjectContextFromParams(id);
+		const { project } = await getProjectContextFromParams(id, request);
 
 		const dbSprint = await prisma.sprint.findFirst({
 			where: {
@@ -118,7 +118,7 @@ export async function PUT(
 ) {
 	try {
 		const { id, sprintId } = await params;
-		const { project } = await getProjectContextFromParams(id);
+		const { project } = await getProjectContextFromParams(id, request);
 		const updates = await request.json();
 
 		const existing = await prisma.sprint.findFirst({
@@ -169,13 +169,19 @@ export async function PUT(
 					});
 
 					if (existingTask) {
+						// Validate title if provided - it cannot be empty
+						const newTitle = task.title !== undefined
+							? (typeof task.title === "string" && task.title.trim() !== "" ? task.title.trim() : existingTask.title)
+							: existingTask.title;
+
 						await prisma.task.update({
 							where: { id: task.id },
 							data: {
 								category: task.category ?? existingTask.category,
-								title:
-									task.title !== undefined ? task.title : existingTask.title,
-								description: task.description ?? existingTask.description,
+								title: newTitle,
+								description: task.description !== undefined
+									? (task.description || null)
+									: existingTask.description,
 								acceptanceCriteriaJson: task.acceptanceCriteria
 									? JSON.stringify(task.acceptanceCriteria)
 									: existingTask.acceptanceCriteriaJson,
@@ -205,14 +211,18 @@ export async function PUT(
 							},
 						});
 					} else {
+						// Task with ID doesn't exist - create new (title is required)
+						if (!task.title || typeof task.title !== "string" || task.title.trim() === "") {
+							continue; // Skip tasks without a valid title
+						}
 						await prisma.task.create({
 							data: {
 								id: task.id,
 								projectId: project.id,
 								sprintId,
 								category: task.category || "task",
-								title: task.title || null,
-								description: task.description || "",
+								title: task.title.trim(),
+								description: task.description || null,
 								acceptanceCriteriaJson: JSON.stringify(
 									task.acceptanceCriteria || [],
 								),
@@ -227,13 +237,17 @@ export async function PUT(
 						});
 					}
 				} else {
+					// New task without ID - title is required
+					if (!task.title || typeof task.title !== "string" || task.title.trim() === "") {
+						continue; // Skip tasks without a valid title
+					}
 					await prisma.task.create({
 						data: {
 							projectId: project.id,
 							sprintId,
 							category: task.category || "task",
-							title: task.title || null,
-							description: task.description || "",
+							title: task.title.trim(),
+							description: task.description || null,
 							acceptanceCriteriaJson: JSON.stringify(
 								task.acceptanceCriteria || [],
 							),
@@ -275,12 +289,12 @@ export async function PUT(
 }
 
 export async function DELETE(
-	_request: Request,
+	request: Request,
 	{ params }: { params: Promise<{ id: string; sprintId: string }> },
 ) {
 	try {
 		const { id, sprintId } = await params;
-		const { project } = await getProjectContextFromParams(id);
+		const { project } = await getProjectContextFromParams(id, request);
 
 		const sprint = await prisma.sprint.findFirst({
 			where: { id: sprintId, projectId: project.id },

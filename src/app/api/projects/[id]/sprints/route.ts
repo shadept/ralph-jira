@@ -20,8 +20,8 @@ function formatSprint(sprint: {
 		projectId: string;
 		sprintId: string | null;
 		category: string;
-		title: string | null;
-		description: string;
+		title: string;
+		description: string | null;
 		acceptanceCriteriaJson: string;
 		status: string;
 		priority: string;
@@ -78,12 +78,12 @@ function formatSprint(sprint: {
 }
 
 export async function GET(
-	_request: Request,
+	request: Request,
 	{ params }: { params: Promise<{ id: string }> },
 ) {
 	try {
 		const { id } = await params;
-		const { project } = await getProjectContextFromParams(id);
+		const { project } = await getProjectContextFromParams(id, request);
 
 		const dbSprints = await prisma.sprint.findMany({
 			where: {
@@ -111,7 +111,7 @@ export async function POST(
 ) {
 	try {
 		const { id } = await params;
-		const { project } = await getProjectContextFromParams(id);
+		const { project } = await getProjectContextFromParams(id, request);
 		const body = await request.json();
 
 		const now = new Date();

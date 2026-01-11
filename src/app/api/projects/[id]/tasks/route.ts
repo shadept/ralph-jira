@@ -10,8 +10,8 @@ function formatTask(task: {
 	projectId: string;
 	sprintId: string | null;
 	category: string;
-	title: string | null;
-	description: string;
+	title: string;
+	description: string | null;
 	acceptanceCriteriaJson: string;
 	status: string;
 	priority: string;
@@ -52,12 +52,12 @@ function formatTask(task: {
 }
 
 export async function GET(
-	_request: Request,
+	request: Request,
 	{ params }: { params: Promise<{ id: string }> },
 ) {
 	try {
 		const { id } = await params;
-		const { project } = await getProjectContextFromParams(id);
+		const { project } = await getProjectContextFromParams(id, request);
 
 		// Fetch all tasks for the project
 		const tasks = await prisma.task.findMany({
@@ -128,16 +128,24 @@ export async function POST(
 ) {
 	try {
 		const { id } = await params;
-		const { project } = await getProjectContextFromParams(id);
+		const { project } = await getProjectContextFromParams(id, request);
 		const body = await request.json();
+
+		// Title is now required
+		if (!body.title || typeof body.title !== "string" || body.title.trim() === "") {
+			return NextResponse.json(
+				{ error: "Title is required", code: "VALIDATION_ERROR" },
+				{ status: 400 },
+			);
+		}
 
 		const task = await prisma.task.create({
 			data: {
 				projectId: project.id,
 				sprintId: body.sprintId || null,
 				category: body.category || "functional",
-				title: body.title || null,
-				description: body.description || "",
+				title: body.title.trim(),
+				description: body.description || null,
 				acceptanceCriteriaJson: JSON.stringify(body.acceptanceCriteria || []),
 				status: body.status || "backlog",
 				priority: body.priority || "medium",

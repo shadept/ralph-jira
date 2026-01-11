@@ -48,6 +48,7 @@ model User {
   memberships   OrganizationMember[]
   sessions      Session[]
   apiKeys       UserApiKey[]
+  authTokens    AuthToken[]  @relation("AuthTokens")
   runsTriggered Run[]     @relation("RunTriggeredBy")
   tasksAssigned Task[]    @relation("TaskAssignee")
   tasksCreated  Task[]    @relation("TaskCreator")
@@ -369,8 +370,8 @@ model Task {
 
   // Core fields
   category               String
-  title                  String?   // Short title
-  description            String    // Full description
+  title                  String    // Short summary title (required)
+  description            String?   // Long-form description/plan (optional, supports multi-paragraph content)
   acceptanceCriteriaJson String    // JSON array
 
   // Status & tracking
@@ -471,6 +472,7 @@ model Run {
   triggeredBy             User?     @relation("RunTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull)
   commands                RunCommand[]
   logs                    RunLog[]  // Progress logs belong to runs
+  authToken               AuthToken? // Runner token for this run
 
   @@index([projectId])
   @@index([sprintId])
@@ -507,4 +509,38 @@ model RunLog {
   @@index([runId])
   @@index([createdAt])
   @@map("run_logs")
+}
+
+// ============================================================================
+// AUTH TOKENS (For API authentication to Ralph)
+// ============================================================================
+
+model AuthToken {
+  id        String    @id @default(cuid())
+  userId    String
+  name      String    // "My sync key" or "Runner: run-abc123"
+  keyHash   String    @unique // SHA-256 hash for lookup
+
+  // Scoping - null means full user access (just strings for filtering)
+  projectId String?   // Restrict to specific project
+  sprintId  String?   // Restrict to specific sprint
+  runId     String?   @unique // Restrict to specific run (for runner tokens)
+
+  // Tracking
+  lastUsedAt DateTime?
+  usageCount Int       @default(0)
+
+  // Lifecycle
+  expiresAt  DateTime? // null = never expires
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  revokedAt  DateTime?
+
+  user       User      @relation("AuthTokens", fields: [userId], references: [id], onDelete: Cascade)
+  run        Run?      @relation(fields: [runId], references: [runId], onDelete: Cascade)
+
+  @@index([keyHash])
+  @@index([userId])
+  @@index([runId])
+  @@map("auth_tokens")
 }

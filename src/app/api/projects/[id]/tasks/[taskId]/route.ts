@@ -10,8 +10,8 @@ function formatTask(task: {
 	projectId: string;
 	sprintId: string | null;
 	category: string;
-	title: string | null;
-	description: string;
+	title: string;
+	description: string | null;
 	acceptanceCriteriaJson: string;
 	status: string;
 	priority: string;
@@ -52,12 +52,12 @@ function formatTask(task: {
 }
 
 export async function GET(
-	_request: Request,
+	request: Request,
 	{ params }: { params: Promise<{ id: string; taskId: string }> },
 ) {
 	try {
 		const { id, taskId } = await params;
-		const { project } = await getProjectContextFromParams(id);
+		const { project } = await getProjectContextFromParams(id, request);
 
 		const task = await prisma.task.findFirst({
 			where: {
@@ -83,7 +83,7 @@ export async function PUT(
 ) {
 	try {
 		const { id, taskId } = await params;
-		const { project } = await getProjectContextFromParams(id);
+		const { project } = await getProjectContextFromParams(id, request);
 		const body = await request.json();
 
 		// Verify task exists and belongs to project
@@ -98,14 +98,24 @@ export async function PUT(
 			return NextResponse.json({ error: "Task not found" }, { status: 404 });
 		}
 
+		// Validate title if provided - it cannot be empty
+		if (body.title !== undefined) {
+			if (typeof body.title !== "string" || body.title.trim() === "") {
+				return NextResponse.json(
+					{ error: "Title cannot be empty", code: "VALIDATION_ERROR" },
+					{ status: 400 },
+				);
+			}
+		}
+
 		const task = await prisma.task.update({
 			where: { id: taskId },
 			data: {
 				sprintId: body.sprintId !== undefined ? body.sprintId : undefined,
 				category: body.category !== undefined ? body.category : undefined,
-				title: body.title !== undefined ? body.title : undefined,
+				title: body.title !== undefined ? body.title.trim() : undefined,
 				description:
-					body.description !== undefined ? body.description : undefined,
+					body.description !== undefined ? (body.description || null) : undefined,
 				acceptanceCriteriaJson:
 					body.acceptanceCriteria !== undefined
 						? JSON.stringify(body.acceptanceCriteria)
@@ -140,12 +150,12 @@ export async function PUT(
 }
 
 export async function DELETE(
-	_request: Request,
+	request: Request,
 	{ params }: { params: Promise<{ id: string; taskId: string }> },
 ) {
 	try {
 		const { id, taskId } = await params;
-		const { project } = await getProjectContextFromParams(id);
+		const { project } = await getProjectContextFromParams(id, request);
 
 		// Verify task exists and belongs to project
 		const existingTask = await prisma.task.findFirst({

@@ -520,8 +520,8 @@ export const TaskSchema = z.object({
 
 	// Core fields
 	category: z.string(),
-	title: z.string().nullable().optional(),
-	description: z.string(),
+	title: z.string(), // Required short summary title
+	description: z.string().nullable().optional(), // Optional long-form description/plan
 	acceptanceCriteria: z.array(z.string()),
 
 	// Status & tracking
