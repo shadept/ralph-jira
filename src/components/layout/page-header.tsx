@@ -20,7 +20,7 @@ export function PageHeader({
 	backLink,
 }: PageHeaderProps) {
 	return (
-		<div className="flex flex-col gap-4 mb-6 md:flex-row md:items-start md:justify-between">
+		<div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-start lg:justify-between">
 			<div className="flex-1 min-w-0 space-y-2">
 				{backLink && <BackButton href={backLink.href} label={backLink.label} />}
 				<div>

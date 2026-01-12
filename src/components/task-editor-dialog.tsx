@@ -188,18 +188,16 @@ function TaskForm({
 
 	const dialogTitle = "Edit Task";
 	const canDelete = Boolean(onDelete);
+	const onOpenChange = (nextOpen: boolean) => {
+		if (!nextOpen) {
+			requestClose();
+		}
+	};
 
 	return (
 		<>
-			<Dialog
-				open={true}
-				onOpenChange={(nextOpen) => {
-					if (!nextOpen) {
-						requestClose();
-					}
-				}}
-			>
-				<DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+			<Dialog open={true} onOpenChange={onOpenChange}>
+				<DialogContent className="w-full md:max-w-2xl lg:max-w-4xl xl:max-w-6xl max-h-[90vh] overflow-y-auto">
 					<DialogHeader>
 						<DialogTitle>{dialogTitle}</DialogTitle>
 					</DialogHeader>

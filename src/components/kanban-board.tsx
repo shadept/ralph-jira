@@ -134,7 +134,7 @@ export function KanbanBoard({
 			onDragStart={handleDragStart}
 			onDragEnd={handleDragEnd}
 		>
-			<div className="mx-auto flex flex-1 gap-4 pb-4">
+			<div className="mx-auto max-w-full flex flex-1 gap-4 pb-4 overflow-x-auto">
 				{columns
 					.sort((a, b) => a.order - b.order)
 					.map((column) => {

@@ -63,12 +63,12 @@ export async function GET(
 			triggeredById: run.triggeredById || undefined,
 		};
 
-		// Format logs
-		const logs = run.logs.map((l) => ({
-			level: l.level,
-			message: l.message,
-			createdAt: l.createdAt.toISOString(),
-		}));
+		// Format logs - return as array of strings for AnsiLog component
+		// Reverse to get chronological order (newest were fetched first)
+		const log = run.logs
+			.slice()
+			.reverse()
+			.map((l) => l.message);
 
 		// Format commands
 		const commands = run.commands.map((c) => ({
@@ -83,7 +83,7 @@ export async function GET(
 
 		return NextResponse.json({
 			run: { ...formattedRun, commands },
-			logs,
+			log,
 		});
 	} catch (error) {
 		console.error("Failed to fetch run details", error);
