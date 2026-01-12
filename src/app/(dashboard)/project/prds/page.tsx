@@ -4,7 +4,10 @@ import {
 	ArchiveIcon,
 	FileTextIcon,
 	PlusIcon,
+	SparkleIcon,
+	SpinnerIcon,
 } from "@phosphor-icons/react";
+import { useForm } from "@tanstack/react-form";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -22,12 +25,22 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
 	Select,
 	SelectContent,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import type { Prd } from "@/lib/schemas";
 
 const statusColors: Record<string, string> = {
@@ -117,6 +130,10 @@ export default function PrdsPage() {
 	const [isEditorOpen, setIsEditorOpen] = useState(false);
 	const [editorMode, setEditorMode] = useState<"create" | "edit">("create");
 
+	// Draft with Description dialog state
+	const [isDraftDialogOpen, setIsDraftDialogOpen] = useState(false);
+	const [draftLoading, setDraftLoading] = useState(false);
+
 	const loadPrds = useCallback(async () => {
 		if (!currentProject) {
 			setPrds([]);
@@ -153,7 +170,66 @@ export default function PrdsPage() {
 		loadPrds();
 	}, [loadPrds]);
 
+	// Open Draft with Description dialog (default for new PRDs)
 	const handleNewPrd = () => {
+		setIsDraftDialogOpen(true);
+	};
+
+	// Handler for creating PRD with AI-generated content
+	const handleDraftPrd = async (description: string, additionalContext?: string) => {
+		setDraftLoading(true);
+		try {
+			// First, create a placeholder PRD
+			const createRes = await apiFetch("/api/prds", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					title: "Generating...",
+					content: "",
+					status: "draft",
+					priority: "medium",
+					tags: [],
+				}),
+			});
+
+			if (!createRes.ok) throw new Error("Failed to create PRD");
+			const { prd: newPrd } = await createRes.json();
+
+			toast.info("AI is generating your PRD...");
+
+			// Then, use AI to generate content
+			const draftRes = await apiFetch("/api/ai/prd/draft", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					prdId: newPrd.id,
+					description,
+					additionalContext,
+				}),
+			});
+
+			if (!draftRes.ok) {
+				const error = await draftRes.json();
+				throw new Error(error.error || "Failed to generate PRD content");
+			}
+
+			const { prd: updatedPrd } = await draftRes.json();
+
+			toast.success("PRD created successfully");
+			setIsDraftDialogOpen(false);
+
+			// Navigate to the new PRD detail page
+			router.push(`/project/prds/${updatedPrd.id}`);
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Failed to create PRD");
+			console.error(error);
+		} finally {
+			setDraftLoading(false);
+		}
+	};
+
+	// Open blank PRD editor (for manual creation)
+	const handleNewBlankPrd = () => {
 		const newPrd: Prd = {
 			id: `prd-${Date.now()}`,
 			projectId: currentProject?.id || "default",
@@ -344,6 +420,146 @@ export default function PrdsPage() {
 				onDelete={editorMode === "edit" ? handleDeletePrd : undefined}
 				mode={editorMode}
 			/>
+
+			{/* Draft with Description Dialog */}
+			<DraftPrdDialog
+				open={isDraftDialogOpen}
+				onOpenChange={setIsDraftDialogOpen}
+				onSubmit={handleDraftPrd}
+				onCreateBlank={handleNewBlankPrd}
+				loading={draftLoading}
+			/>
 		</>
+	);
+}
+
+// Draft with Description Dialog component
+function DraftPrdDialog({
+	open,
+	onOpenChange,
+	onSubmit,
+	onCreateBlank,
+	loading,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	onSubmit: (description: string, additionalContext?: string) => Promise<void>;
+	onCreateBlank: () => void;
+	loading: boolean;
+}) {
+	const form = useForm({
+		defaultValues: {
+			description: "",
+			additionalContext: "",
+		},
+		onSubmit: async ({ value }) => {
+			if (!value.description.trim()) return;
+			await onSubmit(value.description.trim(), value.additionalContext.trim() || undefined);
+		},
+	});
+
+	useEffect(() => {
+		if (open) {
+			form.reset();
+		}
+	}, [open, form]);
+
+	const handleCreateBlank = () => {
+		onOpenChange(false);
+		onCreateBlank();
+	};
+
+	return (
+		<Dialog open={open} onOpenChange={(nextOpen) => !loading && onOpenChange(nextOpen)}>
+			<DialogContent className="max-w-lg">
+				<DialogHeader>
+					<DialogTitle>Create New PRD</DialogTitle>
+					<DialogDescription>
+						Describe what you want to build and AI will generate a comprehensive PRD for you.
+					</DialogDescription>
+				</DialogHeader>
+				<form
+					onSubmit={(e) => {
+						e.preventDefault();
+						form.handleSubmit();
+					}}
+				>
+					<div className="space-y-4">
+						<form.Field name="description">
+							{(field) => (
+								<div className="space-y-2">
+									<Label htmlFor={field.name}>Feature Description *</Label>
+									<Textarea
+										id={field.name}
+										value={field.state.value}
+										onChange={(e) => field.handleChange(e.target.value)}
+										placeholder="e.g., A user authentication system with email/password login, OAuth support, password reset, and session management"
+										rows={4}
+										autoFocus
+										disabled={loading}
+									/>
+									<p className="text-xs text-muted-foreground">
+										Be specific about what you want to build. The more detail, the better the PRD.
+									</p>
+								</div>
+							)}
+						</form.Field>
+
+						<form.Field name="additionalContext">
+							{(field) => (
+								<div className="space-y-2">
+									<Label htmlFor={field.name}>Additional Context (optional)</Label>
+									<Textarea
+										id={field.name}
+										value={field.state.value}
+										onChange={(e) => field.handleChange(e.target.value)}
+										placeholder="e.g., Target audience, specific requirements, constraints, integrations..."
+										rows={2}
+										disabled={loading}
+									/>
+								</div>
+							)}
+						</form.Field>
+					</div>
+
+					<DialogFooter className="mt-4 flex flex-col sm:flex-row gap-2">
+						<Button
+							type="button"
+							variant="ghost"
+							onClick={handleCreateBlank}
+							disabled={loading}
+							className="sm:mr-auto"
+						>
+							Create blank PRD instead
+						</Button>
+						<Button
+							type="button"
+							variant="outline"
+							onClick={() => onOpenChange(false)}
+							disabled={loading}
+						>
+							Cancel
+						</Button>
+						<form.Subscribe selector={(state) => state.values.description}>
+							{(description) => (
+								<Button type="submit" disabled={loading || !description.trim()}>
+									{loading ? (
+										<>
+											Generating
+											<SpinnerIcon className="ml-2 h-4 w-4 animate-spin" />
+										</>
+									) : (
+										<>
+											<SparkleIcon className="mr-2 h-4 w-4" />
+											Generate PRD
+										</>
+									)}
+								</Button>
+							)}
+						</form.Subscribe>
+					</DialogFooter>
+				</form>
+			</DialogContent>
+		</Dialog>
 	);
 }
