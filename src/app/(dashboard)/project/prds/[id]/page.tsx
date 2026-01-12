@@ -4,10 +4,11 @@ import {
 	ArchiveIcon,
 	ArrowsClockwiseIcon,
 	ListBulletsIcon,
-	PencilIcon,
+	PlusIcon,
 	SparkleIcon,
 	SpinnerIcon,
 	TrashIcon,
+	XIcon,
 } from "@phosphor-icons/react";
 import { useForm } from "@tanstack/react-form";
 import { format, formatDistanceToNow } from "date-fns";
@@ -26,7 +27,6 @@ const MarkdownEditor = dynamic(
 	}
 );
 import { PageHeader } from "@/components/layout/page-header";
-import { PrdEditorDialog } from "@/components/prd-editor-dialog";
 import { useProjectContext } from "@/components/projects/project-provider";
 import {
 	AlertDialog,
@@ -597,9 +597,6 @@ export default function PrdDetailPage() {
 	const [loading, setLoading] = useState(true);
 	const [notFound, setNotFound] = useState(false);
 
-	// Editor dialog state
-	const [isEditorOpen, setIsEditorOpen] = useState(false);
-
 	// Delete confirmation state
 	const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 	const [deleting, setDeleting] = useState(false);
@@ -629,6 +626,10 @@ export default function PrdDetailPage() {
 	const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 	const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const lastSavedContentRef = useRef<string>("");
+
+	// Inline editing states for sidebar fields
+	const [newTag, setNewTag] = useState("");
+	const [updatingField, setUpdatingField] = useState<string | null>(null);
 
 	const loadPrd = useCallback(async () => {
 		if (!currentProject || !prdId) {
@@ -680,6 +681,39 @@ export default function PrdDetailPage() {
 			setLoadingSprints(false);
 		}
 	}, [apiFetch, currentProject]);
+
+	// Handler to update a single field inline
+	const handleInlineUpdate = useCallback(async (field: string, value: unknown) => {
+		if (!prd) return;
+		setUpdatingField(field);
+		try {
+			const res = await apiFetch(`/api/prds/${prdId}`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ [field]: value }),
+			});
+			if (!res.ok) throw new Error(`Failed to update ${field}`);
+			await loadPrd();
+		} catch (error) {
+			toast.error(`Failed to update ${field}`);
+			console.error(error);
+		} finally {
+			setUpdatingField(null);
+		}
+	}, [apiFetch, prd, prdId, loadPrd]);
+
+	const handleAddTag = useCallback(async () => {
+		if (!prd || !newTag.trim()) return;
+		const updatedTags = [...prd.tags, newTag.trim()];
+		await handleInlineUpdate("tags", updatedTags);
+		setNewTag("");
+	}, [prd, newTag, handleInlineUpdate]);
+
+	const handleRemoveTag = useCallback(async (tagToRemove: string) => {
+		if (!prd) return;
+		const updatedTags = prd.tags.filter(tag => tag !== tagToRemove);
+		await handleInlineUpdate("tags", updatedTags);
+	}, [prd, handleInlineUpdate]);
 
 	useEffect(() => {
 		loadPrd();
@@ -752,37 +786,6 @@ export default function PrdDetailPage() {
 			loadSprints();
 		}
 	}, [generateTasksDialogOpen, loadSprints]);
-
-	const handleEdit = () => {
-		setIsEditorOpen(true);
-	};
-
-	const handleCloseEditor = () => {
-		setIsEditorOpen(false);
-	};
-
-	const handleSavePrd = async (updatedPrd: Prd) => {
-		try {
-			const res = await apiFetch(`/api/prds/${updatedPrd.id}`, {
-				method: "PUT",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					title: updatedPrd.title,
-					content: updatedPrd.content,
-					status: updatedPrd.status,
-					priority: updatedPrd.priority,
-					tags: updatedPrd.tags,
-				}),
-			});
-			if (!res.ok) throw new Error("Failed to update PRD");
-			toast.success("PRD updated");
-			handleCloseEditor();
-			await loadPrd();
-		} catch (error) {
-			toast.error("Failed to update PRD");
-			console.error(error);
-		}
-	};
 
 	const handleDelete = async () => {
 		setDeleting(true);
@@ -1023,14 +1026,6 @@ export default function PrdDetailPage() {
 
 	const actions = (
 		<div className="flex flex-wrap items-center gap-2">
-			<Button
-				variant="default"
-				onClick={() => setConvertDialogOpen(true)}
-				disabled={isLoading}
-			>
-				<ArrowsClockwiseIcon className="w-4 h-4 mr-2" />
-				{convertLoading ? "Creating..." : "Convert to Sprint"}
-			</Button>
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
 					<Button variant="outline" disabled={isLoading}>
@@ -1074,9 +1069,13 @@ export default function PrdDetailPage() {
 				<TrashIcon className="w-4 h-4 mr-1" />
 				Delete
 			</Button>
-			<Button onClick={handleEdit} disabled={isLoading}>
-				<PencilIcon className="w-4 h-4 mr-2" />
-				Edit
+			<Button
+				variant="default"
+				onClick={() => setConvertDialogOpen(true)}
+				disabled={isLoading}
+			>
+				<ArrowsClockwiseIcon className="w-4 h-4 mr-2" />
+				{convertLoading ? "Creating..." : "Convert to Sprint"}
 			</Button>
 		</div>
 	);
@@ -1125,28 +1124,113 @@ export default function PrdDetailPage() {
 						<CardContent className="space-y-4">
 							<div>
 								<p className="text-xs text-muted-foreground mb-1">Status</p>
-								<Badge className={statusColors[prd.status]}>
-									{statusLabels[prd.status] || prd.status}
-								</Badge>
+								<Select
+									value={prd.status}
+									onValueChange={(value) => handleInlineUpdate("status", value)}
+									disabled={updatingField === "status"}
+								>
+									<SelectTrigger className="w-full h-8">
+										<SelectValue>
+											<Badge className={statusColors[prd.status]}>
+												{updatingField === "status" ? (
+													<>
+														<SpinnerIcon className="h-3 w-3 animate-spin mr-1" />
+														Updating...
+													</>
+												) : (
+													statusLabels[prd.status] || prd.status
+												)}
+											</Badge>
+										</SelectValue>
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="draft">Draft</SelectItem>
+										<SelectItem value="review">In Review</SelectItem>
+										<SelectItem value="approved">Approved</SelectItem>
+										<SelectItem value="archived">Archived</SelectItem>
+									</SelectContent>
+								</Select>
 							</div>
 							<div>
 								<p className="text-xs text-muted-foreground mb-1">Priority</p>
-								<Badge className={priorityColors[prd.priority]}>
-									{prd.priority}
-								</Badge>
-							</div>
-							{prd.tags.length > 0 && (
-								<div>
-									<p className="text-xs text-muted-foreground mb-1">Tags</p>
-									<div className="flex flex-wrap gap-1">
-										{prd.tags.map((tag) => (
-											<Badge key={tag} variant="secondary" className="text-xs">
-												{tag}
+								<Select
+									value={prd.priority}
+									onValueChange={(value) => handleInlineUpdate("priority", value)}
+									disabled={updatingField === "priority"}
+								>
+									<SelectTrigger className="w-full h-8">
+										<SelectValue>
+											<Badge className={priorityColors[prd.priority]}>
+												{updatingField === "priority" ? (
+													<>
+														<SpinnerIcon className="h-3 w-3 animate-spin mr-1" />
+														Updating...
+													</>
+												) : (
+													prd.priority
+												)}
 											</Badge>
-										))}
-									</div>
+										</SelectValue>
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="low">Low</SelectItem>
+										<SelectItem value="medium">Medium</SelectItem>
+										<SelectItem value="high">High</SelectItem>
+										<SelectItem value="urgent">Urgent</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
+							<div>
+								<p className="text-xs text-muted-foreground mb-1">Tags</p>
+								<div className="flex flex-wrap gap-1 mb-2">
+									{prd.tags.map((tag) => (
+										<Badge
+											key={tag}
+											variant="secondary"
+											className="text-xs pr-1 flex items-center gap-1"
+										>
+											{tag}
+											<button
+												type="button"
+												onClick={() => handleRemoveTag(tag)}
+												disabled={updatingField === "tags"}
+												className="ml-0.5 hover:bg-muted-foreground/20 rounded-full p-0.5"
+											>
+												<XIcon className="h-3 w-3" />
+											</button>
+										</Badge>
+									))}
 								</div>
-							)}
+								<div className="flex gap-1">
+									<Input
+										value={newTag}
+										onChange={(e) => setNewTag(e.target.value)}
+										placeholder="Add tag..."
+										className="h-7 text-xs"
+										onKeyDown={(e) => {
+											if (e.key === "Enter") {
+												e.preventDefault();
+												handleAddTag();
+											}
+										}}
+										disabled={updatingField === "tags"}
+									/>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										className="h-7 w-7 p-0"
+										onClick={handleAddTag}
+										disabled={!newTag.trim() || updatingField === "tags"}
+									>
+										{updatingField === "tags" ? (
+											<SpinnerIcon className="h-3 w-3 animate-spin" />
+										) : (
+											<PlusIcon className="h-3 w-3" />
+										)}
+									</Button>
+								</div>
+							</div>
 							<div className="pt-2 border-t">
 								<p className="text-xs text-muted-foreground mb-1">Created</p>
 								<p className="text-sm">
@@ -1178,16 +1262,6 @@ export default function PrdDetailPage() {
 					</Card>
 				</div>
 			</div>
-
-			{/* Editor Dialog */}
-			<PrdEditorDialog
-				prd={prd}
-				open={isEditorOpen}
-				onClose={handleCloseEditor}
-				onSave={handleSavePrd}
-				onDelete={handleDelete}
-				mode="edit"
-			/>
 
 			{/* AI Draft Dialog */}
 			<DraftPrdDialog
