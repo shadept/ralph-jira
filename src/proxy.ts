@@ -75,10 +75,7 @@ export async function proxy(request: NextRequest) {
 	// User API keys (ck_) are still rate limited like session auth
 	// Actual validation happens in route handlers via getProjectContext
 	const authHeader = request.headers.get("Authorization");
-	if (
-		pathname.startsWith("/api/") &&
-		authHeader?.startsWith("Bearer rk_")
-	) {
+	if (pathname.startsWith("/api/") && authHeader?.startsWith("Bearer rk_")) {
 		return NextResponse.next();
 	}
 

@@ -115,7 +115,7 @@ export async function PUT(
 				category: body.category !== undefined ? body.category : undefined,
 				title: body.title !== undefined ? body.title.trim() : undefined,
 				description:
-					body.description !== undefined ? (body.description || null) : undefined,
+					body.description !== undefined ? body.description || null : undefined,
 				acceptanceCriteriaJson:
 					body.acceptanceCriteria !== undefined
 						? JSON.stringify(body.acceptanceCriteria)

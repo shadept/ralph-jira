@@ -170,18 +170,22 @@ export async function PUT(
 
 					if (existingTask) {
 						// Validate title if provided - it cannot be empty
-						const newTitle = task.title !== undefined
-							? (typeof task.title === "string" && task.title.trim() !== "" ? task.title.trim() : existingTask.title)
-							: existingTask.title;
+						const newTitle =
+							task.title !== undefined
+								? typeof task.title === "string" && task.title.trim() !== ""
+									? task.title.trim()
+									: existingTask.title
+								: existingTask.title;
 
 						await prisma.task.update({
 							where: { id: task.id },
 							data: {
 								category: task.category ?? existingTask.category,
 								title: newTitle,
-								description: task.description !== undefined
-									? (task.description || null)
-									: existingTask.description,
+								description:
+									task.description !== undefined
+										? task.description || null
+										: existingTask.description,
 								acceptanceCriteriaJson: task.acceptanceCriteria
 									? JSON.stringify(task.acceptanceCriteria)
 									: existingTask.acceptanceCriteriaJson,
@@ -212,7 +216,11 @@ export async function PUT(
 						});
 					} else {
 						// Task with ID doesn't exist - create new (title is required)
-						if (!task.title || typeof task.title !== "string" || task.title.trim() === "") {
+						if (
+							!task.title ||
+							typeof task.title !== "string" ||
+							task.title.trim() === ""
+						) {
 							continue; // Skip tasks without a valid title
 						}
 						await prisma.task.create({
@@ -238,7 +246,11 @@ export async function PUT(
 					}
 				} else {
 					// New task without ID - title is required
-					if (!task.title || typeof task.title !== "string" || task.title.trim() === "") {
+					if (
+						!task.title ||
+						typeof task.title !== "string" ||
+						task.title.trim() === ""
+					) {
 						continue; // Skip tasks without a valid title
 					}
 					await prisma.task.create({

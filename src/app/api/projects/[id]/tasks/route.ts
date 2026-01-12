@@ -132,7 +132,11 @@ export async function POST(
 		const body = await request.json();
 
 		// Title is now required
-		if (!body.title || typeof body.title !== "string" || body.title.trim() === "") {
+		if (
+			!body.title ||
+			typeof body.title !== "string" ||
+			body.title.trim() === ""
+		) {
 			return NextResponse.json(
 				{ error: "Title is required", code: "VALIDATION_ERROR" },
 				{ status: 400 },

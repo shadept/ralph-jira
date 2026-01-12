@@ -1,24 +1,24 @@
 "use client";
 
-import { SpinnerIcon } from "@phosphor-icons/react";
 import {
-	MDXEditor,
+	BlockTypeSelect,
+	BoldItalicUnderlineToggles,
+	CreateLink,
 	headingsPlugin,
+	InsertThematicBreak,
+	ListsToggle,
+	linkDialogPlugin,
+	linkPlugin,
 	listsPlugin,
+	MDXEditor,
+	type MDXEditorMethods,
+	markdownShortcutPlugin,
 	quotePlugin,
 	thematicBreakPlugin,
-	markdownShortcutPlugin,
-	linkPlugin,
-	linkDialogPlugin,
 	toolbarPlugin,
-	BoldItalicUnderlineToggles,
-	BlockTypeSelect,
-	ListsToggle,
-	CreateLink,
-	InsertThematicBreak,
 	UndoRedo,
-	type MDXEditorMethods,
 } from "@mdxeditor/editor";
+import { SpinnerIcon } from "@phosphor-icons/react";
 import "@mdxeditor/editor/style.css";
 import { forwardRef } from "react";
 
@@ -64,7 +64,7 @@ export const MarkdownEditor = forwardRef<MDXEditorMethods, MarkdownEditorProps>(
 				]}
 			/>
 		);
-	}
+	},
 );
 
 MarkdownEditor.displayName = "MarkdownEditor";

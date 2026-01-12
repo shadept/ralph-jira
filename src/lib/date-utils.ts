@@ -9,7 +9,9 @@ export function toISOString(date: Date | string): string {
 /**
  * Converts an optional date value to ISO string format or null.
  */
-export function toISOStringOrNull(date: Date | string | null | undefined): string | null {
+export function toISOStringOrNull(
+	date: Date | string | null | undefined,
+): string | null {
 	if (date === null || date === undefined) {
 		return null;
 	}

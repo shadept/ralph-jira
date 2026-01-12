@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAIClient } from "@/lib/ai/client";
 import {
-	PRD_TASK_GENERATOR_PROMPT,
 	buildPrdTaskGenerationPrompt,
+	PRD_TASK_GENERATOR_PROMPT,
 } from "@/lib/ai/prompts/prd";
 import { prisma } from "@/lib/db";
 import {
@@ -17,10 +17,14 @@ const GeneratedTaskSchema = z.object({
 	tasks: z.array(
 		z.object({
 			title: z.string().describe("Short, action-oriented task title"),
-			description: z.string().describe("Brief context about what and why, referencing the PRD"),
+			description: z
+				.string()
+				.describe("Brief context about what and why, referencing the PRD"),
 			acceptanceCriteria: z
 				.array(z.string())
-				.describe("Testable outcomes for the task derived from PRD requirements"),
+				.describe(
+					"Testable outcomes for the task derived from PRD requirements",
+				),
 			priority: z.enum(["low", "medium", "high", "urgent"]),
 			estimate: z.number().describe("Story points: 1, 2, 3, 5, 8, or 13"),
 			tags: z.array(z.string()).describe("Relevant tags for categorization"),
@@ -68,8 +72,9 @@ export async function POST(request: Request) {
 		if (!prd.content?.trim()) {
 			return NextResponse.json(
 				{
-					error: "PRD has no content. Please add content to the PRD before generating tasks.",
-					code: "PRD_EMPTY"
+					error:
+						"PRD has no content. Please add content to the PRD before generating tasks.",
+					code: "PRD_EMPTY",
 				},
 				{ status: 400 },
 			);
@@ -121,14 +126,10 @@ export async function POST(request: Request) {
 		});
 
 		// Build user prompt from PRD content
-		const userPrompt = buildPrdTaskGenerationPrompt(
-			prd.title,
-			prd.content,
-			{
-				taskCount,
-				category,
-			},
-		);
+		const userPrompt = buildPrdTaskGenerationPrompt(prd.title, prd.content, {
+			taskCount,
+			category,
+		});
 
 		// Generate tasks with structured output
 		const result = await aiClient.runWithSchema(

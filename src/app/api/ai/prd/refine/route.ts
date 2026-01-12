@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAIClient } from "@/lib/ai/client";
-import {
-	PRD_REFINER_PROMPT,
-	buildPrdRefinePrompt,
-} from "@/lib/ai/prompts/prd";
+import { buildPrdRefinePrompt, PRD_REFINER_PROMPT } from "@/lib/ai/prompts/prd";
 import { prisma } from "@/lib/db";
 import {
 	getProjectContext,
@@ -53,7 +50,8 @@ export async function POST(request: Request) {
 		if (!prd.content?.trim()) {
 			return NextResponse.json(
 				{
-					error: "PRD has no content to refine. Use 'Draft from Description' first.",
+					error:
+						"PRD has no content to refine. Use 'Draft from Description' first.",
 					code: "EMPTY_CONTENT",
 				},
 				{ status: 400 },

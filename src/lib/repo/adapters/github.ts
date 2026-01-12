@@ -26,8 +26,6 @@ export interface GitHubRepoConfig {
 }
 
 export class GitHubRepoAdapter implements RepoAdapter {
-	private config: GitHubRepoConfig;
-
 	constructor(config: GitHubRepoConfig) {
 		this.config = config;
 	}

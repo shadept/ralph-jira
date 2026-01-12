@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAIClient } from "@/lib/ai/client";
-import {
-	PRD_DRAFTER_PROMPT,
-	buildPrdDraftPrompt,
-} from "@/lib/ai/prompts/prd";
+import { buildPrdDraftPrompt, PRD_DRAFTER_PROMPT } from "@/lib/ai/prompts/prd";
 import { prisma } from "@/lib/db";
 import {
 	getProjectContext,
@@ -36,7 +33,10 @@ export async function POST(request: Request) {
 
 		if (!description?.trim()) {
 			return NextResponse.json(
-				{ error: "Feature description is required", code: "MISSING_DESCRIPTION" },
+				{
+					error: "Feature description is required",
+					code: "MISSING_DESCRIPTION",
+				},
 				{ status: 400 },
 			);
 		}

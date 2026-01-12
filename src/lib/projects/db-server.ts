@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
+import { validateApiKey } from "@/lib/api-keys";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { validateApiKey } from "@/lib/api-keys";
 
 const PROJECT_QUERY_PARAM = "projectId";
 

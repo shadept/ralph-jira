@@ -12,7 +12,8 @@ interface SoftDeleteConfig {
 	defaultConfig?: ModelConfig;
 }
 
-const DEFAULT_CREATE_VALUE = (deleted: boolean) => (deleted ? new Date() : null);
+const _DEFAULT_CREATE_VALUE = (deleted: boolean) =>
+	deleted ? new Date() : null;
 
 const FILTER_OPERATIONS = ["findFirst", "findMany", "findUnique", "count"];
 
@@ -20,10 +21,7 @@ const FILTER_OPERATIONS = ["findFirst", "findMany", "findUnique", "count"];
  * Recursively filters soft-deleted records from nested includes.
  * Only filters arrays - does not modify single objects to preserve Prisma's proxy objects.
  */
-function filterSoftDeleted<T>(
-	data: T,
-	models: Record<string, ModelConfig>,
-): T {
+function filterSoftDeleted<T>(data: T, models: Record<string, ModelConfig>): T {
 	if (data === null || data === undefined) {
 		return data;
 	}
@@ -34,7 +32,10 @@ function filterSoftDeleted<T>(
 			.filter((item) => {
 				if (item && typeof item === "object" && !Array.isArray(item)) {
 					for (const config of Object.values(models)) {
-						if (config.field in item && (item as Record<string, unknown>)[config.field] !== null) {
+						if (
+							config.field in item &&
+							(item as Record<string, unknown>)[config.field] !== null
+						) {
 							return false;
 						}
 					}

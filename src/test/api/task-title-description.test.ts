@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { TaskSchema } from "@/lib/schemas";
 import { z } from "zod";
+import { TaskSchema } from "@/lib/schemas";
 
 /**
  * Regression tests for Task title/description contract.
@@ -181,7 +181,7 @@ First, we need to update the database schema to support the new field.
 				// Title is short and summary-like
 				expect(result.data.title.length).toBeLessThan(100);
 				// Description is longer and more detailed
-				expect(result.data.description!.length).toBeGreaterThan(
+				expect(result.data.description?.length).toBeGreaterThan(
 					result.data.title.length,
 				);
 			}
@@ -539,7 +539,7 @@ Users should be able to reset their password via email.
 			const result = TaskSchema.safeParse(taskWithLongDescription);
 			expect(result.success).toBe(true);
 			if (result.success) {
-				expect(result.data.description!.length).toBe(10000);
+				expect(result.data.description?.length).toBe(10000);
 			}
 		});
 

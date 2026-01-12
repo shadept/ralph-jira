@@ -105,7 +105,8 @@ export async function PUT(
 				content: body.content !== undefined ? body.content : undefined,
 				status: body.status !== undefined ? body.status : undefined,
 				priority: body.priority !== undefined ? body.priority : undefined,
-				tagsJson: body.tags !== undefined ? JSON.stringify(body.tags) : undefined,
+				tagsJson:
+					body.tags !== undefined ? JSON.stringify(body.tags) : undefined,
 				order: body.order !== undefined ? body.order : undefined,
 				archivedAt:
 					body.archived !== undefined

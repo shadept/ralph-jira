@@ -305,13 +305,11 @@ function PrdForm({
 								{mode === "edit" && prd.createdAt && (
 									<div className="pt-4 border-t text-sm text-muted-foreground space-y-1">
 										<p>
-											Created:{" "}
-											{new Date(prd.createdAt).toLocaleDateString()}
+											Created: {new Date(prd.createdAt).toLocaleDateString()}
 										</p>
 										{prd.updatedAt && (
 											<p>
-												Updated:{" "}
-												{new Date(prd.updatedAt).toLocaleDateString()}
+												Updated: {new Date(prd.updatedAt).toLocaleDateString()}
 											</p>
 										)}
 									</div>

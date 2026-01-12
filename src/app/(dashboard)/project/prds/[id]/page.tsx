@@ -20,12 +20,14 @@ import { MarkdownEditorLoading } from "@/components/markdown-editor";
 
 // Dynamic import of MDXEditor to avoid SSR issues
 const MarkdownEditor = dynamic(
-	() => import("@/components/markdown-editor").then((mod) => mod.MarkdownEditor),
+	() =>
+		import("@/components/markdown-editor").then((mod) => mod.MarkdownEditor),
 	{
 		ssr: false,
 		loading: () => <MarkdownEditorLoading />,
-	}
+	},
 );
+
 import { PageHeader } from "@/components/layout/page-header";
 import { useProjectContext } from "@/components/projects/project-provider";
 import {
@@ -40,12 +42,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
 	Dialog,
 	DialogContent,
@@ -111,7 +108,10 @@ function DraftPrdDialog({
 		},
 		onSubmit: async ({ value }) => {
 			if (!value.description.trim()) return;
-			await onSubmit(value.description.trim(), value.additionalContext.trim() || undefined);
+			await onSubmit(
+				value.description.trim(),
+				value.additionalContext.trim() || undefined,
+			);
 		},
 	});
 
@@ -127,7 +127,8 @@ function DraftPrdDialog({
 				<DialogHeader>
 					<DialogTitle>Draft PRD with AI</DialogTitle>
 					<DialogDescription>
-						Describe the feature or product you want to document and AI will generate a comprehensive PRD.
+						Describe the feature or product you want to document and AI will
+						generate a comprehensive PRD.
 					</DialogDescription>
 				</DialogHeader>
 				<form
@@ -151,7 +152,8 @@ function DraftPrdDialog({
 										disabled={loading}
 									/>
 									<p className="text-xs text-muted-foreground">
-										Be specific about what you want to build. The more detail, the better the PRD.
+										Be specific about what you want to build. The more detail,
+										the better the PRD.
 									</p>
 								</div>
 							)}
@@ -160,7 +162,9 @@ function DraftPrdDialog({
 						<form.Field name="additionalContext">
 							{(field) => (
 								<div className="space-y-2">
-									<Label htmlFor={field.name}>Additional Context (optional)</Label>
+									<Label htmlFor={field.name}>
+										Additional Context (optional)
+									</Label>
 									<Textarea
 										id={field.name}
 										value={field.state.value}
@@ -243,7 +247,8 @@ function RefinePrdDialog({
 				<DialogHeader>
 					<DialogTitle>Refine PRD with AI</DialogTitle>
 					<DialogDescription>
-						AI will review and improve your PRD for clarity, completeness, and actionability.
+						AI will review and improve your PRD for clarity, completeness, and
+						actionability.
 					</DialogDescription>
 				</DialogHeader>
 				<form
@@ -265,7 +270,8 @@ function RefinePrdDialog({
 									disabled={loading}
 								/>
 								<p className="text-xs text-muted-foreground">
-									Enter specific areas to focus on (one per line), or leave empty for general improvement.
+									Enter specific areas to focus on (one per line), or leave
+									empty for general improvement.
 								</p>
 							</div>
 						)}
@@ -309,7 +315,11 @@ function ConvertToSprintDialog({
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	onSubmit: (data: { name: string; goal: string; deadline: string }) => Promise<void>;
+	onSubmit: (data: {
+		name: string;
+		goal: string;
+		deadline: string;
+	}) => Promise<void>;
 	loading: boolean;
 	prdTitle: string;
 }) {
@@ -317,7 +327,10 @@ function ConvertToSprintDialog({
 		defaultValues: {
 			name: `Sprint: ${prdTitle}`,
 			goal: "",
-			deadline: format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"), // Default to 2 weeks from now
+			deadline: format(
+				new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+				"yyyy-MM-dd",
+			), // Default to 2 weeks from now
 		},
 		onSubmit: async ({ value }) => {
 			if (!value.name.trim() || !value.deadline) return;
@@ -333,7 +346,10 @@ function ConvertToSprintDialog({
 		if (open) {
 			form.setFieldValue("name", `Sprint: ${prdTitle}`);
 			form.setFieldValue("goal", "");
-			form.setFieldValue("deadline", format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"));
+			form.setFieldValue(
+				"deadline",
+				format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
+			);
 		}
 	}, [open, prdTitle, form]);
 
@@ -343,7 +359,8 @@ function ConvertToSprintDialog({
 				<DialogHeader>
 					<DialogTitle>Convert PRD to Sprint</DialogTitle>
 					<DialogDescription>
-						Create a new sprint from this PRD. The sprint will be linked to the source PRD.
+						Create a new sprint from this PRD. The sprint will be linked to the
+						source PRD.
 					</DialogDescription>
 				</DialogHeader>
 				<form
@@ -410,9 +427,17 @@ function ConvertToSprintDialog({
 						>
 							Cancel
 						</Button>
-						<form.Subscribe selector={(state) => ({ name: state.values.name, deadline: state.values.deadline })}>
+						<form.Subscribe
+							selector={(state) => ({
+								name: state.values.name,
+								deadline: state.values.deadline,
+							})}
+						>
 							{({ name, deadline }) => (
-								<Button type="submit" disabled={loading || !name.trim() || !deadline}>
+								<Button
+									type="submit"
+									disabled={loading || !name.trim() || !deadline}
+								>
 									{loading ? (
 										<>
 											Creating
@@ -474,7 +499,7 @@ function GenerateTasksDialog({
 	}, [open, form, sprints]);
 
 	const activeSprints = sprints.filter(
-		(s) => s.status === "planning" || s.status === "active"
+		(s) => s.status === "planning" || s.status === "active",
 	);
 
 	return (
@@ -483,7 +508,8 @@ function GenerateTasksDialog({
 				<DialogHeader>
 					<DialogTitle>Generate Tasks from PRD</DialogTitle>
 					<DialogDescription>
-						AI will analyze this PRD and generate development tasks for the selected sprint.
+						AI will analyze this PRD and generate development tasks for the
+						selected sprint.
 					</DialogDescription>
 				</DialogHeader>
 				<form
@@ -504,7 +530,8 @@ function GenerateTasksDialog({
 										</div>
 									) : activeSprints.length === 0 ? (
 										<p className="text-sm text-muted-foreground">
-											No active sprints found. Please create a sprint first or convert this PRD to a sprint.
+											No active sprints found. Please create a sprint first or
+											convert this PRD to a sprint.
 										</p>
 									) : (
 										<Select
@@ -543,7 +570,8 @@ function GenerateTasksDialog({
 										disabled={loading}
 									/>
 									<p className="text-xs text-muted-foreground">
-										Leave empty to let AI determine the appropriate number of tasks based on PRD complexity.
+										Leave empty to let AI determine the appropriate number of
+										tasks based on PRD complexity.
 									</p>
 								</div>
 							)}
@@ -683,24 +711,27 @@ export default function PrdDetailPage() {
 	}, [apiFetch, currentProject]);
 
 	// Handler to update a single field inline
-	const handleInlineUpdate = useCallback(async (field: string, value: unknown) => {
-		if (!prd) return;
-		setUpdatingField(field);
-		try {
-			const res = await apiFetch(`/api/prds/${prdId}`, {
-				method: "PUT",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ [field]: value }),
-			});
-			if (!res.ok) throw new Error(`Failed to update ${field}`);
-			await loadPrd();
-		} catch (error) {
-			toast.error(`Failed to update ${field}`);
-			console.error(error);
-		} finally {
-			setUpdatingField(null);
-		}
-	}, [apiFetch, prd, prdId, loadPrd]);
+	const handleInlineUpdate = useCallback(
+		async (field: string, value: unknown) => {
+			if (!prd) return;
+			setUpdatingField(field);
+			try {
+				const res = await apiFetch(`/api/prds/${prdId}`, {
+					method: "PUT",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ [field]: value }),
+				});
+				if (!res.ok) throw new Error(`Failed to update ${field}`);
+				await loadPrd();
+			} catch (error) {
+				toast.error(`Failed to update ${field}`);
+				console.error(error);
+			} finally {
+				setUpdatingField(null);
+			}
+		},
+		[apiFetch, prd, prdId, loadPrd],
+	);
 
 	const handleAddTag = useCallback(async () => {
 		if (!prd || !newTag.trim()) return;
@@ -709,11 +740,14 @@ export default function PrdDetailPage() {
 		setNewTag("");
 	}, [prd, newTag, handleInlineUpdate]);
 
-	const handleRemoveTag = useCallback(async (tagToRemove: string) => {
-		if (!prd) return;
-		const updatedTags = prd.tags.filter(tag => tag !== tagToRemove);
-		await handleInlineUpdate("tags", updatedTags);
-	}, [prd, handleInlineUpdate]);
+	const handleRemoveTag = useCallback(
+		async (tagToRemove: string) => {
+			if (!prd) return;
+			const updatedTags = prd.tags.filter((tag) => tag !== tagToRemove);
+			await handleInlineUpdate("tags", updatedTags);
+		},
+		[prd, handleInlineUpdate],
+	);
 
 	useEffect(() => {
 		loadPrd();
@@ -733,43 +767,49 @@ export default function PrdDetailPage() {
 	}, [prd]);
 
 	// Auto-save content handler
-	const saveContent = useCallback(async (content: string) => {
-		if (!prd || content === lastSavedContentRef.current) return;
+	const saveContent = useCallback(
+		async (content: string) => {
+			if (!prd || content === lastSavedContentRef.current) return;
 
-		setIsSaving(true);
-		try {
-			const res = await apiFetch(`/api/prds/${prdId}`, {
-				method: "PUT",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					content,
-				}),
-			});
-			if (!res.ok) throw new Error("Failed to save content");
-			lastSavedContentRef.current = content;
-			setLastSavedAt(new Date());
-		} catch (error) {
-			console.error("Auto-save failed:", error);
-			toast.error("Failed to auto-save content");
-		} finally {
-			setIsSaving(false);
-		}
-	}, [apiFetch, prd, prdId]);
+			setIsSaving(true);
+			try {
+				const res = await apiFetch(`/api/prds/${prdId}`, {
+					method: "PUT",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						content,
+					}),
+				});
+				if (!res.ok) throw new Error("Failed to save content");
+				lastSavedContentRef.current = content;
+				setLastSavedAt(new Date());
+			} catch (error) {
+				console.error("Auto-save failed:", error);
+				toast.error("Failed to auto-save content");
+			} finally {
+				setIsSaving(false);
+			}
+		},
+		[apiFetch, prd, prdId],
+	);
 
 	// Handle content change with debounced auto-save
-	const handleContentChange = useCallback((newContent: string) => {
-		setEditorContent(newContent);
+	const handleContentChange = useCallback(
+		(newContent: string) => {
+			setEditorContent(newContent);
 
-		// Clear existing timeout
-		if (saveTimeoutRef.current) {
-			clearTimeout(saveTimeoutRef.current);
-		}
+			// Clear existing timeout
+			if (saveTimeoutRef.current) {
+				clearTimeout(saveTimeoutRef.current);
+			}
 
-		// Set new timeout for auto-save (2 seconds after last change)
-		saveTimeoutRef.current = setTimeout(() => {
-			saveContent(newContent);
-		}, 2000);
-	}, [saveContent]);
+			// Set new timeout for auto-save (2 seconds after last change)
+			saveTimeoutRef.current = setTimeout(() => {
+				saveContent(newContent);
+			}, 2000);
+		},
+		[saveContent],
+	);
 
 	// Cleanup timeout on unmount
 	useEffect(() => {
@@ -830,7 +870,10 @@ export default function PrdDetailPage() {
 		}
 	};
 
-	const handleDraftPrd = async (description: string, additionalContext?: string) => {
+	const handleDraftPrd = async (
+		description: string,
+		additionalContext?: string,
+	) => {
 		setAiLoading(true);
 		try {
 			toast.info("AI is generating your PRD...");
@@ -860,7 +903,9 @@ export default function PrdDetailPage() {
 				toast.info(`Title set to: "${data.suggestedTitle}"`);
 			}
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Failed to generate PRD");
+			toast.error(
+				error instanceof Error ? error.message : "Failed to generate PRD",
+			);
 			console.error(error);
 		} finally {
 			setAiLoading(false);
@@ -893,17 +938,25 @@ export default function PrdDetailPage() {
 
 			// Show improvements summary
 			if (data.improvements && data.improvements.length > 0) {
-				toast.info(`Improvements: ${data.improvements.slice(0, 2).join(", ")}${data.improvements.length > 2 ? "..." : ""}`);
+				toast.info(
+					`Improvements: ${data.improvements.slice(0, 2).join(", ")}${data.improvements.length > 2 ? "..." : ""}`,
+				);
 			}
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Failed to refine PRD");
+			toast.error(
+				error instanceof Error ? error.message : "Failed to refine PRD",
+			);
 			console.error(error);
 		} finally {
 			setAiLoading(false);
 		}
 	};
 
-	const handleConvertToSprint = async (data: { name: string; goal: string; deadline: string }) => {
+	const handleConvertToSprint = async (data: {
+		name: string;
+		goal: string;
+		deadline: string;
+	}) => {
 		if (!currentProject) return;
 
 		setConvertLoading(true);
@@ -928,14 +981,19 @@ export default function PrdDetailPage() {
 			// Navigate to the new sprint
 			router.push(`/project/sprints/${result.sprint.id}`);
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Failed to create sprint");
+			toast.error(
+				error instanceof Error ? error.message : "Failed to create sprint",
+			);
 			console.error(error);
 		} finally {
 			setConvertLoading(false);
 		}
 	};
 
-	const handleGenerateTasks = async (data: { sprintId: string; taskCount?: number }) => {
+	const handleGenerateTasks = async (data: {
+		sprintId: string;
+		taskCount?: number;
+	}) => {
 		if (!currentProject || !prd) return;
 
 		setGenerateTasksLoading(true);
@@ -964,7 +1022,9 @@ export default function PrdDetailPage() {
 			// Navigate to the sprint to see the new tasks
 			router.push(`/project/sprints/${data.sprintId}`);
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Failed to generate tasks");
+			toast.error(
+				error instanceof Error ? error.message : "Failed to generate tasks",
+			);
 			console.error(error);
 		} finally {
 			setGenerateTasksLoading(false);
@@ -1101,7 +1161,10 @@ export default function PrdDetailPage() {
 										<SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
 									</>
 								) : lastSavedAt ? (
-									<span>Last saved: {formatDistanceToNow(lastSavedAt, { addSuffix: true })}</span>
+									<span>
+										Last saved:{" "}
+										{formatDistanceToNow(lastSavedAt, { addSuffix: true })}
+									</span>
 								) : null}
 							</div>
 						</CardHeader>
@@ -1155,7 +1218,9 @@ export default function PrdDetailPage() {
 								<p className="text-xs text-muted-foreground mb-1">Priority</p>
 								<Select
 									value={prd.priority}
-									onValueChange={(value) => handleInlineUpdate("priority", value)}
+									onValueChange={(value) =>
+										handleInlineUpdate("priority", value)
+									}
 									disabled={updatingField === "priority"}
 								>
 									<SelectTrigger className="w-full h-8">
@@ -1299,11 +1364,16 @@ export default function PrdDetailPage() {
 			/>
 
 			{/* Archive Confirmation */}
-			<AlertDialog open={confirmArchiveOpen} onOpenChange={setConfirmArchiveOpen}>
+			<AlertDialog
+				open={confirmArchiveOpen}
+				onOpenChange={setConfirmArchiveOpen}
+			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
 						<AlertDialogTitle>
-							{prd.status === "archived" ? "Restore this PRD?" : "Archive this PRD?"}
+							{prd.status === "archived"
+								? "Restore this PRD?"
+								: "Archive this PRD?"}
 						</AlertDialogTitle>
 						<AlertDialogDescription>
 							{prd.status === "archived"

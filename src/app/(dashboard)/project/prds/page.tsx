@@ -64,13 +64,7 @@ const priorityColors: Record<string, string> = {
 	urgent: "bg-red-500/10 text-red-700 dark:text-red-400",
 };
 
-function PrdCard({
-	prd,
-	onClick,
-}: {
-	prd: Prd;
-	onClick: () => void;
-}) {
+function PrdCard({ prd, onClick }: { prd: Prd; onClick: () => void }) {
 	return (
 		<Card
 			className="cursor-pointer hover:shadow-md transition-shadow"
@@ -176,7 +170,10 @@ export default function PrdsPage() {
 	};
 
 	// Handler for creating PRD with AI-generated content
-	const handleDraftPrd = async (description: string, additionalContext?: string) => {
+	const handleDraftPrd = async (
+		description: string,
+		additionalContext?: string,
+	) => {
 		setDraftLoading(true);
 		try {
 			// First, create a placeholder PRD
@@ -221,7 +218,9 @@ export default function PrdsPage() {
 			// Navigate to the new PRD detail page
 			router.push(`/project/prds/${updatedPrd.id}`);
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Failed to create PRD");
+			toast.error(
+				error instanceof Error ? error.message : "Failed to create PRD",
+			);
 			console.error(error);
 		} finally {
 			setDraftLoading(false);
@@ -253,7 +252,7 @@ export default function PrdsPage() {
 		router.push(`/project/prds/${prd.id}`);
 	};
 
-	const handleEditPrd = (prd: Prd) => {
+	const _handleEditPrd = (prd: Prd) => {
 		setSelectedPrd(prd);
 		setEditorMode("edit");
 		setIsEditorOpen(true);
@@ -299,7 +298,9 @@ export default function PrdsPage() {
 			await loadPrds();
 		} catch (error) {
 			toast.error(
-				editorMode === "create" ? "Failed to create PRD" : "Failed to update PRD",
+				editorMode === "create"
+					? "Failed to create PRD"
+					: "Failed to update PRD",
 			);
 			console.error(error);
 		}
@@ -454,7 +455,10 @@ function DraftPrdDialog({
 		},
 		onSubmit: async ({ value }) => {
 			if (!value.description.trim()) return;
-			await onSubmit(value.description.trim(), value.additionalContext.trim() || undefined);
+			await onSubmit(
+				value.description.trim(),
+				value.additionalContext.trim() || undefined,
+			);
 		},
 	});
 
@@ -470,12 +474,16 @@ function DraftPrdDialog({
 	};
 
 	return (
-		<Dialog open={open} onOpenChange={(nextOpen) => !loading && onOpenChange(nextOpen)}>
+		<Dialog
+			open={open}
+			onOpenChange={(nextOpen) => !loading && onOpenChange(nextOpen)}
+		>
 			<DialogContent className="max-w-lg">
 				<DialogHeader>
 					<DialogTitle>Create New PRD</DialogTitle>
 					<DialogDescription>
-						Describe what you want to build and AI will generate a comprehensive PRD for you.
+						Describe what you want to build and AI will generate a comprehensive
+						PRD for you.
 					</DialogDescription>
 				</DialogHeader>
 				<form
@@ -499,7 +507,8 @@ function DraftPrdDialog({
 										disabled={loading}
 									/>
 									<p className="text-xs text-muted-foreground">
-										Be specific about what you want to build. The more detail, the better the PRD.
+										Be specific about what you want to build. The more detail,
+										the better the PRD.
 									</p>
 								</div>
 							)}
@@ -508,7 +517,9 @@ function DraftPrdDialog({
 						<form.Field name="additionalContext">
 							{(field) => (
 								<div className="space-y-2">
-									<Label htmlFor={field.name}>Additional Context (optional)</Label>
+									<Label htmlFor={field.name}>
+										Additional Context (optional)
+									</Label>
 									<Textarea
 										id={field.name}
 										value={field.state.value}
