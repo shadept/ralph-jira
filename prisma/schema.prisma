@@ -293,6 +293,7 @@ model Project {
   settings       ProjectSettings?
   tasks          Task[]          // Tasks belong to project
   sprints        Sprint[]        // Sprints organize tasks
+  prds           Prd[]           // PRDs belong to project
   runs           Run[]
 
   @@unique([organizationId, slug])
@@ -319,6 +320,37 @@ model ProjectSettings {
   project             Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("project_settings")
+}
+
+// ============================================================================
+// PRD MODEL (Product Requirements Document)
+// ============================================================================
+
+model Prd {
+  id          String    @id @default(cuid())
+  projectId   String
+
+  // Core fields
+  title       String
+  content     String    @default("")  // Long-form markdown content
+
+  // Status & organization
+  status      String    @default("draft")   // draft, review, approved, archived
+  priority    String    @default("medium")  // low, medium, high, urgent
+  tagsJson    String    @default("[]")      // JSON array
+  order       Int       @default(0)         // For manual ordering
+
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  archivedAt  DateTime?
+  deletedAt   DateTime? // Soft delete
+
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([status])
+  @@map("prds")
 }
 
 // ============================================================================

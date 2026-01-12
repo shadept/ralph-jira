@@ -27,6 +27,14 @@ export const SprintStatusSchema = z.enum([
 ]);
 export type SprintStatus = z.infer<typeof SprintStatusSchema>;
 
+export const PrdStatusSchema = z.enum([
+	"draft",
+	"review",
+	"approved",
+	"archived",
+]);
+export type PrdStatus = z.infer<typeof PrdStatusSchema>;
+
 export const TaskStatusSchema = z.enum([
 	"backlog",
 	"todo",
@@ -572,6 +580,23 @@ export const SprintSchema = z.object({
 });
 
 export type Sprint = z.infer<typeof SprintSchema>;
+
+// PRD schema
+export const PrdSchema = z.object({
+	id: z.string(),
+	projectId: z.string(),
+	title: z.string(),
+	content: z.string(),
+	status: PrdStatusSchema.default("draft"),
+	priority: TaskPrioritySchema.default("medium"),
+	tags: z.array(z.string()).default([]),
+	order: z.number().default(0),
+	createdAt: z.string(),
+	updatedAt: z.string(),
+	archivedAt: z.string().nullable().optional(),
+});
+
+export type Prd = z.infer<typeof PrdSchema>;
 
 // ============================================================================
 // RUN SCHEMAS
