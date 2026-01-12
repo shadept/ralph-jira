@@ -3,6 +3,7 @@
 import {
 	ArchiveIcon,
 	ArrowsClockwiseIcon,
+	ListBulletsIcon,
 	PencilIcon,
 	SparkleIcon,
 	SpinnerIcon,
@@ -50,8 +51,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { Prd } from "@/lib/schemas";
+import type { Prd, Sprint } from "@/lib/schemas";
 
 const statusColors: Record<string, string> = {
 	draft: "bg-slate-500/10 text-slate-700 dark:text-slate-400",
@@ -415,6 +423,158 @@ function ConvertToSprintDialog({
 	);
 }
 
+function GenerateTasksDialog({
+	open,
+	onOpenChange,
+	onSubmit,
+	loading,
+	sprints,
+	loadingSprints,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	onSubmit: (data: { sprintId: string; taskCount?: number }) => Promise<void>;
+	loading: boolean;
+	sprints: Sprint[];
+	loadingSprints: boolean;
+}) {
+	const form = useForm({
+		defaultValues: {
+			sprintId: "",
+			taskCount: "",
+		},
+		onSubmit: async ({ value }) => {
+			if (!value.sprintId) return;
+			await onSubmit({
+				sprintId: value.sprintId,
+				taskCount: value.taskCount ? parseInt(value.taskCount, 10) : undefined,
+			});
+		},
+	});
+
+	useEffect(() => {
+		if (open) {
+			form.reset();
+			// Auto-select the first sprint if there's only one
+			if (sprints.length === 1) {
+				form.setFieldValue("sprintId", sprints[0].id);
+			}
+		}
+	}, [open, form, sprints]);
+
+	const activeSprints = sprints.filter(
+		(s) => s.status === "planning" || s.status === "active"
+	);
+
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="max-w-lg">
+				<DialogHeader>
+					<DialogTitle>Generate Tasks from PRD</DialogTitle>
+					<DialogDescription>
+						AI will analyze this PRD and generate development tasks for the selected sprint.
+					</DialogDescription>
+				</DialogHeader>
+				<form
+					onSubmit={(e) => {
+						e.preventDefault();
+						form.handleSubmit();
+					}}
+				>
+					<div className="space-y-4">
+						<form.Field name="sprintId">
+							{(field) => (
+								<div className="space-y-2">
+									<Label htmlFor={field.name}>Target Sprint *</Label>
+									{loadingSprints ? (
+										<div className="flex items-center gap-2 text-sm text-muted-foreground">
+											<SpinnerIcon className="h-4 w-4 animate-spin" />
+											Loading sprints...
+										</div>
+									) : activeSprints.length === 0 ? (
+										<p className="text-sm text-muted-foreground">
+											No active sprints found. Please create a sprint first or convert this PRD to a sprint.
+										</p>
+									) : (
+										<Select
+											value={field.state.value}
+											onValueChange={(value) => field.handleChange(value)}
+											disabled={loading}
+										>
+											<SelectTrigger>
+												<SelectValue placeholder="Select a sprint" />
+											</SelectTrigger>
+											<SelectContent>
+												{activeSprints.map((sprint) => (
+													<SelectItem key={sprint.id} value={sprint.id}>
+														{sprint.name} ({sprint.status})
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									)}
+								</div>
+							)}
+						</form.Field>
+
+						<form.Field name="taskCount">
+							{(field) => (
+								<div className="space-y-2">
+									<Label htmlFor={field.name}>Number of Tasks (optional)</Label>
+									<Input
+										id={field.name}
+										type="number"
+										min="1"
+										max="20"
+										value={field.state.value}
+										onChange={(e) => field.handleChange(e.target.value)}
+										placeholder="Leave empty for AI to decide"
+										disabled={loading}
+									/>
+									<p className="text-xs text-muted-foreground">
+										Leave empty to let AI determine the appropriate number of tasks based on PRD complexity.
+									</p>
+								</div>
+							)}
+						</form.Field>
+					</div>
+
+					<DialogFooter className="mt-4">
+						<Button
+							type="button"
+							variant="outline"
+							onClick={() => onOpenChange(false)}
+							disabled={loading}
+						>
+							Cancel
+						</Button>
+						<form.Subscribe selector={(state) => state.values.sprintId}>
+							{(sprintId) => (
+								<Button
+									type="submit"
+									disabled={loading || !sprintId || activeSprints.length === 0}
+								>
+									{loading ? (
+										<>
+											Generating
+											<SpinnerIcon className="ml-2 h-4 w-4 animate-spin" />
+										</>
+									) : (
+										<>
+											<ListBulletsIcon className="mr-2 h-4 w-4" />
+											Generate Tasks
+										</>
+									)}
+								</Button>
+							)}
+						</form.Subscribe>
+					</DialogFooter>
+				</form>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
 export default function PrdDetailPage() {
 	const params = useParams();
 	const router = useRouter();
@@ -445,6 +605,12 @@ export default function PrdDetailPage() {
 	const [convertDialogOpen, setConvertDialogOpen] = useState(false);
 	const [convertLoading, setConvertLoading] = useState(false);
 
+	// Generate Tasks states
+	const [generateTasksDialogOpen, setGenerateTasksDialogOpen] = useState(false);
+	const [generateTasksLoading, setGenerateTasksLoading] = useState(false);
+	const [sprints, setSprints] = useState<Sprint[]>([]);
+	const [loadingSprints, setLoadingSprints] = useState(false);
+
 	const loadPrd = useCallback(async () => {
 		if (!currentProject || !prdId) {
 			setPrd(null);
@@ -474,9 +640,38 @@ export default function PrdDetailPage() {
 		}
 	}, [apiFetch, currentProject, prdId]);
 
+	const loadSprints = useCallback(async () => {
+		if (!currentProject) {
+			setSprints([]);
+			return;
+		}
+
+		setLoadingSprints(true);
+		try {
+			const res = await apiFetch(`/api/projects/${currentProject.id}/sprints`);
+			if (!res.ok) {
+				throw new Error("Failed to load sprints");
+			}
+			const data = await res.json();
+			setSprints(data.sprints || []);
+		} catch (error) {
+			console.error("Failed to load sprints:", error);
+			setSprints([]);
+		} finally {
+			setLoadingSprints(false);
+		}
+	}, [apiFetch, currentProject]);
+
 	useEffect(() => {
 		loadPrd();
 	}, [loadPrd]);
+
+	// Load sprints when generate tasks dialog opens
+	useEffect(() => {
+		if (generateTasksDialogOpen) {
+			loadSprints();
+		}
+	}, [generateTasksDialogOpen, loadSprints]);
 
 	const handleEdit = () => {
 		setIsEditorOpen(true);
@@ -656,6 +851,42 @@ export default function PrdDetailPage() {
 		}
 	};
 
+	const handleGenerateTasks = async (data: { sprintId: string; taskCount?: number }) => {
+		if (!currentProject || !prd) return;
+
+		setGenerateTasksLoading(true);
+		try {
+			toast.info("Generating tasks from PRD...");
+
+			const res = await apiFetch("/api/ai/prd/generate-tasks", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					prdId,
+					sprintId: data.sprintId,
+					taskCount: data.taskCount,
+				}),
+			});
+
+			if (!res.ok) {
+				const error = await res.json();
+				throw new Error(error.error || "Failed to generate tasks");
+			}
+
+			const result = await res.json();
+			toast.success(`${result.taskCount} tasks generated successfully!`);
+			setGenerateTasksDialogOpen(false);
+
+			// Navigate to the sprint to see the new tasks
+			router.push(`/project/sprints/${data.sprintId}`);
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Failed to generate tasks");
+			console.error(error);
+		} finally {
+			setGenerateTasksLoading(false);
+		}
+	};
+
 	if (!currentProject) {
 		return (
 			<>
@@ -707,7 +938,7 @@ export default function PrdDetailPage() {
 		);
 	}
 
-	const isLoading = aiLoading || convertLoading;
+	const isLoading = aiLoading || convertLoading || generateTasksLoading;
 
 	const actions = (
 		<div className="flex flex-wrap items-center gap-2">
@@ -735,6 +966,12 @@ export default function PrdDetailPage() {
 						disabled={!prd.content?.trim()}
 					>
 						Refine & Improve
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						onClick={() => setGenerateTasksDialogOpen(true)}
+						disabled={!prd.content?.trim()}
+					>
+						Generate Tasks from PRD
 					</DropdownMenuItem>
 				</DropdownMenuContent>
 			</DropdownMenu>
@@ -900,6 +1137,16 @@ export default function PrdDetailPage() {
 				onSubmit={handleConvertToSprint}
 				loading={convertLoading}
 				prdTitle={prd.title || "Untitled PRD"}
+			/>
+
+			{/* Generate Tasks Dialog */}
+			<GenerateTasksDialog
+				open={generateTasksDialogOpen}
+				onOpenChange={setGenerateTasksDialogOpen}
+				onSubmit={handleGenerateTasks}
+				loading={generateTasksLoading}
+				sprints={sprints}
+				loadingSprints={loadingSprints}
 			/>
 
 			{/* Delete Confirmation */}
