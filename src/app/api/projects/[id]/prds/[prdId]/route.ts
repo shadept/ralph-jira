@@ -98,12 +98,20 @@ export async function PUT(
 			}
 		}
 
+		// Determine status update - archived flag takes precedence over explicit status
+		let statusUpdate: string | undefined = undefined;
+		if (body.archived !== undefined) {
+			statusUpdate = body.archived ? "archived" : "draft";
+		} else if (body.status !== undefined) {
+			statusUpdate = body.status;
+		}
+
 		const prd = await prisma.prd.update({
 			where: { id: prdId },
 			data: {
 				title: body.title !== undefined ? body.title.trim() : undefined,
 				content: body.content !== undefined ? body.content : undefined,
-				status: body.status !== undefined ? body.status : undefined,
+				status: statusUpdate,
 				priority: body.priority !== undefined ? body.priority : undefined,
 				tagsJson:
 					body.tags !== undefined ? JSON.stringify(body.tags) : undefined,
