@@ -561,6 +561,7 @@ export type Task = z.infer<typeof TaskSchema>;
 export const SprintSchema = z.object({
 	id: z.string(),
 	projectId: z.string().optional(), // Optional for frontend (comes from context)
+	sourcePrdId: z.string().nullable().optional(), // Links to source PRD if created via "Convert to Sprint"
 	name: z.string(),
 	goal: z.string().nullable().optional(),
 	deadline: z.string(),

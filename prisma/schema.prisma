@@ -347,6 +347,7 @@ model Prd {
   deletedAt   DateTime? // Soft delete
 
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sprints     Sprint[]  // Sprints created from this PRD
 
   @@index([projectId])
   @@index([status])
@@ -362,6 +363,7 @@ model Prd {
 model Sprint {
   id          String   @id @default(cuid())
   projectId   String
+  sourcePrdId String?  // Links to source PRD if created from "Convert to Sprint"
   name        String
   goal        String?
   deadline    DateTime
@@ -373,12 +375,14 @@ model Sprint {
   archivedAt  DateTime?
 
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourcePrd   Prd?     @relation(fields: [sourcePrdId], references: [id], onDelete: SetNull)
   tasks       Task[]   // Tasks assigned to this sprint
   runs        Run[]
   columns     SprintColumn[]
 
   @@index([projectId])
   @@index([status])
+  @@index([sourcePrdId])
   @@map("sprints")
 }
 

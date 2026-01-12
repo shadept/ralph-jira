@@ -2,6 +2,7 @@
 
 import {
 	ArchiveIcon,
+	ArrowsClockwiseIcon,
 	PencilIcon,
 	SparkleIcon,
 	SpinnerIcon,
@@ -47,6 +48,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { Prd } from "@/lib/schemas";
@@ -279,6 +281,140 @@ function RefinePrdDialog({
 	);
 }
 
+function ConvertToSprintDialog({
+	open,
+	onOpenChange,
+	onSubmit,
+	loading,
+	prdTitle,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	onSubmit: (data: { name: string; goal: string; deadline: string }) => Promise<void>;
+	loading: boolean;
+	prdTitle: string;
+}) {
+	const form = useForm({
+		defaultValues: {
+			name: `Sprint: ${prdTitle}`,
+			goal: "",
+			deadline: format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"), // Default to 2 weeks from now
+		},
+		onSubmit: async ({ value }) => {
+			if (!value.name.trim() || !value.deadline) return;
+			await onSubmit({
+				name: value.name.trim(),
+				goal: value.goal.trim(),
+				deadline: value.deadline,
+			});
+		},
+	});
+
+	useEffect(() => {
+		if (open) {
+			form.setFieldValue("name", `Sprint: ${prdTitle}`);
+			form.setFieldValue("goal", "");
+			form.setFieldValue("deadline", format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"));
+		}
+	}, [open, prdTitle, form]);
+
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="max-w-lg">
+				<DialogHeader>
+					<DialogTitle>Convert PRD to Sprint</DialogTitle>
+					<DialogDescription>
+						Create a new sprint from this PRD. The sprint will be linked to the source PRD.
+					</DialogDescription>
+				</DialogHeader>
+				<form
+					onSubmit={(e) => {
+						e.preventDefault();
+						form.handleSubmit();
+					}}
+				>
+					<div className="space-y-4">
+						<form.Field name="name">
+							{(field) => (
+								<div className="space-y-2">
+									<Label htmlFor={field.name}>Sprint Name *</Label>
+									<Input
+										id={field.name}
+										value={field.state.value}
+										onChange={(e) => field.handleChange(e.target.value)}
+										placeholder="e.g., Sprint 1: Authentication"
+										autoFocus
+										disabled={loading}
+									/>
+								</div>
+							)}
+						</form.Field>
+
+						<form.Field name="goal">
+							{(field) => (
+								<div className="space-y-2">
+									<Label htmlFor={field.name}>Sprint Goal (optional)</Label>
+									<Textarea
+										id={field.name}
+										value={field.state.value}
+										onChange={(e) => field.handleChange(e.target.value)}
+										placeholder="What do you want to achieve in this sprint?"
+										rows={2}
+										disabled={loading}
+									/>
+								</div>
+							)}
+						</form.Field>
+
+						<form.Field name="deadline">
+							{(field) => (
+								<div className="space-y-2">
+									<Label htmlFor={field.name}>Deadline *</Label>
+									<Input
+										id={field.name}
+										type="date"
+										value={field.state.value}
+										onChange={(e) => field.handleChange(e.target.value)}
+										disabled={loading}
+									/>
+								</div>
+							)}
+						</form.Field>
+					</div>
+
+					<DialogFooter className="mt-4">
+						<Button
+							type="button"
+							variant="outline"
+							onClick={() => onOpenChange(false)}
+							disabled={loading}
+						>
+							Cancel
+						</Button>
+						<form.Subscribe selector={(state) => ({ name: state.values.name, deadline: state.values.deadline })}>
+							{({ name, deadline }) => (
+								<Button type="submit" disabled={loading || !name.trim() || !deadline}>
+									{loading ? (
+										<>
+											Creating
+											<SpinnerIcon className="ml-2 h-4 w-4 animate-spin" />
+										</>
+									) : (
+										<>
+											<ArrowsClockwiseIcon className="mr-2 h-4 w-4" />
+											Create Sprint
+										</>
+									)}
+								</Button>
+							)}
+						</form.Subscribe>
+					</DialogFooter>
+				</form>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
 export default function PrdDetailPage() {
 	const params = useParams();
 	const router = useRouter();
@@ -304,6 +440,10 @@ export default function PrdDetailPage() {
 	const [draftDialogOpen, setDraftDialogOpen] = useState(false);
 	const [refineDialogOpen, setRefineDialogOpen] = useState(false);
 	const [aiLoading, setAiLoading] = useState(false);
+
+	// Convert to Sprint states
+	const [convertDialogOpen, setConvertDialogOpen] = useState(false);
+	const [convertLoading, setConvertLoading] = useState(false);
 
 	const loadPrd = useCallback(async () => {
 		if (!currentProject || !prdId) {
@@ -484,6 +624,38 @@ export default function PrdDetailPage() {
 		}
 	};
 
+	const handleConvertToSprint = async (data: { name: string; goal: string; deadline: string }) => {
+		if (!currentProject) return;
+
+		setConvertLoading(true);
+		try {
+			toast.info("Creating sprint from PRD...");
+
+			const res = await apiFetch(`/api/prds/${prdId}/convert-to-sprint`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(data),
+			});
+
+			if (!res.ok) {
+				const error = await res.json();
+				throw new Error(error.error || "Failed to create sprint");
+			}
+
+			const result = await res.json();
+			toast.success(result.message || "Sprint created successfully");
+			setConvertDialogOpen(false);
+
+			// Navigate to the new sprint
+			router.push(`/project/sprints/${result.sprint.id}`);
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Failed to create sprint");
+			console.error(error);
+		} finally {
+			setConvertLoading(false);
+		}
+	};
+
 	if (!currentProject) {
 		return (
 			<>
@@ -535,11 +707,21 @@ export default function PrdDetailPage() {
 		);
 	}
 
+	const isLoading = aiLoading || convertLoading;
+
 	const actions = (
 		<div className="flex flex-wrap items-center gap-2">
+			<Button
+				variant="default"
+				onClick={() => setConvertDialogOpen(true)}
+				disabled={isLoading}
+			>
+				<ArrowsClockwiseIcon className="w-4 h-4 mr-2" />
+				{convertLoading ? "Creating..." : "Convert to Sprint"}
+			</Button>
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
-					<Button variant="outline" disabled={aiLoading}>
+					<Button variant="outline" disabled={isLoading}>
 						<SparkleIcon className="w-4 h-4 mr-2" />
 						{aiLoading ? "AI Working..." : "AI Actions"}
 					</Button>
@@ -560,7 +742,7 @@ export default function PrdDetailPage() {
 				variant="outline"
 				size="sm"
 				onClick={handleArchiveToggle}
-				disabled={archiving || aiLoading}
+				disabled={archiving || isLoading}
 			>
 				<ArchiveIcon className="w-4 h-4 mr-1" />
 				{prd.status === "archived" ? "Restore" : "Archive"}
@@ -569,12 +751,12 @@ export default function PrdDetailPage() {
 				variant="outline"
 				size="sm"
 				onClick={() => setConfirmDeleteOpen(true)}
-				disabled={aiLoading}
+				disabled={isLoading}
 			>
 				<TrashIcon className="w-4 h-4 mr-1" />
 				Delete
 			</Button>
-			<Button onClick={handleEdit} disabled={aiLoading}>
+			<Button onClick={handleEdit} disabled={isLoading}>
 				<PencilIcon className="w-4 h-4 mr-2" />
 				Edit
 			</Button>
@@ -709,6 +891,15 @@ export default function PrdDetailPage() {
 				onOpenChange={setRefineDialogOpen}
 				onSubmit={handleRefinePrd}
 				loading={aiLoading}
+			/>
+
+			{/* Convert to Sprint Dialog */}
+			<ConvertToSprintDialog
+				open={convertDialogOpen}
+				onOpenChange={setConvertDialogOpen}
+				onSubmit={handleConvertToSprint}
+				loading={convertLoading}
+				prdTitle={prd.title || "Untitled PRD"}
 			/>
 
 			{/* Delete Confirmation */}

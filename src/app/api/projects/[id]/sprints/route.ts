@@ -11,6 +11,7 @@ function formatSprint(sprint: {
 	goal: string | null;
 	deadline: Date;
 	status: string;
+	sourcePrdId?: string | null;
 	metricsJson: string | null;
 	createdAt: Date;
 	updatedAt: Date;
@@ -44,6 +45,7 @@ function formatSprint(sprint: {
 		goal: sprint.goal || "",
 		deadline: sprint.deadline.toISOString(),
 		status: sprint.status,
+		sourcePrdId: sprint.sourcePrdId || null,
 		columns: sprint.columns.map((col) => ({
 			id: col.columnId,
 			name: col.name,
@@ -119,6 +121,7 @@ export async function POST(
 		const dbSprint = await prisma.sprint.create({
 			data: {
 				projectId: project.id,
+				sourcePrdId: body.sourcePrdId || null,
 				name: body.name || "New Sprint",
 				goal: body.goal || "",
 				deadline: body.deadline ? new Date(body.deadline) : now,
