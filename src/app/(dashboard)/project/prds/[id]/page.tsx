@@ -593,7 +593,8 @@ export default function PrdDetailPage() {
 	const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 	const [deleting, setDeleting] = useState(false);
 
-	// Archive state
+	// Archive confirmation state
+	const [confirmArchiveOpen, setConfirmArchiveOpen] = useState(false);
 	const [archiving, setArchiving] = useState(false);
 
 	// AI action states
@@ -743,6 +744,7 @@ export default function PrdDetailPage() {
 			console.error(error);
 		} finally {
 			setArchiving(false);
+			setConfirmArchiveOpen(false);
 		}
 	};
 
@@ -978,7 +980,7 @@ export default function PrdDetailPage() {
 			<Button
 				variant="outline"
 				size="sm"
-				onClick={handleArchiveToggle}
+				onClick={() => setConfirmArchiveOpen(true)}
 				disabled={archiving || isLoading}
 			>
 				<ArchiveIcon className="w-4 h-4 mr-1" />
@@ -1148,6 +1150,37 @@ export default function PrdDetailPage() {
 				sprints={sprints}
 				loadingSprints={loadingSprints}
 			/>
+
+			{/* Archive Confirmation */}
+			<AlertDialog open={confirmArchiveOpen} onOpenChange={setConfirmArchiveOpen}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>
+							{prd.status === "archived" ? "Restore this PRD?" : "Archive this PRD?"}
+						</AlertDialogTitle>
+						<AlertDialogDescription>
+							{prd.status === "archived"
+								? `This will restore "${prd.title}" and make it visible in the main PRD list.`
+								: `This will archive "${prd.title}". Archived PRDs can be restored later.`}
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={archiving}>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={handleArchiveToggle}
+							disabled={archiving}
+						>
+							{archiving
+								? prd.status === "archived"
+									? "Restoring..."
+									: "Archiving..."
+								: prd.status === "archived"
+									? "Restore PRD"
+									: "Archive PRD"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 
 			{/* Delete Confirmation */}
 			<AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
