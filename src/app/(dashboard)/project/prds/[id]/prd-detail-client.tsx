@@ -2,7 +2,9 @@
 
 import {
 	ArchiveIcon,
+	ArrowClockwiseIcon,
 	ArrowsClockwiseIcon,
+	CaretDownIcon,
 	CheckIcon,
 	PencilSimpleIcon,
 	PlusIcon,
@@ -17,8 +19,8 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { MarkdownEditorLoading } from "@/components/markdown-editor";
 import { PageHeader } from "@/components/layout/page-header";
+import { MarkdownEditorLoading } from "@/components/markdown-editor";
 import { useProjectContext } from "@/components/projects/project-provider";
 import {
 	AlertDialog,
@@ -41,6 +43,12 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -51,6 +59,11 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { Prd } from "@/lib/schemas";
 
 // Dynamic import of MDXEditor to avoid SSR issues
@@ -658,32 +671,71 @@ export function PrdDetailClient({ initialPrd, prdId }: PrdDetailClientProps) {
 
 	const actions = (
 		<div className="flex flex-wrap items-center gap-2">
-			<Button
-				variant="outline"
-				size="sm"
-				onClick={() => setConfirmArchiveOpen(true)}
-				disabled={archiving || isLoading}
-			>
-				<ArchiveIcon className="w-4 h-4 mr-1" />
-				{prd.status === "archived" ? "Restore" : "Archive"}
-			</Button>
-			<Button
-				variant="outline"
-				size="sm"
-				onClick={() => setConfirmDeleteOpen(true)}
-				disabled={isLoading}
-			>
-				<TrashIcon className="w-4 h-4 mr-1" />
-				Delete
-			</Button>
-			<Button
-				variant="default"
-				onClick={() => setConvertDialogOpen(true)}
-				disabled={isLoading}
-			>
-				<ArrowsClockwiseIcon className="w-4 h-4 mr-2" />
-				{convertLoading ? "Creating..." : "Convert to Sprint"}
-			</Button>
+			<div className="flex">
+				<Button
+					variant="outline"
+					className="rounded-r-none border-r-0"
+					onClick={() => setConfirmArchiveOpen(true)}
+					disabled={archiving || isLoading}
+				>
+					{archiving ? (
+						<SpinnerIcon className="w-4 h-4 mr-2 animate-spin" />
+					) : prd.status === "archived" ? (
+						<ArrowClockwiseIcon className="w-4 h-4 mr-2" />
+					) : (
+						<ArchiveIcon className="w-4 h-4 mr-2" />
+					)}
+					{prd.status === "archived" ? "Restore" : "Archive"}
+				</Button>
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button
+							variant="outline"
+							className="rounded-l-none px-2"
+							disabled={isLoading}
+						>
+							<CaretDownIcon className="w-4 h-4" />
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end">
+						<DropdownMenuItem
+							variant="destructive"
+							onClick={() => setConfirmDeleteOpen(true)}
+						>
+							<TrashIcon className="w-4 h-4 mr-2" />
+							Delete
+						</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
+			</div>
+			{prd.status === "draft" || prd.status === "review" ? (
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<span>
+							<Button
+								variant="default"
+								disabled
+								className="pointer-events-none"
+							>
+								<ArrowsClockwiseIcon className="w-4 h-4 mr-2" />
+								Convert to Sprint
+							</Button>
+						</span>
+					</TooltipTrigger>
+					<TooltipContent>
+						PRD must be approved before converting to sprint
+					</TooltipContent>
+				</Tooltip>
+			) : (
+				<Button
+					variant="default"
+					onClick={() => setConvertDialogOpen(true)}
+					disabled={isLoading}
+				>
+					<ArrowsClockwiseIcon className="w-4 h-4 mr-2" />
+					{convertLoading ? "Creating..." : "Convert to Sprint"}
+				</Button>
+			)}
 		</div>
 	);
 

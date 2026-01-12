@@ -172,7 +172,7 @@ export class ClaudeAgent extends Agent {
 							}
 							// Add newline before tool call for readability
 							await appendSandboxLog(
-								`\n\x1b[36m| ${block.name}${details ? ` ${details}` : ""}\x1b[0m\n`,
+								`\n\x1b[36m| ${block.name}${details ? ` ${details}` : ""}\x1b[0m`,
 							);
 						}
 					}

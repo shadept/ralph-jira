@@ -99,6 +99,12 @@ export const MarkdownEditor = forwardRef<MDXEditorMethods, MarkdownEditorProps>(
 					toolbarPlugin({
 						toolbarContents: () => (
 							<>
+								{onAiRefine && (
+									<>
+										<AiRefineButton onClick={onAiRefine} loading={aiLoading} />
+										<Separator />
+									</>
+								)}
 								<UndoRedo />
 								<Separator />
 								<BlockTypeSelect />
@@ -108,12 +114,6 @@ export const MarkdownEditor = forwardRef<MDXEditorMethods, MarkdownEditorProps>(
 								<CreateLink />
 								<InsertCodeBlock />
 								<InsertThematicBreak />
-								{onAiRefine && (
-									<>
-										<Separator />
-										<AiRefineButton onClick={onAiRefine} loading={aiLoading} />
-									</>
-								)}
 							</>
 						),
 					}),
