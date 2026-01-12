@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { BackButton } from "./back-button";
 
 type PageHeaderProps = {
-	title: string;
+	title: ReactNode;
 	description?: string;
 	actions?: ReactNode;
 	backLink?: {

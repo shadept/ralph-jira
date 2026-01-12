@@ -397,13 +397,17 @@ export default function SprintPage({
 				const runs: RunRecord[] = data.runs || [];
 				const sprintRuns = runs.filter((run) => run.sprintId === id);
 				setSprintRunCount(sprintRuns.length);
-				const running = runs.find((run) => run.status === "running");
-				if (running) {
-					setActiveRun(running);
+				// Only track running runs for THIS sprint
+				const runningForThisSprint = sprintRuns.find(
+					(run) => run.status === "running",
+				);
+				if (runningForThisSprint) {
+					setActiveRun(runningForThisSprint);
 					setRunDrawerOpen(true);
-					setPollingRunId(running.runId);
-				} else if (runs.length) {
-					setActiveRun(runs[0]);
+					setPollingRunId(runningForThisSprint.runId);
+				} else if (sprintRuns.length) {
+					// Show most recent run for this sprint
+					setActiveRun(sprintRuns[0]);
 				}
 			} catch (error) {
 				console.error("Failed to fetch runs", error);
@@ -679,7 +683,9 @@ export default function SprintPage({
 		}
 	};
 
-	const isRunActive = activeRun?.status === "running";
+	// Only lock sprint if there's a running run for THIS sprint
+	const isRunActive =
+		activeRun?.status === "running" && activeRun?.sprintId === id;
 	const sprintLocked = isRunActive;
 
 	const actions = (
