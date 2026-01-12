@@ -255,7 +255,7 @@ export default function ProjectPage() {
 				</section>
 
 				<section>
-					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 						<Card
 							className="cursor-pointer transition-shadow hover:shadow-lg"
 							onClick={() => router.push("/project/prds")}
@@ -288,27 +288,16 @@ export default function ProjectPage() {
 
 						<Card
 							className="cursor-pointer transition-shadow hover:shadow-lg"
-							onClick={() => router.push("/project/files")}
-						>
-							<CardHeader>
-								<CardTitle className="text-lg">Files</CardTitle>
-								<CardDescription>
-									View planning artifacts and progress logs
-								</CardDescription>
-							</CardHeader>
-						</Card>
-
-						<Card
-							className="cursor-pointer transition-shadow hover:shadow-lg"
 							onClick={() => router.push("/project/assistant")}
 						>
 							<CardHeader>
 								<CardTitle className="text-lg flex items-center gap-2">
 									<SparkleIcon className="w-5 h-5" />
-									AI Assistant
+									AI Chat
 								</CardTitle>
 								<CardDescription>
-									Chat with AI to manage your project
+									Ask Ralph to generate tasks, refine requirements, and guide
+									next steps.
 								</CardDescription>
 							</CardHeader>
 						</Card>
