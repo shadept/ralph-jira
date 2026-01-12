@@ -1,6 +1,7 @@
 "use client";
 
 import {
+	FileTextIcon,
 	FolderOpenIcon,
 	GearSixIcon,
 	ListChecksIcon,
@@ -254,7 +255,22 @@ export default function ProjectPage() {
 				</section>
 
 				<section>
-					<div className="grid gap-4 md:grid-cols-3">
+					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+						<Card
+							className="cursor-pointer transition-shadow hover:shadow-lg"
+							onClick={() => router.push("/project/prds")}
+						>
+							<CardHeader>
+								<CardTitle className="text-lg flex items-center gap-2">
+									<FileTextIcon className="w-5 h-5" />
+									PRDs
+								</CardTitle>
+								<CardDescription>
+									Manage Product Requirements Documents
+								</CardDescription>
+							</CardHeader>
+						</Card>
+
 						<Card
 							className="cursor-pointer transition-shadow hover:shadow-lg"
 							onClick={() => router.push("/project/tasks")}

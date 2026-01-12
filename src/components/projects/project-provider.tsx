@@ -92,6 +92,17 @@ function rewriteApiUrl(url: string, projectId: string): string {
 		return `${url}${separator}projectId=${encodeURIComponent(projectId)}`;
 	}
 
+	// PRD routes
+	if (path === "/api/prds") {
+		return `/api/projects/${projectId}/prds${query}`;
+	}
+	const prdsMatch = path.match(/^\/api\/prds\/([^/]+)(\/.*)?$/);
+	if (prdsMatch) {
+		const prdId = prdsMatch[1];
+		const rest = prdsMatch[2] || "";
+		return `/api/projects/${projectId}/prds/${prdId}${rest}${query}`;
+	}
+
 	const separator = query ? "&" : "?";
 	return `${url}${separator}projectId=${encodeURIComponent(projectId)}`;
 }
