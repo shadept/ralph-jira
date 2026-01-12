@@ -2,6 +2,7 @@
 
 import {
 	ClockCounterClockwiseIcon,
+	FileTextIcon,
 	GearSixIcon,
 	PlayCircleIcon,
 	PlusIcon,
@@ -715,6 +716,15 @@ export default function SprintPage({
 				<GearSixIcon className="w-4 h-4 mr-2" />
 				Properties
 			</Button>
+			{sprint?.sourcePrdId && (
+				<Button
+					variant="outline"
+					onClick={() => router.push(`/project/prds/${sprint.sourcePrdId}`)}
+				>
+					<FileTextIcon className="w-4 h-4 mr-2" />
+					Go to PRD
+				</Button>
+			)}
 			<Button variant="outline" onClick={() => router.push("/project/runs")}>
 				<ClockCounterClockwiseIcon className="w-4 h-4 mr-2" />
 				Run History
