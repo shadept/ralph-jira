@@ -3,8 +3,11 @@
 import {
 	ArchiveIcon,
 	PencilIcon,
+	SparkleIcon,
+	SpinnerIcon,
 	TrashIcon,
 } from "@phosphor-icons/react";
+import { useForm } from "@tanstack/react-form";
 import { format } from "date-fns";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -30,6 +33,22 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import type { Prd } from "@/lib/schemas";
 
 const statusColors: Record<string, string> = {
@@ -53,6 +72,213 @@ const priorityColors: Record<string, string> = {
 	urgent: "bg-red-500/10 text-red-700 dark:text-red-400",
 };
 
+function DraftPrdDialog({
+	open,
+	onOpenChange,
+	onSubmit,
+	loading,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	onSubmit: (description: string, additionalContext?: string) => Promise<void>;
+	loading: boolean;
+}) {
+	const form = useForm({
+		defaultValues: {
+			description: "",
+			additionalContext: "",
+		},
+		onSubmit: async ({ value }) => {
+			if (!value.description.trim()) return;
+			await onSubmit(value.description.trim(), value.additionalContext.trim() || undefined);
+		},
+	});
+
+	useEffect(() => {
+		if (open) {
+			form.reset();
+		}
+	}, [open, form]);
+
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="max-w-lg">
+				<DialogHeader>
+					<DialogTitle>Draft PRD with AI</DialogTitle>
+					<DialogDescription>
+						Describe the feature or product you want to document and AI will generate a comprehensive PRD.
+					</DialogDescription>
+				</DialogHeader>
+				<form
+					onSubmit={(e) => {
+						e.preventDefault();
+						form.handleSubmit();
+					}}
+				>
+					<div className="space-y-4">
+						<form.Field name="description">
+							{(field) => (
+								<div className="space-y-2">
+									<Label htmlFor={field.name}>Feature Description *</Label>
+									<Textarea
+										id={field.name}
+										value={field.state.value}
+										onChange={(e) => field.handleChange(e.target.value)}
+										placeholder="e.g., A user authentication system with email/password login, OAuth support, password reset, and session management"
+										rows={4}
+										autoFocus
+										disabled={loading}
+									/>
+									<p className="text-xs text-muted-foreground">
+										Be specific about what you want to build. The more detail, the better the PRD.
+									</p>
+								</div>
+							)}
+						</form.Field>
+
+						<form.Field name="additionalContext">
+							{(field) => (
+								<div className="space-y-2">
+									<Label htmlFor={field.name}>Additional Context (optional)</Label>
+									<Textarea
+										id={field.name}
+										value={field.state.value}
+										onChange={(e) => field.handleChange(e.target.value)}
+										placeholder="e.g., Target audience, specific requirements, constraints, integrations..."
+										rows={2}
+										disabled={loading}
+									/>
+								</div>
+							)}
+						</form.Field>
+					</div>
+
+					<DialogFooter className="mt-4">
+						<Button
+							type="button"
+							variant="outline"
+							onClick={() => onOpenChange(false)}
+							disabled={loading}
+						>
+							Cancel
+						</Button>
+						<form.Subscribe selector={(state) => state.values.description}>
+							{(description) => (
+								<Button type="submit" disabled={loading || !description.trim()}>
+									{loading ? (
+										<>
+											Generating
+											<SpinnerIcon className="ml-2 h-4 w-4 animate-spin" />
+										</>
+									) : (
+										<>
+											<SparkleIcon className="mr-2 h-4 w-4" />
+											Generate PRD
+										</>
+									)}
+								</Button>
+							)}
+						</form.Subscribe>
+					</DialogFooter>
+				</form>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+function RefinePrdDialog({
+	open,
+	onOpenChange,
+	onSubmit,
+	loading,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	onSubmit: (focusAreas?: string[]) => Promise<void>;
+	loading: boolean;
+}) {
+	const form = useForm({
+		defaultValues: {
+			focusAreas: "",
+		},
+		onSubmit: async ({ value }) => {
+			const areas = value.focusAreas
+				.split("\n")
+				.map((a) => a.trim())
+				.filter(Boolean);
+			await onSubmit(areas.length > 0 ? areas : undefined);
+		},
+	});
+
+	useEffect(() => {
+		if (open) {
+			form.reset();
+		}
+	}, [open, form]);
+
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="max-w-lg">
+				<DialogHeader>
+					<DialogTitle>Refine PRD with AI</DialogTitle>
+					<DialogDescription>
+						AI will review and improve your PRD for clarity, completeness, and actionability.
+					</DialogDescription>
+				</DialogHeader>
+				<form
+					onSubmit={(e) => {
+						e.preventDefault();
+						form.handleSubmit();
+					}}
+				>
+					<form.Field name="focusAreas">
+						{(field) => (
+							<div className="space-y-2">
+								<Label htmlFor={field.name}>Focus Areas (optional)</Label>
+								<Textarea
+									id={field.name}
+									value={field.state.value}
+									onChange={(e) => field.handleChange(e.target.value)}
+									placeholder="e.g., Add more edge cases&#10;Improve acceptance criteria&#10;Clarify technical requirements"
+									rows={3}
+									disabled={loading}
+								/>
+								<p className="text-xs text-muted-foreground">
+									Enter specific areas to focus on (one per line), or leave empty for general improvement.
+								</p>
+							</div>
+						)}
+					</form.Field>
+
+					<DialogFooter className="mt-4">
+						<Button
+							type="button"
+							variant="outline"
+							onClick={() => onOpenChange(false)}
+							disabled={loading}
+						>
+							Cancel
+						</Button>
+						<Button type="submit" disabled={loading}>
+							{loading ? (
+								<>
+									Refining
+									<SpinnerIcon className="ml-2 h-4 w-4 animate-spin" />
+								</>
+							) : (
+								<>
+									<SparkleIcon className="mr-2 h-4 w-4" />
+									Refine PRD
+								</>
+							)}
+						</Button>
+					</DialogFooter>
+				</form>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
 export default function PrdDetailPage() {
 	const params = useParams();
 	const router = useRouter();
@@ -73,6 +299,11 @@ export default function PrdDetailPage() {
 
 	// Archive state
 	const [archiving, setArchiving] = useState(false);
+
+	// AI action states
+	const [draftDialogOpen, setDraftDialogOpen] = useState(false);
+	const [refineDialogOpen, setRefineDialogOpen] = useState(false);
+	const [aiLoading, setAiLoading] = useState(false);
 
 	const loadPrd = useCallback(async () => {
 		if (!currentProject || !prdId) {
@@ -180,6 +411,79 @@ export default function PrdDetailPage() {
 		}
 	};
 
+	const handleDraftPrd = async (description: string, additionalContext?: string) => {
+		setAiLoading(true);
+		try {
+			toast.info("AI is generating your PRD...");
+
+			const res = await apiFetch("/api/ai/prd/draft", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					prdId,
+					description,
+					additionalContext,
+				}),
+			});
+
+			if (!res.ok) {
+				const error = await res.json();
+				throw new Error(error.error || "Failed to generate PRD");
+			}
+
+			const data = await res.json();
+			toast.success("PRD generated successfully");
+			setDraftDialogOpen(false);
+			await loadPrd();
+
+			// Show suggested title if it was applied
+			if (data.suggestedTitle) {
+				toast.info(`Title set to: "${data.suggestedTitle}"`);
+			}
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Failed to generate PRD");
+			console.error(error);
+		} finally {
+			setAiLoading(false);
+		}
+	};
+
+	const handleRefinePrd = async (focusAreas?: string[]) => {
+		setAiLoading(true);
+		try {
+			toast.info("AI is refining your PRD...");
+
+			const res = await apiFetch("/api/ai/prd/refine", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					prdId,
+					focusAreas,
+				}),
+			});
+
+			if (!res.ok) {
+				const error = await res.json();
+				throw new Error(error.error || "Failed to refine PRD");
+			}
+
+			const data = await res.json();
+			toast.success("PRD refined successfully");
+			setRefineDialogOpen(false);
+			await loadPrd();
+
+			// Show improvements summary
+			if (data.improvements && data.improvements.length > 0) {
+				toast.info(`Improvements: ${data.improvements.slice(0, 2).join(", ")}${data.improvements.length > 2 ? "..." : ""}`);
+			}
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Failed to refine PRD");
+			console.error(error);
+		} finally {
+			setAiLoading(false);
+		}
+	};
+
 	if (!currentProject) {
 		return (
 			<>
@@ -232,12 +536,31 @@ export default function PrdDetailPage() {
 	}
 
 	const actions = (
-		<div className="flex items-center gap-2">
+		<div className="flex flex-wrap items-center gap-2">
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Button variant="outline" disabled={aiLoading}>
+						<SparkleIcon className="w-4 h-4 mr-2" />
+						{aiLoading ? "AI Working..." : "AI Actions"}
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent>
+					<DropdownMenuItem onClick={() => setDraftDialogOpen(true)}>
+						Draft from Description
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						onClick={() => setRefineDialogOpen(true)}
+						disabled={!prd.content?.trim()}
+					>
+						Refine & Improve
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
 			<Button
 				variant="outline"
 				size="sm"
 				onClick={handleArchiveToggle}
-				disabled={archiving}
+				disabled={archiving || aiLoading}
 			>
 				<ArchiveIcon className="w-4 h-4 mr-1" />
 				{prd.status === "archived" ? "Restore" : "Archive"}
@@ -246,11 +569,12 @@ export default function PrdDetailPage() {
 				variant="outline"
 				size="sm"
 				onClick={() => setConfirmDeleteOpen(true)}
+				disabled={aiLoading}
 			>
 				<TrashIcon className="w-4 h-4 mr-1" />
 				Delete
 			</Button>
-			<Button onClick={handleEdit}>
+			<Button onClick={handleEdit} disabled={aiLoading}>
 				<PencilIcon className="w-4 h-4 mr-2" />
 				Edit
 			</Button>
@@ -280,9 +604,19 @@ export default function PrdDetailPage() {
 									</pre>
 								</div>
 							) : (
-								<p className="text-muted-foreground italic">
-									No content yet. Click Edit to add requirements.
-								</p>
+								<div className="text-center py-8">
+									<p className="text-muted-foreground italic mb-4">
+										No content yet. Use AI to draft your PRD or add content manually.
+									</p>
+									<Button
+										variant="outline"
+										onClick={() => setDraftDialogOpen(true)}
+										disabled={aiLoading}
+									>
+										<SparkleIcon className="w-4 h-4 mr-2" />
+										Draft with AI
+									</Button>
+								</div>
 							)}
 						</CardContent>
 					</Card>
@@ -359,6 +693,22 @@ export default function PrdDetailPage() {
 				onSave={handleSavePrd}
 				onDelete={handleDelete}
 				mode="edit"
+			/>
+
+			{/* AI Draft Dialog */}
+			<DraftPrdDialog
+				open={draftDialogOpen}
+				onOpenChange={setDraftDialogOpen}
+				onSubmit={handleDraftPrd}
+				loading={aiLoading}
+			/>
+
+			{/* AI Refine Dialog */}
+			<RefinePrdDialog
+				open={refineDialogOpen}
+				onOpenChange={setRefineDialogOpen}
+				onSubmit={handleRefinePrd}
+				loading={aiLoading}
 			/>
 
 			{/* Delete Confirmation */}
