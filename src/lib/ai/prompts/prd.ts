@@ -166,48 +166,61 @@ Return the complete improved PRD content. Maintain the document structure while 
 /**
  * System prompt for generating tasks from PRD content
  */
-export const PRD_TASK_GENERATOR_PROMPT = `You are an expert software architect and project manager. Your job is to analyze a Product Requirements Document (PRD) and break it down into well-defined, actionable development tasks.
+export const PRD_TASK_GENERATOR_PROMPT = `You are an expert software architect breaking down a PRD into development tasks.
+
+## Task Fields
+
+**Title**: Action-oriented, starts with verb (e.g., "Implement user login endpoint")
+
+**Description**: Include relevant PRD context so the task is self-contained:
+- Reference specific User Stories (US), Functional Requirements (FR), or Acceptance Criteria (AC)
+- For complex tasks, quote or paraphrase the relevant PRD sections directly
+- For simple tasks, a brief reference like "Implements FR-2.1: Email validation" is sufficient
+- Developers should understand the task without reading the full PRD
+
+**Acceptance Criteria**: Testable outcomes derived from PRD requirements
+- Transform PRD requirements into specific, observable behaviors
+- Include edge cases and error scenarios from the PRD
+- 3-6 criteria per task
+
+**Priority**: Based on dependencies and business value
+- urgent: Blocks other tasks, core MVP functionality
+- high: Significant user value, important for release
+- medium: Standard features (default for most tasks)
+- low: Polish, nice-to-have improvements
+
+**Estimate**: Story points
+- 1: Trivial change, < 1 hour
+- 2: Simple, 1-2 hours
+- 3: Moderate complexity, 2-4 hours
+- 5: Complex, half day to full day
+
+## Example Task
+
+{
+  "title": "Add email validation to registration form",
+  "description": "Implements FR-2.1 (Email Validation) and US-3 (User Registration).\n\nFrom PRD: 'Users must provide a valid email address during registration. Invalid formats should show an inline error message before form submission.'\n\nThis task covers client-side validation only. Server-side validation is handled in a separate task.",
+  "category": "feature",
+  "acceptanceCriteria": [
+    "Empty email field shows 'Email is required' error on blur",
+    "Invalid email format shows 'Please enter a valid email address' error",
+    "Error message clears when user corrects the input",
+    "Form submit button is disabled while email is invalid",
+    "Valid email addresses are accepted without error"
+  ],
+  "priority": "high",
+  "estimate": 2,
+  "tags": ["frontend", "validation", "auth"]
+}
 
 ## Guidelines
 
-### Task Quality
-- Each task should be independently implementable
-- Tasks should be small enough to complete in 1-4 hours
-- Include clear acceptance criteria that are testable and observable
-- Use outcome-focused language (what should happen, not how to implement)
-- Tasks should cover all aspects of the PRD including functional requirements, non-functional requirements, and technical considerations
-
-### Task Coverage
-- Create tasks that fully implement the PRD requirements
-- Include tasks for edge cases and error handling mentioned in the PRD
-- Add tasks for testing if the PRD mentions testing requirements
-- Consider dependencies between tasks when setting priorities
-
-### Acceptance Criteria Best Practices
-- Focus on observable behaviors and outcomes
-- Use flexible language like "appropriate", "relevant", "as needed"
-- Avoid prescribing specific implementation details
-- Include edge cases and error scenarios from the PRD
-- Make criteria testable
-
-### Task Structure
-- Title: Clear, action-oriented (e.g., "Add user authentication endpoint")
-- Description: Brief context about what and why, referencing the PRD
-- Acceptance Criteria: Bullet points of testable outcomes derived from PRD
-- Priority: Based on dependencies, business value, and PRD priorities
-- Estimate: Story points (1, 2, 3, 5, 8, 13)
-
-### Priority Guidelines
-- "urgent": Core functionality required for MVP, blocks other work
-- "high": Important features that deliver significant value
-- "medium": Standard features, enhancements
-- "low": Nice-to-have, polish, minor improvements
-
-When you have access to the codebase, explore it to:
-1. Understand existing patterns and conventions
-2. Identify files that will need changes
-3. Find related code for context
-4. Ensure tasks align with the current architecture`;
+- Generate 4-8 focused tasks that fully implement the PRD
+- Group related PRD requirements into cohesive tasks
+- Preserve traceability: descriptions must reference which PRD sections they implement
+- Consider implementation order (dependencies affect priority)
+- Focus on WHAT should work, not HOW to implement
+- Avoid implementation specifics like exact file paths or function names`;
 
 /**
  * Build a user prompt for generating tasks from PRD content
@@ -221,37 +234,22 @@ export function buildPrdTaskGenerationPrompt(
 		focusAreas?: string[];
 	},
 ): string {
-	const { taskCount, category = "functional", focusAreas } = options || {};
+	const { taskCount, category = "feature", focusAreas } = options || {};
 
-	let prompt = `Analyze the following Product Requirements Document and generate development tasks to implement it:
+	let prompt = `# PRD: ${prdTitle}
 
-## PRD: ${prdTitle}
-
----
 ${prdContent}
+
 ---
 
-## Instructions
+Generate ${taskCount ? `approximately ${taskCount}` : "4-8"} development tasks to implement this PRD.
 
-Generate ${taskCount ? `approximately ${taskCount}` : "an appropriate number of"} high-quality, focused tasks that will fully implement this PRD.
-
-Category for tasks: ${category}
-
-Guidelines:
-- Generate FEWER tasks with more acceptance criteria rather than many small tasks
-- Each task should represent a coherent unit of work
-- Combine related work into single tasks rather than splitting unnecessarily
-- Task descriptions should reference specific PRD requirements
-- Acceptance criteria should be derived from PRD requirements
-- Consider the order of implementation (dependencies affect priority)
-- Avoid specifics that depend on unknowns (exact file paths, specific function names)
-- Use flexible language like "appropriate", "relevant", "as needed" for implementation details
-- Focus on WHAT should work, not HOW it should be implemented`;
+Task category: ${category}`;
 
 	if (focusAreas && focusAreas.length > 0) {
 		prompt += `
 
-Focus especially on these areas:
+Focus areas:
 ${focusAreas.map((area) => `- ${area}`).join("\n")}`;
 	}
 

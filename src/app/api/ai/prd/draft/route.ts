@@ -91,7 +91,8 @@ export async function POST(request: Request) {
 		const userPrompt = buildPrdDraftPrompt(description, additionalContext);
 
 		// Generate PRD content with structured output
-		const result = await aiClient.runWithSchema(
+		// Use generateWithCodebaseContext to leverage codebase analysis if available
+		const result = await aiClient.generateWithCodebaseContext(
 			PRD_DRAFTER_PROMPT,
 			userPrompt,
 			DraftedPrdSchema,

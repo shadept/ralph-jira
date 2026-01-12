@@ -4,6 +4,30 @@ import {
 	getProjectContextFromParams,
 	handleProjectRouteError,
 } from "@/lib/projects/db-server";
+import { sanitizeQuotes, sanitizeStringArray } from "@/lib/utils";
+
+/**
+ * Ensures a value is an array, parsing JSON strings if needed.
+ * Handles double-stringified JSON from agent file edits.
+ */
+function ensureArray(value: unknown): string[] {
+	if (Array.isArray(value)) {
+		return value.map((v) => (typeof v === "string" ? sanitizeQuotes(v) : v));
+	}
+	if (typeof value === "string") {
+		try {
+			const parsed = JSON.parse(value);
+			if (Array.isArray(parsed)) {
+				return parsed.map((v) =>
+					typeof v === "string" ? sanitizeQuotes(v) : v,
+				);
+			}
+		} catch {
+			// Not valid JSON, return empty array
+		}
+	}
+	return [];
+}
 
 function formatSprint(sprint: {
 	id: string;
@@ -94,9 +118,25 @@ export async function GET(
 			},
 			include: {
 				columns: { orderBy: { order: "asc" } },
-				tasks: { orderBy: { createdAt: "asc" } },
+				tasks: true,
 			},
 		});
+
+		// Sort tasks by priority (urgent > high > medium > low) then by createdAt
+		if (dbSprint?.tasks) {
+			const priorityOrder: Record<string, number> = {
+				urgent: 0,
+				high: 1,
+				medium: 2,
+				low: 3,
+			};
+			dbSprint.tasks.sort((a, b) => {
+				const priorityDiff =
+					(priorityOrder[a.priority] ?? 4) - (priorityOrder[b.priority] ?? 4);
+				if (priorityDiff !== 0) return priorityDiff;
+				return a.createdAt.getTime() - b.createdAt.getTime();
+			});
+		}
 
 		if (!dbSprint) {
 			return NextResponse.json(
@@ -165,94 +205,88 @@ export async function PUT(
 
 		if (updates.tasks) {
 			for (const task of updates.tasks) {
+				// Sanitize incoming data - handles smart quotes and stringified arrays
+				const sanitizedTitle = task.title
+					? sanitizeQuotes(task.title.trim())
+					: null;
+				const sanitizedDescription = task.description
+					? sanitizeQuotes(task.description)
+					: null;
+				const sanitizedAcceptanceCriteria = ensureArray(
+					task.acceptanceCriteria,
+				);
+				const sanitizedTags = ensureArray(task.tags);
+				const sanitizedFilesTouched = ensureArray(task.filesTouched);
+				const sanitizedFailureNotes = task.failureNotes
+					? sanitizeQuotes(task.failureNotes)
+					: task.failureNotes;
+
 				if (task.id) {
-					const existingTask = await prisma.task.findUnique({
-						where: { id: task.id },
-					});
-
-					if (existingTask) {
-						// Validate title if provided - it cannot be empty
-						const newTitle =
-							task.title !== undefined
-								? typeof task.title === "string" && task.title.trim() !== ""
-									? task.title.trim()
-									: existingTask.title
-								: existingTask.title;
-
-						await prisma.task.update({
+					// Use upsert to atomically create or update - avoids race conditions
+					// when multiple requests try to update the same task simultaneously
+					if (!sanitizedTitle) {
+						// For upsert, we need a valid title for create case
+						// If task exists, update will preserve existing title
+						// If task doesn't exist and no title, skip
+						const exists = await prisma.task.findUnique({
 							where: { id: task.id },
-							data: {
-								category: task.category ?? existingTask.category,
-								title: newTitle,
-								description:
-									task.description !== undefined
-										? task.description || null
-										: existingTask.description,
-								acceptanceCriteriaJson: task.acceptanceCriteria
-									? JSON.stringify(task.acceptanceCriteria)
-									: existingTask.acceptanceCriteriaJson,
-								status: task.status ?? existingTask.status,
-								priority: task.priority ?? existingTask.priority,
-								passes: task.passes ?? existingTask.passes,
-								estimate:
-									task.estimate !== undefined
-										? task.estimate
-										: existingTask.estimate,
-								deadline: task.deadline
-									? new Date(task.deadline)
-									: existingTask.deadline,
-								tagsJson: task.tags
-									? JSON.stringify(task.tags)
-									: existingTask.tagsJson,
-								filesTouchedJson: task.filesTouched
-									? JSON.stringify(task.filesTouched)
-									: existingTask.filesTouchedJson,
-								failureNotes:
-									task.failureNotes !== undefined
-										? task.failureNotes
-										: existingTask.failureNotes,
-								lastRun: task.lastRun
-									? new Date(task.lastRun)
-									: existingTask.lastRun,
-							},
+							select: { id: true },
 						});
-					} else {
-						// Task with ID doesn't exist - create new (title is required)
-						if (
-							!task.title ||
-							typeof task.title !== "string" ||
-							task.title.trim() === ""
-						) {
-							continue; // Skip tasks without a valid title
-						}
-						await prisma.task.create({
-							data: {
-								id: task.id,
-								projectId: project.id,
-								sprintId,
-								category: task.category || "task",
-								title: task.title.trim(),
-								description: task.description || null,
-								acceptanceCriteriaJson: JSON.stringify(
-									task.acceptanceCriteria || [],
-								),
-								status: task.status || "backlog",
-								priority: task.priority || "medium",
-								passes: task.passes || false,
-								estimate: task.estimate || null,
-								deadline: task.deadline ? new Date(task.deadline) : null,
-								tagsJson: JSON.stringify(task.tags || []),
-								filesTouchedJson: JSON.stringify(task.filesTouched || []),
-							},
-						});
+						if (!exists) continue;
 					}
+
+					await prisma.task.upsert({
+						where: { id: task.id },
+						create: {
+							id: task.id,
+							projectId: project.id,
+							sprintId,
+							category: task.category || "task",
+							title: sanitizedTitle || "Untitled Task",
+							description: sanitizedDescription,
+							acceptanceCriteriaJson: JSON.stringify(
+								sanitizedAcceptanceCriteria,
+							),
+							status: task.status || "backlog",
+							priority: task.priority || "medium",
+							passes: task.passes || false,
+							estimate: task.estimate || null,
+							deadline: task.deadline ? new Date(task.deadline) : null,
+							tagsJson: JSON.stringify(sanitizedTags),
+							filesTouchedJson: JSON.stringify(sanitizedFilesTouched),
+						},
+						update: {
+							category: task.category,
+							title: sanitizedTitle || undefined, // undefined means don't update
+							description:
+								task.description !== undefined ? sanitizedDescription : undefined,
+							acceptanceCriteriaJson:
+								task.acceptanceCriteria !== undefined
+									? JSON.stringify(sanitizedAcceptanceCriteria)
+									: undefined,
+							status: task.status,
+							priority: task.priority,
+							passes: task.passes,
+							estimate: task.estimate,
+							deadline: task.deadline ? new Date(task.deadline) : undefined,
+							tagsJson:
+								task.tags !== undefined
+									? JSON.stringify(sanitizedTags)
+									: undefined,
+							filesTouchedJson:
+								task.filesTouched !== undefined
+									? JSON.stringify(sanitizedFilesTouched)
+									: undefined,
+							failureNotes:
+								task.failureNotes !== undefined
+									? sanitizedFailureNotes
+									: undefined,
+							lastRun: task.lastRun ? new Date(task.lastRun) : undefined,
+						},
+					});
 				} else {
 					// New task without ID - title is required
-					if (
-						!task.title ||
-						typeof task.title !== "string" ||
-						task.title.trim() === ""
-					) {
+					if (!sanitizedTitle) {
 						continue; // Skip tasks without a valid title
 					}
 					await prisma.task.create({
@@ -260,18 +294,18 @@ export async function PUT(
 							projectId: project.id,
 							sprintId,
 							category: task.category || "task",
-							title: task.title.trim(),
-							description: task.description || null,
+							title: sanitizedTitle,
+							description: sanitizedDescription,
 							acceptanceCriteriaJson: JSON.stringify(
-								task.acceptanceCriteria || [],
+								sanitizedAcceptanceCriteria,
 							),
 							status: task.status || "backlog",
 							priority: task.priority || "medium",
 							passes: task.passes || false,
 							estimate: task.estimate || null,
 							deadline: task.deadline ? new Date(task.deadline) : null,
-							tagsJson: JSON.stringify(task.tags || []),
-							filesTouchedJson: JSON.stringify(task.filesTouched || []),
+							tagsJson: JSON.stringify(sanitizedTags),
+							filesTouchedJson: JSON.stringify(sanitizedFilesTouched),
 						},
 					});
 				}

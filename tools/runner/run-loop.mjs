@@ -678,29 +678,52 @@ class RunLoop {
 	 * @returns {Promise<boolean>} True if sync succeeded, false otherwise.
 	 */
 	async syncBackToRoot() {
-		// Sandbox board is local filesystem
-		const sandboxBoard = await readJson(this.sandboxBoardPath).catch((err) => {
-			console.error("Failed to read sandbox PRD:", err.message);
-			return null;
-		});
-		if (!sandboxBoard) {
-			console.error("syncBackToRoot: No sandbox board found");
-			return false;
-		}
+		await this.appendSandboxLog("\n--- Syncing PRD back to backend API ---\n");
 
-		// Root board via backend API (using sprint terminology)
-		const sprintId = this.run.sprintId || this.run.boardId || "prd";
-		const rootBoard = await this.backend.readSprint(sprintId).catch((err) => {
-			console.error("Failed to read root sprint:", err.message);
-			return null;
-		});
-		if (!rootBoard) {
-			console.error(
-				"syncBackToRoot: No root board found for sprint:",
-				sprintId,
+		// Sandbox board is local filesystem
+		await this.appendSandboxLog(
+			`Reading sandbox PRD from: ${this.sandboxBoardPath}\n`,
+		);
+		const sandboxBoard = await readJson(this.sandboxBoardPath).catch(
+			async (err) => {
+				await this.appendSandboxLog(
+					`Failed to read sandbox PRD: ${err.message}\n`,
+				);
+				return null;
+			},
+		);
+		if (!sandboxBoard) {
+			await this.appendSandboxLog(
+				"ERROR: No sandbox board found. Cannot sync PRD.\n",
 			);
 			return false;
 		}
+		await this.appendSandboxLog(
+			`Sandbox PRD loaded: ${sandboxBoard.tasks?.length || 0} tasks\n`,
+		);
+
+		// Root board via backend API (using sprint terminology)
+		const sprintId = this.run.sprintId || this.run.boardId || "prd";
+		await this.appendSandboxLog(
+			`Reading root sprint from backend API: ${sprintId}\n`,
+		);
+		const rootBoard = await this.backend.readSprint(sprintId).catch(
+			async (err) => {
+				await this.appendSandboxLog(
+					`Failed to read root sprint: ${err.message}\n`,
+				);
+				return null;
+			},
+		);
+		if (!rootBoard) {
+			await this.appendSandboxLog(
+				`ERROR: No root board found for sprint: ${sprintId}. Cannot sync PRD.\n`,
+			);
+			return false;
+		}
+		await this.appendSandboxLog(
+			`Root sprint loaded: ${rootBoard.tasks?.length || 0} tasks\n`,
+		);
 
 		const sandboxMap = new Map();
 		for (const task of sandboxBoard.tasks) {
@@ -714,6 +737,9 @@ class RunLoop {
 		);
 		const now = new Date().toISOString();
 
+		await this.appendSandboxLog(`Syncing ${selected.size} task(s)...\n`);
+
+		let updatedCount = 0;
 		rootBoard.tasks = rootBoard.tasks.map((task) => {
 			if (!selected.has(task.id)) return task;
 			const sandboxTask = sandboxMap.get(task.id);
@@ -721,6 +747,7 @@ class RunLoop {
 				return { ...task, status: "in_progress", updatedAt: now };
 			}
 			const passes = sandboxTask.passes === true;
+			updatedCount++;
 			return {
 				...task,
 				passes,
@@ -736,20 +763,29 @@ class RunLoop {
 
 		// Try to write with one retry
 		try {
+			await this.appendSandboxLog(
+				`Writing ${updatedCount} updated task(s) to backend API...\n`,
+			);
 			await this.backend.writeSprint(rootBoard);
-			console.log(`Synced ${selected.size} tasks back to sprint ${sprintId}`);
+			await this.appendSandboxLog(
+				`SUCCESS: Synced ${selected.size} tasks back to sprint ${sprintId}\n`,
+			);
 			return true;
 		} catch (err) {
-			console.error("First sync attempt failed, retrying...", err.message);
+			await this.appendSandboxLog(
+				`First sync attempt failed: ${err.message}. Retrying...\n`,
+			);
 			await new Promise((r) => setTimeout(r, 1000));
 			try {
 				await this.backend.writeSprint(rootBoard);
-				console.log(
-					`Synced ${selected.size} tasks back to sprint ${sprintId} (after retry)`,
+				await this.appendSandboxLog(
+					`SUCCESS: Synced ${selected.size} tasks back to sprint ${sprintId} (after retry)\n`,
 				);
 				return true;
 			} catch (retryErr) {
-				console.error("Sync failed after retry:", retryErr.message);
+				await this.appendSandboxLog(
+					`ERROR: Sync failed after retry: ${retryErr.message}\n`,
+				);
 				return false;
 			}
 		}
@@ -948,25 +984,39 @@ class RunLoop {
 	 * @returns {Promise<void>}
 	 */
 	async finalize(error) {
+		await this.appendSandboxLog("\n--- Run Finalization ---\n");
+
 		let syncSuccess = false;
 		try {
 			syncSuccess = await this.syncBackToRoot();
 		} catch (syncError) {
-			console.error("Failed to sync sandbox back to root", syncError);
+			await this.appendSandboxLog(
+				`Failed to sync sandbox back to root: ${syncError.message}\n`,
+			);
 		}
 
 		try {
 			await this.workspace.copyLogs(this.persistedLogPath);
+			await this.appendSandboxLog(
+				`Archived logs to: ${this.persistedLogPath}\n`,
+			);
 		} catch (copyError) {
-			console.error("Unable to archive sandbox log", copyError);
+			await this.appendSandboxLog(
+				`Unable to archive sandbox log: ${copyError.message}\n`,
+			);
 		}
 
 		// Capture stats and update workspace
 		let stats = { passed: 0, failed: 0 };
 		try {
 			stats = await this.workspace.captureSandboxStats();
+			await this.appendSandboxLog(
+				`Stats: ${stats.passed} passed, ${stats.failed} failed\n`,
+			);
 		} catch (statsError) {
-			console.error("Unable to capture sandbox stats", statsError);
+			await this.appendSandboxLog(
+				`Unable to capture sandbox stats: ${statsError.message}\n`,
+			);
 		}
 
 		// Run workspace finalization (auto-save, push, PR, cleanup)
@@ -975,7 +1025,9 @@ class RunLoop {
 			const result = await this.workspace.finalize({ syncSuccess });
 			prUrl = result.prUrl;
 		} catch (workspaceError) {
-			console.error("Unable to finalize workspace", workspaceError);
+			await this.appendSandboxLog(
+				`Unable to finalize workspace: ${workspaceError.message}\n`,
+			);
 		}
 
 		const finishedAt = new Date().toISOString();
@@ -1022,6 +1074,11 @@ class RunLoop {
 		summaryLines.push(`Details: plans/runs/${this.runId}.json`);
 
 		const summary = summaryLines.join("\n");
+
+		// Log summary to sandbox before archiving
+		await this.appendSandboxLog(`\n--- Run Summary ---\n${summary}\n`);
+		await this.flushSandboxLog();
+
 		await this.appendRootProgress(summary);
 	}
 }

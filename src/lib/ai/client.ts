@@ -2,9 +2,13 @@
  * Unified AI Client
  *
  * Provides a single interface for all AI operations with:
- * - Automatic repo tool access when available
- * - Manual agentic loop for tool calling
- * - Structured output support
+ * - Agentic tool calling loop for codebase exploration
+ * - Structured output generation
+ * - Clear separation between system prompts and user context
+ *
+ * API Design:
+ * - systemPrompt: Agent persona and task instructions (reusable)
+ * - userContext: Input data to process - PRD content, user request, etc. (variable)
  */
 
 import { openai } from "@ai-sdk/openai";
@@ -29,6 +33,25 @@ import type {
 
 const DEFAULT_MODEL = "gpt-4-turbo";
 
+/**
+ * Internal prompt for codebase exploration phase.
+ * Focused on gathering context, not generating final output.
+ */
+const CODEBASE_EXPLORER_PROMPT = `You are a codebase analyst. Your job is to explore the codebase and gather relevant context for the task at hand.
+
+## Instructions
+
+1. Start by calling get_file_tree to understand the project structure
+2. Use find_files and search_code to locate relevant files
+3. Read key files to understand existing patterns and implementations
+4. Summarize your findings concisely, focusing on:
+   - Relevant existing code and patterns
+   - File locations that may need changes
+   - Architectural considerations
+   - Any constraints or conventions you observed
+
+Be thorough but efficient. Focus on information that will help with the task.`;
+
 export class AIClient {
 	private config: AIClientConfig;
 	private toolRegistry: ToolRegistry;
@@ -42,7 +65,7 @@ export class AIClient {
 	}
 
 	/**
-	 * Build the full system prompt with project context
+	 * Build system prompt with project context appended
 	 */
 	private buildSystemPrompt(basePrompt: string): string {
 		let prompt = basePrompt;
@@ -51,7 +74,16 @@ export class AIClient {
 			prompt += this.formatProjectContext(this.config.projectContext);
 		}
 
-		if (this.config.repoAdapter) {
+		return prompt;
+	}
+
+	/**
+	 * Build system prompt with project context AND codebase tool instructions
+	 */
+	private buildSystemPromptWithTools(basePrompt: string): string {
+		let prompt = this.buildSystemPrompt(basePrompt);
+
+		if (this.toolRegistry.size > 0) {
 			prompt += `\n\n## Codebase Access
 
 You have access to the project's codebase through the following tools:
@@ -61,8 +93,7 @@ You have access to the project's codebase through the following tools:
 - search_code: Search for code patterns
 - file_exists: Check if a file exists
 
-Always explore the codebase to understand the existing implementation before making recommendations.
-Start by calling get_file_tree to understand the project structure.`;
+Use these tools to explore the codebase and gather relevant context.`;
 		}
 
 		return prompt;
@@ -97,15 +128,15 @@ Start by calling get_file_tree to understand the project structure.`;
 			execute: async (args) => {
 				const startTime = Date.now();
 				const argsStr = JSON.stringify(args, null, 2);
-				console.log(`[AI] 🔧 Tool call: ${name}`);
+				console.log(`[AI] Tool call: ${name}`);
 				console.log(`[AI]    Args: ${argsStr}`);
 				try {
 					const result = await tool.execute(args as Record<string, unknown>);
 					const duration = Date.now() - startTime;
-					console.log(`[AI] ✅ Tool ${name} completed in ${duration}ms`);
+					console.log(`[AI] Tool ${name} completed in ${duration}ms`);
 					return result;
 				} catch (error) {
-					console.error(`[AI] ❌ Tool ${name} failed:`, error);
+					console.error(`[AI] Tool ${name} failed:`, error);
 					throw error;
 				}
 			},
@@ -133,59 +164,71 @@ Start by calling get_file_tree to understand the project structure.`;
 	}
 
 	/**
-	 * Run AI with simple approach - single call with tools
+	 * Extract usage from AI SDK response
 	 */
-	async run(
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	private extractUsage(response: any): TokenUsage {
+		const totalUsage = response.totalUsage ?? response.usage ?? {};
+		const usage: TokenUsage = {
+			promptTokens: totalUsage.promptTokens ?? 0,
+			completionTokens: totalUsage.completionTokens ?? 0,
+			totalTokens: 0,
+		};
+		usage.totalTokens = usage.promptTokens + usage.completionTokens;
+		return usage;
+	}
+
+	/**
+	 * Run agentic loop with tools
+	 *
+	 * Use this for tasks that require codebase exploration or multi-step reasoning.
+	 *
+	 * @param systemPrompt - Agent persona and task instructions
+	 * @param userContext - Input data to process (PRD content, user request, etc.)
+	 */
+	private async run(
 		systemPrompt: string,
-		userMessage: string,
+		userContext: string,
 	): Promise<AIResult<string>> {
 		const startTime = Date.now();
 		const toolCallLogs: ToolCallLog[] = [];
 
-		const fullSystemPrompt = this.buildSystemPrompt(systemPrompt);
+		const fullSystemPrompt = this.buildSystemPromptWithTools(systemPrompt);
 		const model = this.config.model ?? DEFAULT_MODEL;
 		const tools = this.buildTools();
-
 		const maxSteps = this.config.maxToolCalls ?? 20;
 
-		console.log(`[AI] 🚀 Starting run with model: ${model}`);
+		console.log(`[AI] run() starting`);
+		console.log(`[AI]   Model: ${model}`);
 		console.log(
-			`[AI] 💬 Prompt: ${userMessage.slice(0, 200)}${userMessage.length > 200 ? "..." : ""}`,
+			`[AI]   Tools: ${tools ? Object.keys(tools).join(", ") : "none"}`,
 		);
+		console.log(`[AI]   Max steps: ${maxSteps}`);
 		console.log(
-			`[AI] 📝 Available tools: ${tools ? Object.keys(tools).join(", ") : "none"}`,
+			`[AI]   User context: ${userContext.slice(0, 150)}${userContext.length > 150 ? "..." : ""}`,
 		);
-		console.log(`[AI] 🔄 Max steps: ${maxSteps}`);
 
-		// Use ToolLoopAgent for proper agentic tool calling loop
 		const agent = new ToolLoopAgent({
 			model: openai(model),
 			tools: tools ?? {},
 			instructions: fullSystemPrompt,
 			stopWhen: stepCountIs(maxSteps),
 			onStepFinish: (step) => {
-				// Log each step as it completes
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				const stepAny = step as any;
 				if (stepAny.toolCalls?.length > 0) {
 					console.log(
-						`[AI] 📍 Step completed with ${stepAny.toolCalls.length} tool call(s)`,
+						`[AI]   Step completed: ${stepAny.toolCalls.length} tool call(s)`,
 					);
 				}
 			},
 		});
 
-		const response = await agent.generate({
-			prompt: userMessage,
-		});
+		const response = await agent.generate({ prompt: userContext });
 
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const responseAny = response as any;
 		const steps = responseAny.steps ?? [];
-
-		console.log(
-			`[AI] ✨ Run completed in ${Date.now() - startTime}ms (${steps.length} steps)`,
-		);
 
 		// Extract tool calls from all steps
 		for (const step of steps) {
@@ -202,81 +245,55 @@ Start by calling get_file_tree to understand the project structure.`;
 			}
 		}
 
-		// Extract usage from totalUsage (aggregated across all steps)
-		const totalUsage = responseAny.totalUsage ?? responseAny.usage ?? {};
-		const usage: TokenUsage = {
-			promptTokens: totalUsage.promptTokens ?? 0,
-			completionTokens: totalUsage.completionTokens ?? 0,
-			totalTokens: 0,
-		};
-		usage.totalTokens = usage.promptTokens + usage.completionTokens;
+		const durationMs = Date.now() - startTime;
+		console.log(
+			`[AI] run() completed in ${durationMs}ms (${steps.length} steps, ${toolCallLogs.length} tool calls)`,
+		);
 
 		return {
 			output: response.text,
 			toolCalls: toolCallLogs,
-			usage,
-			durationMs: Date.now() - startTime,
+			usage: this.extractUsage(responseAny),
+			durationMs,
 			iterations: steps.length || 1,
 		};
 	}
 
 	/**
-	 * Run AI and parse output with Zod schema
+	 * Generate structured output (single call, no tools)
+	 *
+	 * Use this for straightforward generation tasks that don't need codebase access.
+	 *
+	 * @param systemPrompt - Agent persona and task instructions
+	 * @param userContext - Input data to process (PRD content, user request, etc.)
+	 * @param schema - Zod schema for structured output
 	 */
-	async runWithSchema<T>(
+	async generateStructured<T>(
 		systemPrompt: string,
-		userMessage: string,
+		userContext: string,
 		schema: z.ZodSchema<T>,
 	): Promise<AIResult<T>> {
 		const startTime = Date.now();
 		const fullSystemPrompt = this.buildSystemPrompt(systemPrompt);
 		const model = this.config.model ?? DEFAULT_MODEL;
 
-		console.log(`[AI] 🎯 Starting runWithSchema with model: ${model}`);
+		console.log(`[AI] generateStructured() starting`);
+		console.log(`[AI]   Model: ${model}`);
 		console.log(
-			`[AI] 💬 Prompt: ${userMessage.slice(0, 200)}${userMessage.length > 200 ? "..." : ""}`,
+			`[AI]   User context: ${userContext.slice(0, 150)}${userContext.length > 150 ? "..." : ""}`,
 		);
 
-		// First, gather context with tools if available
-		let toolCallLogs: ToolCallLog[] = [];
-		let contextText = "";
-
-		if (this.toolRegistry.size > 0) {
-			console.log(`[AI] 🔍 Phase 1: Gathering codebase context...`);
-			const contextResult = await this.run(
-				systemPrompt +
-					"\n\nExplore the codebase and summarize what you find relevant to the request.",
-				userMessage,
-			);
-			toolCallLogs = contextResult.toolCalls;
-			contextText = contextResult.output;
-			console.log(
-				`[AI] 📊 Context gathered: ${contextText.length} chars, ${toolCallLogs.length} tool calls`,
-			);
-		}
-
-		// Now generate structured output using generateText with Output
-		console.log(`[AI] 🔍 Phase 2: Generating structured output...`);
-		const structuredPrompt = contextText
-			? `Based on your codebase analysis:\n${contextText}\n\nNow respond to:\n${userMessage}`
-			: userMessage;
-
-		const structuredResponse = await generateText({
+		const response = await generateText({
 			model: openai(model),
 			system: fullSystemPrompt,
-			prompt: structuredPrompt,
+			prompt: userContext,
 			output: Output.object({ schema }),
 		});
 
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const responseAny = structuredResponse as any;
-
-		console.log(
-			`[AI] ✨ runWithSchema completed in ${Date.now() - startTime}ms`,
-		);
+		const responseAny = response as any;
 
 		// The structured output location varies by SDK version
-		// Try experimental_output first (newer), then object (older), then _output (internal)
 		const output =
 			responseAny.experimental_output ??
 			responseAny.object ??
@@ -284,29 +301,103 @@ Start by calling get_file_tree to understand the project structure.`;
 			responseAny.output;
 
 		if (!output) {
-			console.error(`[AI] ❌ No structured output found`);
-			console.error(`[AI] 📦 Response keys:`, Object.keys(responseAny));
-			console.error(`[AI] 📦 Response text:`, responseAny.text?.slice(0, 500));
+			console.error(`[AI] No structured output found`);
+			console.error(`[AI]   Response keys:`, Object.keys(responseAny));
+			console.error(`[AI]   Response text:`, responseAny.text?.slice(0, 500));
 			throw new Error("AI did not return structured output");
 		}
 
-		console.log(`[AI] ✅ Structured output received`);
-
-		// Extract usage from totalUsage (aggregated) or usage
-		const totalUsage = responseAny.totalUsage ?? responseAny.usage ?? {};
-		const usage: TokenUsage = {
-			promptTokens: totalUsage.promptTokens ?? 0,
-			completionTokens: totalUsage.completionTokens ?? 0,
-			totalTokens: 0,
-		};
-		usage.totalTokens = usage.promptTokens + usage.completionTokens;
+		const durationMs = Date.now() - startTime;
+		console.log(`[AI] generateStructured() completed in ${durationMs}ms`);
 
 		return {
 			output: output as T,
+			toolCalls: [],
+			usage: this.extractUsage(responseAny),
+			durationMs,
+			iterations: 1,
+		};
+	}
+
+	/**
+	 * Generate structured output with codebase context (two-phase)
+	 *
+	 * Phase 1: Explore codebase using tools to gather relevant context
+	 * Phase 2: Generate structured output using the gathered context
+	 *
+	 * Use this when the task benefits from understanding existing code patterns.
+	 *
+	 * @param systemPrompt - Agent persona and task instructions (used in phase 2)
+	 * @param userContext - Input data to process (used in both phases)
+	 * @param schema - Zod schema for structured output
+	 */
+	async generateWithCodebaseContext<T>(
+		systemPrompt: string,
+		userContext: string,
+		schema: z.ZodSchema<T>,
+	): Promise<AIResult<T> & { codebaseContext: string }> {
+		const startTime = Date.now();
+		let toolCallLogs: ToolCallLog[] = [];
+		let codebaseContext = "";
+
+		console.log(`[AI] generateWithCodebaseContext() starting`);
+
+		// Phase 1: Explore codebase (only if tools available)
+		if (this.toolRegistry.size > 0) {
+			console.log(`[AI]   Phase 1: Exploring codebase...`);
+
+			// Include the final task's system prompt so explorer knows what context to gather
+			const explorationContext = `## Final Task
+The gathered context will be used for the following task:
+
+${systemPrompt}
+
+## User Input
+${userContext}
+
+---
+Explore the codebase to gather context relevant to completing the above task.`;
+
+			const explorationResult = await this.run(
+				CODEBASE_EXPLORER_PROMPT,
+				explorationContext,
+			);
+
+			toolCallLogs = explorationResult.toolCalls;
+			codebaseContext = explorationResult.output;
+
+			console.log(
+				`[AI]   Phase 1 complete: ${codebaseContext.length} chars, ${toolCallLogs.length} tool calls`,
+			);
+		} else {
+			console.log(`[AI]   Phase 1 skipped: no tools available`);
+		}
+
+		// Phase 2: Generate structured output
+		console.log(`[AI]   Phase 2: Generating structured output...`);
+
+		const contextualUserPrompt = codebaseContext
+			? `## Codebase Analysis\n${codebaseContext}\n\n## Task\n${userContext}`
+			: userContext;
+
+		const structuredResult = await this.generateStructured(
+			systemPrompt,
+			contextualUserPrompt,
+			schema,
+		);
+
+		const durationMs = Date.now() - startTime;
+		console.log(
+			`[AI] generateWithCodebaseContext() completed in ${durationMs}ms`,
+		);
+
+		return {
+			output: structuredResult.output,
 			toolCalls: toolCallLogs,
-			usage,
-			durationMs: Date.now() - startTime,
+			usage: structuredResult.usage,
+			durationMs,
 			iterations: toolCallLogs.length > 0 ? toolCallLogs.length + 1 : 1,
+			codebaseContext,
 		};
 	}
 

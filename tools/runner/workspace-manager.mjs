@@ -5,6 +5,41 @@ const PENDING_STATUSES = new Set(["todo", "in_progress"]);
 const MAX_LOG_SNIPPET = 1200;
 
 /**
+ * Sanitizes text by replacing smart/curly quotes with straight ASCII quotes.
+ * AI models sometimes generate Unicode quotation marks that cause parsing issues.
+ * @param {string} text
+ * @returns {string}
+ */
+function sanitizeQuotes(text) {
+	if (typeof text !== "string") return text;
+	return text
+		.replace(/[\u201C\u201D]/g, '"') // Smart double quotes → straight double quote
+		.replace(/[\u2018\u2019]/g, "'"); // Smart single quotes → straight single quote
+}
+
+/**
+ * Recursively sanitizes all string values in an object or array.
+ * @param {any} value
+ * @returns {any}
+ */
+function deepSanitizeQuotes(value) {
+	if (typeof value === "string") {
+		return sanitizeQuotes(value);
+	}
+	if (Array.isArray(value)) {
+		return value.map(deepSanitizeQuotes);
+	}
+	if (value && typeof value === "object") {
+		const result = {};
+		for (const key of Object.keys(value)) {
+			result[key] = deepSanitizeQuotes(value[key]);
+		}
+		return result;
+	}
+	return value;
+}
+
+/**
  * Detects if a path is a local filesystem path (not a remote URL).
  * @param {string} repoPath
  * @returns {boolean}
@@ -704,7 +739,8 @@ export class WorkspaceManager {
 			filteredTasks.length,
 		);
 
-		const sandboxBoard = { ...board, tasks: filteredTasks };
+		// Sanitize smart quotes to prevent JSON parsing issues for the agent
+		const sandboxBoard = deepSanitizeQuotes({ ...board, tasks: filteredTasks });
 		console.log(
 			"[workspace-manager:prepareSandboxPlan] Creating plans directory...",
 		);

@@ -247,8 +247,8 @@ function ConvertToSprintDialog({
 				<DialogHeader>
 					<DialogTitle>Convert PRD to Sprint</DialogTitle>
 					<DialogDescription>
-						Create a new sprint from this PRD. The sprint will be linked to the
-						source PRD.
+						Create a new sprint from this PRD. AI will analyze the PRD content
+						and automatically generate an initial backlog of tasks.
 					</DialogDescription>
 				</DialogHeader>
 				<form
@@ -328,13 +328,13 @@ function ConvertToSprintDialog({
 								>
 									{loading ? (
 										<>
-											Creating
-											<SpinnerIcon className="ml-2 h-4 w-4 animate-spin" />
+											Generating Tasks...
+											<SpinnerIcon className="h-4 w-4 animate-spin" />
 										</>
 									) : (
 										<>
-											<ArrowsClockwiseIcon className="mr-2 h-4 w-4" />
-											Create Sprint
+											Create Sprint & Generate Tasks
+											<SparkleIcon className="h-4 w-4" />
 										</>
 									)}
 								</Button>
@@ -385,6 +385,7 @@ export function PrdDetailClient({
 	const [editorContent, setEditorContent] = useState<string>(
 		initialPrd.content ?? "",
 	);
+	const [editorKey, setEditorKey] = useState(0); // Key to force MDXEditor re-render
 	const [isSaving, setIsSaving] = useState(false);
 	const [lastSavedAt, setLastSavedAt] = useState<Date | null>(
 		initialPrd.updatedAt ? new Date(initialPrd.updatedAt) : null,
@@ -611,13 +612,15 @@ export function PrdDetailClient({
 			const data = await res.json();
 			toast.success("PRD refined successfully");
 			setRefineDialogOpen(false);
-			await loadPrd();
 
-			// Update editor content with refined content
+			// Update editor content with refined content and force re-render
 			if (data.prd?.content) {
 				setEditorContent(data.prd.content);
 				lastSavedContentRef.current = data.prd.content;
+				setEditorKey((prev) => prev + 1); // Force MDXEditor to re-render
 			}
+
+			await loadPrd();
 
 			// Show improvements summary
 			if (data.improvements && data.improvements.length > 0) {
@@ -642,7 +645,9 @@ export function PrdDetailClient({
 	}) => {
 		setConvertLoading(true);
 		try {
-			toast.info("Creating sprint from PRD...");
+			toast.info("Creating sprint and generating tasks from PRD...", {
+				duration: 10000, // AI generation can take a while
+			});
 
 			const res = await apiFetch(`/api/prds/${prdId}/convert-to-sprint`, {
 				method: "POST",
@@ -658,6 +663,15 @@ export function PrdDetailClient({
 			const result = await res.json();
 			toast.success(result.message || "Sprint created successfully");
 			setConvertDialogOpen(false);
+
+			// Show additional info about task generation
+			if (result.tasksGenerated > 0) {
+				toast.info(`${result.tasksGenerated} tasks added to backlog`);
+			} else if (result.taskGenerationError) {
+				toast.warning(
+					`Sprint created but task generation failed: ${result.taskGenerationError}`,
+				);
+			}
 
 			// Navigate to the new sprint
 			router.push(`/project/sprints/${result.sprint.id}`);
@@ -691,8 +705,8 @@ export function PrdDetailClient({
 					onClick={() => setConvertDialogOpen(true)}
 					disabled={isLoading}
 				>
-					<ArrowsClockwiseIcon className="w-4 h-4 mr-2" />
 					{convertLoading ? "Creating..." : "Convert to Sprint"}
+					<ArrowsClockwiseIcon className="w-4 h-4" />
 				</Button>
 			);
 		}
@@ -705,8 +719,8 @@ export function PrdDetailClient({
 					onClick={() => router.push(`/project/sprints/${linkedSprints[0].id}`)}
 					disabled={isLoading}
 				>
-					<LinkIcon className="w-4 h-4 mr-2" />
 					Go to Sprint
+					<LinkIcon className="w-4 h-4" />
 				</Button>
 			);
 		}
@@ -745,11 +759,11 @@ export function PrdDetailClient({
 					disabled={archiving || isLoading}
 				>
 					{archiving ? (
-						<SpinnerIcon className="w-4 h-4 mr-2 animate-spin" />
+						<SpinnerIcon className="w-4 h-4 animate-spin" />
 					) : prd.status === "archived" ? (
-						<ArrowClockwiseIcon className="w-4 h-4 mr-2" />
+						<ArrowClockwiseIcon className="w-4 h-4" />
 					) : (
-						<ArchiveIcon className="w-4 h-4 mr-2" />
+						<ArchiveIcon className="w-4 h-4" />
 					)}
 					{prd.status === "archived" ? "Restore" : "Archive"}
 				</Button>
@@ -793,16 +807,8 @@ export function PrdDetailClient({
 					</TooltipContent>
 				</Tooltip>
 			) : (
-				<Button
-					variant="default"
-					onClick={() => setConvertDialogOpen(true)}
-					disabled={isLoading}
-				>
-					<ArrowsClockwiseIcon className="w-4 h-4 mr-2" />
-					{convertLoading ? "Creating..." : "Convert to Sprint"}
-				</Button>
+				renderSprintAction()
 			)}
-			{renderSprintAction()}
 		</div>
 	);
 
@@ -881,6 +887,7 @@ export function PrdDetailClient({
 						</CardHeader>
 						<CardContent>
 							<MarkdownEditor
+								key={editorKey}
 								markdown={editorContent}
 								onChange={handleContentChange}
 								placeholder="Start writing your PRD content here..."

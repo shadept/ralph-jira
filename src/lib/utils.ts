@@ -28,3 +28,21 @@ export function getInitials(
 	}
 	return "??";
 }
+
+/**
+ * Sanitizes text by replacing smart/curly quotes with straight ASCII quotes.
+ * This is needed because AI models sometimes generate Unicode quotation marks
+ * (U+201C, U+201D, U+2018, U+2019) which can cause parsing issues downstream.
+ */
+export function sanitizeQuotes(text: string): string {
+	return text
+		.replace(/[\u201C\u201D]/g, '"') // Smart double quotes → straight double quote
+		.replace(/[\u2018\u2019]/g, "'"); // Smart single quotes → straight single quote
+}
+
+/**
+ * Sanitizes an array of strings by replacing smart quotes in each element.
+ */
+export function sanitizeStringArray(arr: string[]): string[] {
+	return arr.map(sanitizeQuotes);
+}

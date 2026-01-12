@@ -13,7 +13,7 @@ interface KanbanColumnProps {
 	column: Column;
 	tasks: Task[];
 	onTaskClick: (task: Task) => void;
-	onTogglePasses: (taskId: string) => void;
+	onTogglePasses?: (taskId: string) => void;
 }
 
 export function KanbanColumn({
@@ -60,7 +60,9 @@ export function KanbanColumn({
 							key={task.id}
 							task={task}
 							onClick={() => onTaskClick(task)}
-							onTogglePasses={() => onTogglePasses(task.id)}
+							onTogglePasses={
+								onTogglePasses ? () => onTogglePasses(task.id) : undefined
+							}
 						/>
 					))}
 				</SortableContext>

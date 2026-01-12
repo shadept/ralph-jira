@@ -92,7 +92,8 @@ export async function POST(request: Request) {
 		const userPrompt = buildPrdRefinePrompt(prd.content, focusAreas);
 
 		// Generate refined PRD content with structured output
-		const result = await aiClient.runWithSchema(
+		// Use generateWithCodebaseContext to leverage codebase analysis if available
+		const result = await aiClient.generateWithCodebaseContext(
 			PRD_REFINER_PROMPT,
 			userPrompt,
 			RefinedPrdSchema,

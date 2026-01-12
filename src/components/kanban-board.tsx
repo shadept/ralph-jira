@@ -17,14 +17,14 @@ import { TaskCard } from "./task-card";
 
 interface KanbanBoardProps {
 	sprint: Sprint;
-	onUpdateSprint: (sprint: Sprint) => Promise<void>;
+	onTaskStatusChange: (taskId: string, newStatus: Task["status"]) => Promise<void>;
 	onTaskClick: (task: Task) => void;
 	onTogglePasses?: (taskId: string) => void;
 }
 
 export function KanbanBoard({
 	sprint,
-	onUpdateSprint,
+	onTaskStatusChange,
 	onTaskClick,
 	onTogglePasses,
 }: KanbanBoardProps) {
@@ -57,34 +57,6 @@ export function KanbanBoard({
 		return targetTask?.status;
 	};
 
-	const handleTogglePasses = async (taskId: string) => {
-		if (onTogglePasses) {
-			onTogglePasses(taskId);
-			return;
-		}
-
-		const task = tasks.find((t) => t.id === taskId);
-		if (!task) return;
-
-		const nextTasks = tasks.map((t) =>
-			t.id === taskId
-				? {
-						...t,
-						passes: !t.passes,
-						updatedAt: new Date().toISOString(),
-					}
-				: t,
-		);
-
-		const updatedSprint = {
-			...sprint,
-			tasks: nextTasks,
-			updatedAt: new Date().toISOString(),
-		};
-
-		await onUpdateSprint(updatedSprint);
-	};
-
 	const handleDragEnd = async (event: DragEndEvent) => {
 		const { active, over } = event;
 
@@ -107,24 +79,8 @@ export function KanbanBoard({
 			return;
 		}
 
-		const nextTasks = tasks.map((t) =>
-			t.id === taskId
-				? {
-						...t,
-						status: newStatus,
-						updatedAt: new Date().toISOString(),
-					}
-				: t,
-		);
-
-		const updatedSprint = {
-			...sprint,
-			tasks: nextTasks,
-			updatedAt: new Date().toISOString(),
-		};
-
 		setActiveTask(null);
-		await onUpdateSprint(updatedSprint);
+		await onTaskStatusChange(taskId, newStatus);
 	};
 
 	return (
@@ -146,7 +102,7 @@ export function KanbanBoard({
 								column={column}
 								tasks={columnTasks}
 								onTaskClick={onTaskClick}
-								onTogglePasses={handleTogglePasses}
+								onTogglePasses={onTogglePasses}
 							/>
 						);
 					})}

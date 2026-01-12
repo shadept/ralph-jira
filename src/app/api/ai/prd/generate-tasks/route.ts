@@ -12,22 +12,35 @@ import {
 } from "@/lib/projects/db-server";
 import { getRepoAdapterForProject } from "@/lib/repo";
 import { parseAiPreferences, parseTechStack } from "@/lib/schemas";
+import { sanitizeQuotes, sanitizeStringArray } from "@/lib/utils";
 
+// Note: All fields must be required for OpenAI structured output API
 const GeneratedTaskSchema = z.object({
 	tasks: z.array(
 		z.object({
-			title: z.string().describe("Short, action-oriented task title"),
+			title: z.string().describe("Clear, action-oriented task title"),
 			description: z
 				.string()
-				.describe("Brief context about what and why, referencing the PRD"),
+				.describe(
+					"Task context referencing PRD sections (e.g., 'Implements FR-2.1: Email validation')",
+				),
+			category: z
+				.enum(["feature", "bug", "chore", "refactor", "test", "docs"])
+				.describe("Task category"),
 			acceptanceCriteria: z
 				.array(z.string())
+				.describe("3-6 testable outcomes derived from PRD requirements"),
+			priority: z
+				.enum(["low", "medium", "high", "urgent"])
 				.describe(
-					"Testable outcomes for the task derived from PRD requirements",
+					"Task priority: urgent=MVP blocker, high=important, medium=standard, low=nice-to-have",
 				),
-			priority: z.enum(["low", "medium", "high", "urgent"]),
-			estimate: z.number().describe("Story points: 1, 2, 3, 5, 8, or 13"),
-			tags: z.array(z.string()).describe("Relevant tags for categorization"),
+			estimate: z
+				.number()
+				.describe("Story points: 1=trivial, 2=simple, 3=moderate, 5=complex"),
+			tags: z
+				.array(z.string())
+				.describe("2-4 tags for categorization (e.g., 'frontend', 'api', 'database', 'auth')"),
 		}),
 	),
 });
@@ -132,7 +145,8 @@ export async function POST(request: Request) {
 		});
 
 		// Generate tasks with structured output
-		const result = await aiClient.runWithSchema(
+		// Use generateWithCodebaseContext to leverage codebase analysis if available
+		const result = await aiClient.generateWithCodebaseContext(
 			PRD_TASK_GENERATOR_PROMPT,
 			userPrompt,
 			GeneratedTaskSchema,
@@ -141,17 +155,25 @@ export async function POST(request: Request) {
 		// Create tasks in database
 		const newTasks = await Promise.all(
 			result.output.tasks.map(async (t) => {
+				// Sanitize AI-generated text to replace smart quotes with ASCII quotes
+				const sanitizedAcceptanceCriteria = sanitizeStringArray(
+					t.acceptanceCriteria,
+				);
+				const sanitizedTags = sanitizeStringArray(t.tags);
+				const sanitizedTitle = sanitizeQuotes(t.title);
+				const sanitizedDescription = sanitizeQuotes(t.description);
+
 				const task = await prisma.task.create({
 					data: {
 						projectId: project.id,
 						sprintId: sprint.id,
-						category,
-						title: t.title,
-						description: t.description,
-						acceptanceCriteriaJson: JSON.stringify(t.acceptanceCriteria),
+						category: t.category,
+						title: sanitizedTitle,
+						description: sanitizedDescription,
+						acceptanceCriteriaJson: JSON.stringify(sanitizedAcceptanceCriteria),
 						priority: t.priority,
 						estimate: t.estimate,
-						tagsJson: JSON.stringify(t.tags),
+						tagsJson: JSON.stringify(sanitizedTags),
 						status: "backlog",
 						passes: false,
 						filesTouchedJson: "[]",
@@ -165,12 +187,12 @@ export async function POST(request: Request) {
 					title: task.title,
 					category: task.category,
 					description: task.description,
-					acceptanceCriteria: t.acceptanceCriteria,
+					acceptanceCriteria: sanitizedAcceptanceCriteria,
 					status: task.status,
 					priority: task.priority,
 					passes: task.passes,
 					estimate: task.estimate,
-					tags: t.tags,
+					tags: sanitizedTags,
 					filesTouched: [],
 					createdAt: task.createdAt.toISOString(),
 					updatedAt: task.updatedAt.toISOString(),

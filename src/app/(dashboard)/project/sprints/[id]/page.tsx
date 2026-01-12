@@ -490,6 +490,68 @@ export default function SprintPage({
 		openTaskEditor(task);
 	};
 
+	const handleTaskStatusChange = async (
+		taskId: string,
+		newStatus: Task["status"],
+	) => {
+		if (!sprint || !currentProject || !sprint.tasks) return;
+
+		// Optimistically update local state
+		const updatedTasks = sprint.tasks.map((t) =>
+			t.id === taskId
+				? { ...t, status: newStatus, updatedAt: new Date().toISOString() }
+				: t,
+		);
+		setSprint({ ...sprint, tasks: updatedTasks });
+
+		try {
+			await apiFetch(`/api/tasks/${taskId}`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ status: newStatus }),
+			});
+		} catch (error) {
+			// Revert on failure
+			setSprint(sprint);
+			const message =
+				error instanceof Error ? error.message : "Failed to update task";
+			toast.error(message);
+			console.error("Task status update error:", error);
+		}
+	};
+
+	const handleTogglePasses = async (taskId: string) => {
+		if (!sprint || !currentProject || !sprint.tasks) return;
+
+		const task = sprint.tasks.find((t) => t.id === taskId);
+		if (!task) return;
+
+		const newPasses = !task.passes;
+
+		// Optimistically update local state
+		const updatedTasks = sprint.tasks.map((t) =>
+			t.id === taskId
+				? { ...t, passes: newPasses, updatedAt: new Date().toISOString() }
+				: t,
+		);
+		setSprint({ ...sprint, tasks: updatedTasks });
+
+		try {
+			await apiFetch(`/api/tasks/${taskId}`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ passes: newPasses }),
+			});
+		} catch (error) {
+			// Revert on failure
+			setSprint(sprint);
+			const message =
+				error instanceof Error ? error.message : "Failed to update task";
+			toast.error(message);
+			console.error("Task passes update error:", error);
+		}
+	};
+
 	const handleNewTask = () => {
 		const newTask: Task = {
 			id: `task-${Date.now()}`,
@@ -511,32 +573,76 @@ export default function SprintPage({
 	};
 
 	const handleSaveTask = async (task: Task) => {
-		if (!sprint) return;
-
-		const timestamp = new Date().toISOString();
-		const preparedTask = {
-			...task,
-			createdAt: task.createdAt || timestamp,
-			updatedAt: timestamp,
-		};
+		if (!sprint || !currentProject) return;
 
 		const tasks = sprint.tasks || [];
-		const existingIndex = tasks.findIndex((t) => t.id === preparedTask.id);
-		const updatedTasks = [...tasks];
+		const isNewTask = !tasks.some((t) => t.id === task.id);
 
-		if (existingIndex >= 0) {
-			updatedTasks[existingIndex] = preparedTask;
-		} else {
-			updatedTasks.push(preparedTask);
+		try {
+			if (isNewTask) {
+				// Create new task via sprint tasks endpoint
+				const res = await apiFetch(`/api/sprints/${sprint.id}/tasks`, {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						title: task.title,
+						description: task.description,
+						category: task.category,
+						priority: task.priority,
+						estimate: task.estimate,
+						acceptanceCriteria: task.acceptanceCriteria,
+						tags: task.tags,
+						status: task.status,
+					}),
+				});
+				const data = await res.json();
+
+				// Add new task to local state
+				setSprint((prev) => {
+					if (!prev) return prev;
+					return {
+						...prev,
+						tasks: [...(prev.tasks || []), data.task],
+					};
+				});
+				toast.success("Task created");
+			} else {
+				// Update existing task
+				const res = await apiFetch(`/api/tasks/${task.id}`, {
+					method: "PUT",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						title: task.title,
+						description: task.description,
+						category: task.category,
+						priority: task.priority,
+						estimate: task.estimate,
+						acceptanceCriteria: task.acceptanceCriteria,
+						tags: task.tags,
+						status: task.status,
+						failureNotes: task.failureNotes,
+					}),
+				});
+				const data = await res.json();
+
+				// Update task in local state
+				setSprint((prev) => {
+					if (!prev) return prev;
+					return {
+						...prev,
+						tasks: (prev.tasks || []).map((t) =>
+							t.id === task.id ? data.task : t,
+						),
+					};
+				});
+				toast.success("Task updated");
+			}
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : "Failed to save task";
+			toast.error(message);
+			console.error("Task save error:", error);
 		}
-
-		const updatedSprint = {
-			...sprint,
-			tasks: updatedTasks,
-			updatedAt: timestamp,
-		};
-
-		await handleUpdateSprint(updatedSprint);
 	};
 
 	const handleDeleteTask = async (taskId: string) => {
@@ -692,13 +798,13 @@ export default function SprintPage({
 	const actions = (
 		<div className="flex flex-wrap items-center gap-2">
 			<Button variant="outline" onClick={handleNewTask} disabled={sprintLocked}>
-				<PlusIcon className="w-4 h-4 mr-2" />
+				<PlusIcon className="w-4 h-4" />
 				New Task
 			</Button>
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
 					<Button variant="outline" disabled={sprintLocked}>
-						<SparkleIcon className="w-4 h-4 mr-2" />
+						<SparkleIcon className="w-4 h-4" />
 						AI Actions
 					</Button>
 				</DropdownMenuTrigger>
@@ -713,7 +819,7 @@ export default function SprintPage({
 				onClick={() => setSprintPropertiesOpen(true)}
 				disabled={sprintLocked}
 			>
-				<GearSixIcon className="w-4 h-4 mr-2" />
+				<GearSixIcon className="w-4 h-4" />
 				Properties
 			</Button>
 			{sprint?.sourcePrdId && (
@@ -721,12 +827,12 @@ export default function SprintPage({
 					variant="outline"
 					onClick={() => router.push(`/project/prds/${sprint.sourcePrdId}`)}
 				>
-					<FileTextIcon className="w-4 h-4 mr-2" />
+					<FileTextIcon className="w-4 h-4" />
 					Go to PRD
 				</Button>
 			)}
 			<Button variant="outline" onClick={() => router.push("/project/runs")}>
-				<ClockCounterClockwiseIcon className="w-4 h-4 mr-2" />
+				<ClockCounterClockwiseIcon className="w-4 h-4" />
 				Run History
 			</Button>
 			<Button
@@ -734,8 +840,8 @@ export default function SprintPage({
 				onClick={handleRunButtonClick}
 				disabled={runLoading}
 			>
-				<PlayCircleIcon className="w-4 h-4 mr-2" />
 				{isRunActive ? "Loop Running…" : "Run AI Loop"}
+				<PlayCircleIcon className="w-4 h-4" />
 			</Button>
 		</div>
 	);
@@ -791,8 +897,9 @@ export default function SprintPage({
 					>
 						<KanbanBoard
 							sprint={sprint}
-							onUpdateSprint={handleUpdateSprint}
+							onTaskStatusChange={handleTaskStatusChange}
 							onTaskClick={handleTaskClick}
+							onTogglePasses={handleTogglePasses}
 						/>
 					</div>
 				</div>

@@ -150,7 +150,7 @@ export function createRepoTools(adapter: RepoAdapter): Tool[] {
 					query: {
 						type: "string",
 						description:
-							"Text or regex to search for, e.g., 'useAuth', 'async function login', 'TODO:'",
+							"Text or regex (properly escaped) to search for, e.g., 'useAuth', 'async function login', 'TODO:'",
 					},
 					filePattern: {
 						type: "string",

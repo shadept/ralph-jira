@@ -170,9 +170,8 @@ export class ClaudeAgent extends Agent {
 									.map(([k, v]) => `${k}=${truncate(toRelative(v))}`)
 									.join(" ");
 							}
-							// Add newline before tool call for readability
 							await appendSandboxLog(
-								`\n\x1b[36m| ${block.name}${details ? ` ${details}` : ""}\x1b[0m`,
+								`\x1b[36m| ${block.name}${details ? ` ${details}` : ""}\x1b[0m\n`,
 							);
 						}
 					}
