@@ -128,3 +128,52 @@
 		@apply bg-background text-foreground;
 	}
 }
+
+/* MDXEditor styles */
+.mdx-editor-wrapper {
+	--accentBase: var(--primary);
+	--accentBgSubtle: var(--accent);
+	--accentSolid: var(--primary);
+	--accentText: var(--primary);
+	--accentTextContrast: var(--primary-foreground);
+	--baseBase: var(--background);
+	--baseBgSubtle: var(--muted);
+	--baseBorder: var(--border);
+	--baseSolid: var(--secondary);
+	--baseSolidHover: var(--accent);
+	--baseText: var(--foreground);
+	--baseTextContrast: var(--foreground);
+	font-family: var(--font-sans);
+}
+
+.mdx-editor-wrapper [class*="_toolbarRoot_"] {
+	background: var(--card);
+	border-color: var(--border);
+	border-radius: var(--radius);
+}
+
+.mdx-editor-wrapper [class*="_contentEditable_"] {
+	padding: 1rem;
+}
+
+.dark .mdx-editor-wrapper {
+	--baseBase: var(--background);
+	--baseBgSubtle: var(--muted);
+	--baseBorder: var(--border);
+}
+
+.dark .mdx-editor-wrapper [class*="_toolbarRoot_"] {
+	background: var(--card);
+}
+
+.dark .mdx-editor-wrapper [class*="_selectTrigger_"],
+.dark .mdx-editor-wrapper [class*="_toolbarToggleItem_"],
+.dark .mdx-editor-wrapper [class*="_iconButton_"] {
+	color: var(--foreground);
+}
+
+.dark .mdx-editor-wrapper [class*="_selectTrigger_"]:hover,
+.dark .mdx-editor-wrapper [class*="_toolbarToggleItem_"]:hover,
+.dark .mdx-editor-wrapper [class*="_iconButton_"]:hover {
+	background: var(--accent);
+}

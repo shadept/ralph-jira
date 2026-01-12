@@ -10,10 +10,21 @@ import {
 	TrashIcon,
 } from "@phosphor-icons/react";
 import { useForm } from "@tanstack/react-form";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
+import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { MarkdownEditorLoading } from "@/components/markdown-editor";
+
+// Dynamic import of MDXEditor to avoid SSR issues
+const MarkdownEditor = dynamic(
+	() => import("@/components/markdown-editor").then((mod) => mod.MarkdownEditor),
+	{
+		ssr: false,
+		loading: () => <MarkdownEditorLoading />,
+	}
+);
 import { PageHeader } from "@/components/layout/page-header";
 import { PrdEditorDialog } from "@/components/prd-editor-dialog";
 import { useProjectContext } from "@/components/projects/project-provider";
@@ -612,6 +623,13 @@ export default function PrdDetailPage() {
 	const [sprints, setSprints] = useState<Sprint[]>([]);
 	const [loadingSprints, setLoadingSprints] = useState(false);
 
+	// Content editing & auto-save states
+	const [editorContent, setEditorContent] = useState<string>("");
+	const [isSaving, setIsSaving] = useState(false);
+	const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+	const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const lastSavedContentRef = useRef<string>("");
+
 	const loadPrd = useCallback(async () => {
 		if (!currentProject || !prdId) {
 			setPrd(null);
@@ -666,6 +684,67 @@ export default function PrdDetailPage() {
 	useEffect(() => {
 		loadPrd();
 	}, [loadPrd]);
+
+	// Sync editor content when PRD loads
+	useEffect(() => {
+		if (prd) {
+			const content = prd.content ?? "";
+			setEditorContent(content);
+			lastSavedContentRef.current = content;
+			// Set initial lastSavedAt based on PRD updatedAt
+			if (prd.updatedAt) {
+				setLastSavedAt(new Date(prd.updatedAt));
+			}
+		}
+	}, [prd]);
+
+	// Auto-save content handler
+	const saveContent = useCallback(async (content: string) => {
+		if (!prd || content === lastSavedContentRef.current) return;
+
+		setIsSaving(true);
+		try {
+			const res = await apiFetch(`/api/prds/${prdId}`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					content,
+				}),
+			});
+			if (!res.ok) throw new Error("Failed to save content");
+			lastSavedContentRef.current = content;
+			setLastSavedAt(new Date());
+		} catch (error) {
+			console.error("Auto-save failed:", error);
+			toast.error("Failed to auto-save content");
+		} finally {
+			setIsSaving(false);
+		}
+	}, [apiFetch, prd, prdId]);
+
+	// Handle content change with debounced auto-save
+	const handleContentChange = useCallback((newContent: string) => {
+		setEditorContent(newContent);
+
+		// Clear existing timeout
+		if (saveTimeoutRef.current) {
+			clearTimeout(saveTimeoutRef.current);
+		}
+
+		// Set new timeout for auto-save (2 seconds after last change)
+		saveTimeoutRef.current = setTimeout(() => {
+			saveContent(newContent);
+		}, 2000);
+	}, [saveContent]);
+
+	// Cleanup timeout on unmount
+	useEffect(() => {
+		return () => {
+			if (saveTimeoutRef.current) {
+				clearTimeout(saveTimeoutRef.current);
+			}
+		};
+	}, []);
 
 	// Load sprints when generate tasks dialog opens
 	useEffect(() => {
@@ -1014,31 +1093,25 @@ export default function PrdDetailPage() {
 				{/* Main content - takes 3/4 on large screens */}
 				<div className="lg:col-span-3 space-y-6">
 					<Card>
-						<CardHeader>
+						<CardHeader className="flex flex-row items-center justify-between space-y-0">
 							<CardTitle>Content</CardTitle>
+							<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+								{isSaving ? (
+									<>
+										<span>Saving...</span>
+										<SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
+									</>
+								) : lastSavedAt ? (
+									<span>Last saved: {formatDistanceToNow(lastSavedAt, { addSuffix: true })}</span>
+								) : null}
+							</div>
 						</CardHeader>
 						<CardContent>
-							{prd.content ? (
-								<div className="prose dark:prose-invert max-w-none">
-									<pre className="whitespace-pre-wrap font-sans text-sm">
-										{prd.content}
-									</pre>
-								</div>
-							) : (
-								<div className="text-center py-8">
-									<p className="text-muted-foreground italic mb-4">
-										No content yet. Use AI to draft your PRD or add content manually.
-									</p>
-									<Button
-										variant="outline"
-										onClick={() => setDraftDialogOpen(true)}
-										disabled={aiLoading}
-									>
-										<SparkleIcon className="w-4 h-4 mr-2" />
-										Draft with AI
-									</Button>
-								</div>
-							)}
+							<MarkdownEditor
+								markdown={editorContent}
+								onChange={handleContentChange}
+								placeholder="Start writing your PRD content here... Use AI Actions to draft content."
+							/>
 						</CardContent>
 					</Card>
 				</div>
