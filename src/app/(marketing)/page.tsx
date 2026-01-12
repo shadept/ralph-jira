@@ -50,9 +50,9 @@ const features = [
 	},
 	{
 		icon: SparkleIcon,
-		title: "AI Assistant",
+		title: "AI Chat",
 		description:
-			"Chat with AI to manage your project, generate acceptance criteria, and get intelligent suggestions.",
+			"Ask Ralph to generate tasks, refine requirements, and guide next steps for your project.",
 	},
 	{
 		icon: CheckCircleIcon,
