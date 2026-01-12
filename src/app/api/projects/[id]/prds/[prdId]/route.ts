@@ -33,6 +33,13 @@ function formatPrd(prd: {
 	};
 }
 
+// Minimal sprint info for linked sprints
+interface LinkedSprint {
+	id: string;
+	name: string;
+	status: string;
+}
+
 export async function GET(
 	request: Request,
 	{ params }: { params: Promise<{ id: string; prdId: string }> },
@@ -56,7 +63,27 @@ export async function GET(
 			);
 		}
 
-		return NextResponse.json({ prd: formatPrd(prd) });
+		// Fetch sprints linked to this PRD (via sourcePrdId)
+		const linkedSprintsData = await prisma.sprint.findMany({
+			where: {
+				sourcePrdId: prdId,
+				projectId: project.id,
+			},
+			select: {
+				id: true,
+				name: true,
+				status: true,
+			},
+			orderBy: { createdAt: "desc" },
+		});
+
+		const linkedSprints: LinkedSprint[] = linkedSprintsData.map((sprint: { id: string; name: string; status: string }) => ({
+			id: sprint.id,
+			name: sprint.name,
+			status: sprint.status,
+		}));
+
+		return NextResponse.json({ prd: formatPrd(prd), linkedSprints });
 	} catch (error) {
 		console.error("Error fetching PRD:", error);
 		return handleProjectRouteError(error);

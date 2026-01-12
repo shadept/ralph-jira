@@ -6,6 +6,7 @@ import {
 	ArrowsClockwiseIcon,
 	CaretDownIcon,
 	CheckIcon,
+	LinkIcon,
 	PencilSimpleIcon,
 	PlusIcon,
 	SparkleIcon,
@@ -65,6 +66,7 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { Prd } from "@/lib/schemas";
+import type { LinkedSprint } from "@/lib/prds/server";
 
 // Dynamic import of MDXEditor to avoid SSR issues
 const MarkdownEditor = dynamic(
@@ -348,13 +350,20 @@ function ConvertToSprintDialog({
 interface PrdDetailClientProps {
 	initialPrd: Prd;
 	prdId: string;
+	initialLinkedSprints: LinkedSprint[];
 }
 
-export function PrdDetailClient({ initialPrd, prdId }: PrdDetailClientProps) {
+export function PrdDetailClient({
+	initialPrd,
+	prdId,
+	initialLinkedSprints,
+}: PrdDetailClientProps) {
 	const router = useRouter();
 	const { apiFetch } = useProjectContext();
 
 	const [prd, setPrd] = useState<Prd>(initialPrd);
+	const [linkedSprints, setLinkedSprints] =
+		useState<LinkedSprint[]>(initialLinkedSprints);
 
 	// Delete confirmation state
 	const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -400,6 +409,9 @@ export function PrdDetailClient({ initialPrd, prdId }: PrdDetailClientProps) {
 			}
 			const data = await res.json();
 			setPrd(data.prd);
+			if (data.linkedSprints) {
+				setLinkedSprints(data.linkedSprints);
+			}
 		} catch (error) {
 			toast.error("Failed to load PRD");
 			console.error(error);
@@ -669,6 +681,60 @@ export function PrdDetailClient({ initialPrd, prdId }: PrdDetailClientProps) {
 		setRefineDialogOpen(true);
 	};
 
+	// Render sprint action button based on linked sprints
+	const renderSprintAction = () => {
+		// No linked sprints - show "Convert to Sprint" button
+		if (linkedSprints.length === 0) {
+			return (
+				<Button
+					variant="default"
+					onClick={() => setConvertDialogOpen(true)}
+					disabled={isLoading}
+				>
+					<ArrowsClockwiseIcon className="w-4 h-4 mr-2" />
+					{convertLoading ? "Creating..." : "Convert to Sprint"}
+				</Button>
+			);
+		}
+
+		// Exactly one linked sprint - show "Go to Sprint" button
+		if (linkedSprints.length === 1) {
+			return (
+				<Button
+					variant="default"
+					onClick={() => router.push(`/project/sprints/${linkedSprints[0].id}`)}
+					disabled={isLoading}
+				>
+					<LinkIcon className="w-4 h-4 mr-2" />
+					Go to Sprint
+				</Button>
+			);
+		}
+
+		// Multiple linked sprints - show dropdown
+		return (
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Button variant="default" disabled={isLoading}>
+						<LinkIcon className="w-4 h-4 mr-2" />
+						Go to Sprint
+						<CaretDownIcon className="w-4 h-4 ml-2" />
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end">
+					{linkedSprints.map((sprint) => (
+						<DropdownMenuItem
+							key={sprint.id}
+							onClick={() => router.push(`/project/sprints/${sprint.id}`)}
+						>
+							{sprint.name}
+						</DropdownMenuItem>
+					))}
+				</DropdownMenuContent>
+			</DropdownMenu>
+		);
+	};
+
 	const actions = (
 		<div className="flex flex-wrap items-center gap-2">
 			<div className="flex">
@@ -736,6 +802,7 @@ export function PrdDetailClient({ initialPrd, prdId }: PrdDetailClientProps) {
 					{convertLoading ? "Creating..." : "Convert to Sprint"}
 				</Button>
 			)}
+			{renderSprintAction()}
 		</div>
 	);
 

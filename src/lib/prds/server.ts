@@ -2,8 +2,15 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type { Prd } from "@/lib/schemas";
 
+// Minimal sprint info for linked sprints
+export interface LinkedSprint {
+	id: string;
+	name: string;
+	status: string;
+}
+
 export type PrdLoadResult =
-	| { status: "success"; prd: Prd; projectId: string }
+	| { status: "success"; prd: Prd; projectId: string; linkedSprints: LinkedSprint[] }
 	| { status: "not_found" }
 	| { status: "unauthorized" }
 	| { status: "no_access" };
@@ -55,6 +62,26 @@ export async function loadPrdById(prdId: string): Promise<PrdLoadResult> {
 		return { status: "no_access" };
 	}
 
+	// Fetch sprints linked to this PRD (via sourcePrdId)
+	const linkedSprintsData = await prisma.sprint.findMany({
+		where: {
+			sourcePrdId: prdId,
+			projectId: prd.projectId,
+		},
+		select: {
+			id: true,
+			name: true,
+			status: true,
+		},
+		orderBy: { createdAt: "desc" },
+	});
+
+	const linkedSprints: LinkedSprint[] = linkedSprintsData.map((sprint: { id: string; name: string; status: string }) => ({
+		id: sprint.id,
+		name: sprint.name,
+		status: sprint.status,
+	}));
+
 	// Format the PRD for the client
 	const formattedPrd: Prd = {
 		id: prd.id,
@@ -74,5 +101,6 @@ export async function loadPrdById(prdId: string): Promise<PrdLoadResult> {
 		status: "success",
 		prd: formattedPrd,
 		projectId: prd.projectId,
+		linkedSprints,
 	};
 }

@@ -57,5 +57,5 @@ export default async function PrdDetailPage({ params }: PrdDetailPageProps) {
 		);
 	}
 
-	return <PrdDetailClient initialPrd={result.prd} prdId={id} />;
+	return <PrdDetailClient initialPrd={result.prd} prdId={id} initialLinkedSprints={result.linkedSprints} />;
 }
